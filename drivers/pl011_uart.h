@@ -26,7 +26,7 @@ typedef struct __attribute__((__packed__)) {
 } PL011_Struct ;
 
 #define VIRT_UART ((PL011_Struct*) 0x09000000)
-#define VIRT_UART_VMEM ((PL011_Struct*) 0x09100000)
+#define VIRT_UART_VMEM ((PL011_Struct*) 0xFFFF000009100000)
 // #define VIRT_UART ((PL011_Struct*) 0x40000100)
 
 #define PL011_FR_RI (1 << 8)

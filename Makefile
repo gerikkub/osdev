@@ -40,6 +40,10 @@ COMP_DIR = $(TOOLS_DIR)/aarch64-none-elf/
 # source
 ######################################
 
+C_SRC_BOOTSTRAP = \
+bootstrap/main_bootstrap.c \
+bootstrap/vmem_bootstrap.c
+
 C_SRC_DRIVERS = \
 drivers/cortex_a57_gic.c \
 drivers/pl011_uart.c
@@ -50,17 +54,17 @@ kernel/console.c \
 kernel/exception.c \
 kernel/kmalloc.c \
 kernel/panic.c \
-kernel/vmem.c \
-printf/printf.c
+kernel/vmem.c
 
 
 # C sources
-C_SOURCES = ${C_SRC_KERNEL} ${C_SRC_DRIVERS}
+C_SOURCES = ${C_SRC_BOOTSTRAP} ${C_SRC_KERNEL} ${C_SRC_DRIVERS}
 
 
 # ASM sources
 ASM_SOURCES =  \
-multiboot/start.s \
+bootstrap/start.s \
+kernel/high_start.s \
 kernel/exception_asm.s
 
 
@@ -124,7 +128,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 # LDFLAGS
 #######################################
 # link script
-LDSCRIPT = multiboot/multiboot.ld
+LDSCRIPT = kernel.ld
 
 # libraries
 LIBS =
@@ -174,7 +178,7 @@ clean:
 
 
 run: $(BUILD_DIR)/$(TARGET).elf
-	qemu-system-aarch64 -M virt -cpu cortex-a72 -nographic -kernel $<
+	qemu-system-aarch64 -M virt -cpu cortex-a72 -nographic -s -kernel $<
 
 debug: $(BUILD_DIR)/$(TARGET).elf
 	qemu-system-aarch64 -M virt -cpu cortex-a72 -nographic -S -s -kernel $<

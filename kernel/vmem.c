@@ -222,13 +222,18 @@ void vmem_map_range_flat(_vmem_table* table_ptr, addr_phy_t addr_lo, addr_phy_t 
 
     ASSERT((addr_lo & 0xFFF) == 0)
     ASSERT((addr_hi & 0xFFF) == 0)
-    ASSERT(addr_lo < addr_hi);
+    ASSERT(addr_lo <= addr_hi);
 
     addr_phy_t addr_map = addr_lo;
 
-    // For each page, map the physical address to an indentical virtual address
-    for (addr_map = addr_lo; addr_map < addr_hi; addr_map += 0x1000) {
-        vmem_map_address(table_ptr, addr_map, addr_map, ap_flags, VMEM_ATTR_MEM);
+    if (addr_lo == addr_hi) {
+        vmem_map_address(table_ptr, addr_lo, addr_lo, ap_flags, VMEM_ATTR_MEM);
+    } else {
+
+        // For each page, map the physical address to an indentical virtual address
+        for (addr_map = addr_lo; addr_map < addr_hi; addr_map += 0x1000) {
+            vmem_map_address(table_ptr, addr_map, addr_map, ap_flags, VMEM_ATTR_MEM);
+        }
     }
 }
 
@@ -243,21 +248,28 @@ _vmem_table* vmem_create_kernel_map(void) {
                               VMEM_AP_P_E;
 
     // Map text, data, bss. Page alignment guarenteed by the linker script
-    vmem_map_range_flat(level0_table_ptr, (addr_phy_t)&_text_start, (addr_phy_t)&_text_end, ap_flags);
-    vmem_map_range_flat(level0_table_ptr, (addr_phy_t)&_data_start, (addr_phy_t)&_data_end, ap_flags);
-    vmem_map_range_flat(level0_table_ptr, (addr_phy_t)&_bss_start, (addr_phy_t)&_bss_end, ap_flags);
+    vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_text_start) & 0xFFFFFFFF, ((addr_phy_t)&_text_end) & 0xFFFFFFFF, ap_flags);
+    vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_data_start) & 0xFFFFFFFF, ((addr_phy_t)&_data_end) & 0xFFFFFFFF, ap_flags);
+    vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_bss_start) & 0xFFFFFFFF, ((addr_phy_t)&_bss_end) & 0xFFFFFFFF, ap_flags);
 
     return level0_table_ptr;
 }
 
-void vmem_set_l0_table(_vmem_table* table_ptr) {
+void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr) {
 
-    ASSERT(table_ptr != NULL);
+    ASSERT(kernel_ptr != NULL);
+    ASSERT(user_ptr != NULL);
 
-    uint64_t ttbr0_el1 = ((uintptr_t)table_ptr) | 
+    uint64_t ttbr0_el1 = ((uintptr_t)user_ptr) | 
                           0;
 
+    uint64_t ttbr1_el1 = ((uintptr_t)kernel_ptr) | 
+                          0;
+
+    asm ("DSB SY");
+
     WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
+    WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
 
 }
 

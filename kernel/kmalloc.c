@@ -29,9 +29,14 @@ static uint64_t s_last_memblock = 0;
 
 extern uint8_t _data_start;
 extern uint8_t _bss_end;
+extern uint8_t _heap_base;
+extern uint8_t _heap_limit;
+
+static uintptr_t s_next_ptr;
 
 void kmalloc_init(void) {
 
+    /*
     uint64_t elfmem = (uint64_t)((&_bss_end) - (&_data_start));
     uint64_t elfpages = PAGES(elfmem);
 
@@ -44,6 +49,9 @@ void kmalloc_init(void) {
     s_memblocks[1].flags = 0;
 
     s_last_memblock = 1;
+    */
+
+    s_next_ptr = (uintptr_t)&_heap_base;
 }
 
 uint8_t* kmalloc_phy(uint64_t bytes) {
@@ -52,6 +60,13 @@ uint8_t* kmalloc_phy(uint64_t bytes) {
     uint64_t idx = 0;
     bool found_mem = false;
 
+    uintptr_t return_ptr = s_next_ptr;
+    s_next_ptr += pagebytes;
+    ASSERT(s_next_ptr <= (uint64_t)&_heap_limit);
+
+    return (uint8_t*)s_next_ptr;
+
+    /*
     while (!found_mem) {
         if (pagebytes <= s_memblocks[idx].size &&
             !(s_memblocks[idx].flags & MEMBLOCK_FLAG_ALLOCATED)) {
@@ -76,10 +91,12 @@ uint8_t* kmalloc_phy(uint64_t bytes) {
 
     s_memblocks[idx].flags |= MEMBLOCK_FLAG_ALLOCATED;
     return s_memblocks[idx].ptr;
+    */
 }
 
 void kfree_phy(uint8_t* ptr) {
 
+    /*
     uint64_t idx;
     for (idx = 0; idx < s_last_memblock; idx++) {
         if (s_memblocks[idx].ptr == ptr) {
@@ -90,4 +107,5 @@ void kfree_phy(uint8_t* ptr) {
     ASSERT(idx < s_last_memblock)
 
     s_memblocks[idx].flags &= ~(MEMBLOCK_FLAG_ALLOCATED);
+    */
 }

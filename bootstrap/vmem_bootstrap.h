@@ -1,6 +1,10 @@
 
-#ifndef __VMEM_H__
-#define __VMEM_H__
+#ifndef __VMEM_BOOTSTRAP_H__
+#define __VMEM_BOOTSTRAP_H__
+
+#ifdef __VMEM_H__
+#error "Both vmem.h and vmem_bootstrap.h have been defined"
+#endif
 
 #include <stdint.h>
 
@@ -107,10 +111,9 @@ typedef enum {
 } vmem_attr_t;
 
 
-_vmem_table* vmem_allocate_empty_table(void);
 void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
 _vmem_table* vmem_create_kernel_map(void);
-void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr);
+void vmem_set_l0_table(_vmem_table* table_ptr);
 void vmem_initialize(void);
 void vmem_enable_translations(void);
 void vmem_print_l0_table(_vmem_table* table_ptr);
