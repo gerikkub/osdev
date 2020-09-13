@@ -13,7 +13,7 @@
 
 void gtimer_init(void);
 
-void gtimer_start_downtimer(int32_t downcount);
+void gtimer_start_downtimer(int32_t downcount, bool enable_interrupt);
 
 bool gtimer_downtimer_triggered(void);
 

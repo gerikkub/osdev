@@ -10,7 +10,7 @@
 typedef void (*exception_handler)(uint32_t vector, uint32_t esr);
 
 exception_handler get_sync_handler(uint32_t ec);
-void set_sync_handler(uint32_t ec, exception_handler);
+void set_sync_handler(uint32_t ec, exception_handler handler);
 
 void exception_init();
 

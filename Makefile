@@ -57,7 +57,8 @@ kernel/kmalloc.c \
 kernel/panic.c \
 kernel/vmem.c \
 kernel/pagefault.c \
-kernel/gtimer.c
+kernel/gtimer.c \
+kernel/gic.c
 
 
 # C sources
@@ -181,10 +182,10 @@ clean:
 
 
 run: $(BUILD_DIR)/$(TARGET).elf
-	qemu-system-aarch64 -M virt -cpu cortex-a72 -nographic -s -kernel $<
+	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $<
 
 debug: $(BUILD_DIR)/$(TARGET).elf
-	qemu-system-aarch64 -M virt -cpu cortex-a72 -nographic -S -s -kernel $<
+	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $<
 
 .PHONY: run debug
 

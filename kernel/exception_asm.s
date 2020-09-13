@@ -17,8 +17,17 @@
 
 .macro generic_exception name impl
 \name :
-    b \impl
-.rept 31
+    stp x9, x10, [sp], #-16
+    stp x11, x12, [sp], #-16
+    stp x13, x14, [sp], #-16
+    stp x15, xzr, [sp], #-16
+    bl \impl
+    ldp x15, xzr, [sp, #0]!
+    ldp x13, x14, [sp, #0]!
+    ldp x11, x12, [sp, #0]!
+    ldp x9, x10, [sp, #0]!
+    eret
+.rept 22
 .word 0
 .endr
 .endm

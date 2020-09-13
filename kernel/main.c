@@ -11,9 +11,12 @@
 #include "kernel/vmem.h"
 #include "kernel/pagefault.h"
 #include "kernel/gtimer.h"
+#include "kernel/gic.h"
 
 
 static volatile uint32_t dummy_mem = 1;
+
+extern volatile uint8_t gic_got_irq;
 
 void main() {
 
@@ -32,8 +35,10 @@ void main() {
                               VMEM_AP_P_W |
                               VMEM_AP_P_E;
 
-    vmem_map_address(vmem_l0_table, (addr_phy_t)VIRT_UART, (addr_virt_t)VIRT_UART, ap_flags, VMEM_ATTR_DEVICE);
+    //vmem_map_address(vmem_l0_table, (addr_phy_t)VIRT_UART, (addr_virt_t)VIRT_UART, ap_flags, VMEM_ATTR_DEVICE);
     vmem_map_address(vmem_l0_table, (addr_phy_t)VIRT_UART, (addr_virt_t)VIRT_UART_VMEM, ap_flags, VMEM_ATTR_DEVICE);
+    vmem_map_address(vmem_l0_table, (addr_phy_t)GICD_BASE_PHYS, (addr_virt_t)GICD_BASE_VIRT, ap_flags, VMEM_ATTR_DEVICE);
+    vmem_map_address(vmem_l0_table, (addr_phy_t)GICC_BASE_PHYS, (addr_virt_t)GICC_BASE_VIRT, ap_flags, VMEM_ATTR_DEVICE);
 
     _vmem_table* dummy_user_table = vmem_allocate_empty_table();
 
@@ -43,13 +48,20 @@ void main() {
 
     gtimer_init();
 
+    gic_init();
+    gic_enable_intid(30);
+    gic_enable();
+
+
     while (1) {
 
-        gtimer_start_downtimer(62500000);
+        gtimer_start_downtimer(62500000, true);
 
-        while (!gtimer_downtimer_triggered()) {
-
+        while (gic_got_irq == 0) {
         }
+
         console_write("Tiggered\n");
+
+        gic_got_irq = 0;
     }
 }
