@@ -4,7 +4,7 @@
 #include "drivers/pl011_uart.h"
 
 void console_putc(char c) {
-    pl011_putc(VIRT_UART, c);
+    pl011_putc(VIRT_UART_VMEM, c);
 }
 
 void console_endl(void) {
@@ -12,7 +12,7 @@ void console_endl(void) {
 }
 
 void console_write(char* s) {
-    pl011_puts(VIRT_UART, s);
+    pl011_puts(VIRT_UART_VMEM, s);
 }
 
 void console_write_unum(uint64_t num) {
@@ -62,7 +62,7 @@ void console_write_hex(uint64_t hex) {
 
 void console_write_hex_fixed(uint64_t hex, uint8_t digits) {
     const char* hex_lookup = "0123456789abcdef";
-    uint8_t idx = digits;
+    uint8_t idx = digits - 1;
 
     do {
         console_putc(hex_lookup[(hex >> (idx*4)) & 0xF]);

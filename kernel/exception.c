@@ -1,6 +1,9 @@
 
 #include <stdint.h>
+#include <stdbool.h>
 
+#include "kernel/bitutils.h"
+#include "kernel/exception.h"
 #include "kernel/panic.h"
 
 void unhandled_exception(uint64_t exception_num) {
@@ -8,7 +11,20 @@ void unhandled_exception(uint64_t exception_num) {
 }
 
 void exception_handler_sync(void) {
-    panic("Exception", 0, "Sync");
+
+    uint64_t esr;
+
+    READ_SYS_REG(ESR_EL1, esr);
+
+    uint64_t ec = (esr >> 26) & 0x3F;
+
+    exception_handler handler = get_sync_handler(ec);
+
+    if (handler == 0) {
+        panic("Exception", 0, "Sync");
+    } else {
+        handler(0, esr);
+    }
 }
 
 void exception_handler_sync_lower(void) {

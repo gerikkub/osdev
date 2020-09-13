@@ -9,12 +9,13 @@
 #include "kernel/assert.h"
 #include "kernel/exception.h"
 #include "kernel/vmem.h"
+#include "kernel/pagefault.h"
+#include "kernel/gtimer.h"
 
 
 static volatile uint32_t dummy_mem = 1;
 
 void main() {
-
 
     kmalloc_init();
 
@@ -22,6 +23,7 @@ void main() {
 
     pl011_puts(VIRT_UART, "Hello World!\n");
 
+    pagefault_init();
     exception_init();
 
     _vmem_table* vmem_l0_table = vmem_create_kernel_map();
@@ -38,7 +40,16 @@ void main() {
     vmem_set_tables(vmem_l0_table, dummy_user_table);
 
     pl011_puts(VIRT_UART_VMEM, "UART_VMEM is Mapped!\n");
-    
+
+    gtimer_init();
+
     while (1) {
+
+        gtimer_start_downtimer(62500000);
+
+        while (!gtimer_downtimer_triggered()) {
+
+        }
+        console_write("Tiggered\n");
     }
 }

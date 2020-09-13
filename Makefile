@@ -52,9 +52,12 @@ C_SRC_KERNEL = \
 kernel/main.c \
 kernel/console.c \
 kernel/exception.c \
+kernel/exception_handler_table.c \
 kernel/kmalloc.c \
 kernel/panic.c \
-kernel/vmem.c
+kernel/vmem.c \
+kernel/pagefault.c \
+kernel/gtimer.c
 
 
 # C sources
@@ -108,7 +111,7 @@ C_DEFS = -I .
 AS_INCLUDES = 
 
 # C includes
-C_INCLUDES = -DPRINTF_INCLUDE_CONFIG_H
+C_INCLUDES = 
 
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections

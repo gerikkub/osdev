@@ -6,6 +6,8 @@
 
 #define BIT(x) (1UL << (x))
 
+#define BITSIZE(x) BIT(x)
+
 #define WRITE_SYS_REG(reg, x) \
     asm ("msr " # reg ", %[value]" : : [value] "r" (x))
 

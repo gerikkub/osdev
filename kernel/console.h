@@ -2,6 +2,7 @@
 #define __CONSOLE_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 void console_putc(char c);
 void console_endl(void);
