@@ -5,6 +5,7 @@ build/
 *.elf
 *.bin
 *.map
+*.swp
 
 
 .gdb_history
