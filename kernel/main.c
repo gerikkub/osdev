@@ -12,11 +12,29 @@
 #include "kernel/pagefault.h"
 #include "kernel/gtimer.h"
 #include "kernel/gic.h"
+#include "kernel/task.h"
 
 
-static volatile uint32_t dummy_mem = 1;
+static volatile uint8_t timer_irq_fired;
 
-extern volatile uint8_t gic_got_irq;
+void timer_handler(uint32_t intid) {
+
+    // Turn off the timer
+    uint32_t zero;
+    WRITE_SYS_REG(CNTP_CTL_EL0, zero);
+
+    timer_irq_fired = 1;
+}
+
+void my_task(void* ctx) {
+
+    pl011_puts(VIRT_UART_VMEM, "In Thread!\n");
+
+
+    volatile uint8_t* bad_ptr = 0;
+
+    *bad_ptr;
+}
 
 void main() {
 
@@ -48,6 +66,21 @@ void main() {
 
     gtimer_init();
 
+
+    task_init();
+
+    uint64_t tid = create_task(4096, my_task, NULL, NULL, true);
+
+    restore_context(tid);
+
+    console_write("Should not get here\n");
+
+
+    create_task(4096, my_task, NULL, NULL, true);
+
+
+    gic_set_irq_handler(timer_handler, 30);
+
     gic_init();
     gic_enable_intid(30);
     gic_enable();
@@ -55,13 +88,13 @@ void main() {
 
     while (1) {
 
+        timer_irq_fired = 0;
+
         gtimer_start_downtimer(62500000, true);
 
-        while (gic_got_irq == 0) {
+        while (timer_irq_fired == 0) {
         }
 
         console_write("Tiggered\n");
-
-        gic_got_irq = 0;
     }
 }

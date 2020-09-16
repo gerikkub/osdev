@@ -6,15 +6,19 @@
 
 #include "kernel/bitutils.h"
 
+typedef void (*irq_handler)(uint32_t intid);
+
 void gic_init(void);
 
 void gic_enable(void);
 
+void gic_set_irq_handler(irq_handler handler, uint32_t intid);
 void gic_enable_intid(uint32_t intid);
 void gic_disable_intid(uint32_t intid);
 
-typedef void (*irq_handler)(uint32_t intid);
+void gic_irq_handler(uint32_t vector);
 
+#define GIC_MAX_IRQS (1024)
 
 #define GIC_MAX_IRQ_WORDS (0x80/4)
 #define GIC_MAX_SGI_WORDS (0x10/4)

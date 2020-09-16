@@ -6,7 +6,7 @@
 #include "kernel/exception.h"
 #include "kernel/assert.h"
 
-static exception_handler s_sync_handlers[NUM_EXCEPTION_EC] = {0};
+static sync_handler s_sync_handlers[NUM_EXCEPTION_EC] = {0};
 
 
 exception_handler get_sync_handler(uint32_t ec) {
@@ -16,7 +16,7 @@ exception_handler get_sync_handler(uint32_t ec) {
     return s_sync_handlers[ec];
 }
 
-void set_sync_handler(uint32_t ec, exception_handler handler) {
+void set_sync_handler(uint32_t ec, sync_handler handler) {
 
     ASSERT(ec < NUM_EXCEPTION_EC);
     ASSERT(s_sync_handlers[ec] == NULL);

@@ -58,7 +58,8 @@ kernel/panic.c \
 kernel/vmem.c \
 kernel/pagefault.c \
 kernel/gtimer.c \
-kernel/gic.c
+kernel/gic.c \
+kernel/task.c
 
 
 # C sources

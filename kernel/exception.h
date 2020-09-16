@@ -7,10 +7,11 @@
 
 #define NUM_EXCEPTION_EC (BITSIZE(9))
 
-typedef void (*exception_handler)(uint32_t vector, uint32_t esr);
+typedef void (*exception_handler)(uint64_t vector);
+typedef void (*sync_handler)(uint64_t vector, uint64_t esr);
 
 exception_handler get_sync_handler(uint32_t ec);
-void set_sync_handler(uint32_t ec, exception_handler handler);
+void set_sync_handler(uint32_t ec, sync_handler handler);
 
 void exception_init();
 

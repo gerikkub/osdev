@@ -249,7 +249,10 @@ _vmem_table* vmem_create_kernel_map(void) {
 
     // Map text, data, bss. Page alignment guarenteed by the linker script
     vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_text_start) & 0xFFFFFFFF, ((addr_phy_t)&_text_end) & 0xFFFFFFFF, ap_flags);
-    vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_data_start) & 0xFFFFFFFF, ((addr_phy_t)&_data_end) & 0xFFFFFFFF, ap_flags);
+
+    if (((addr_phy_t)&_data_start) != ((addr_phy_t)&_data_end)) {
+        vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_data_start) & 0xFFFFFFFF, ((addr_phy_t)&_data_end) & 0xFFFFFFFF, ap_flags);
+    }
     vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_bss_start) & 0xFFFFFFFF, ((addr_phy_t)&_bss_end) & 0xFFFFFFFF, ap_flags);
 
     return level0_table_ptr;

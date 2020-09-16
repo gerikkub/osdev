@@ -7,8 +7,20 @@
 #include "kernel/assert.h"
 #include "kernel/console.h"
 
+static irq_handler s_irq_handlers[GIC_MAX_IRQS] = {0};
+
 void gic_init(void) {
 
+}
+
+void gic_set_irq_handler(irq_handler handler, uint32_t intid) {
+
+    ASSERT(handler != NULL);
+    ASSERT(intid < GIC_MAX_IRQS);
+
+    ASSERT(s_irq_handlers[intid] == NULL);
+
+    s_irq_handlers[intid] = handler;
 }
 
 void gic_enable(void) {
@@ -27,7 +39,7 @@ void gic_enable(void) {
 
 void gic_enable_intid(uint32_t intid) {
 
-    ASSERT(intid < (GIC_MAX_IRQ_WORDS * 32));
+    ASSERT(intid < GIC_MAX_IRQS);
 
     uint32_t intid_word = intid / 32;
     uint32_t intid_bit = intid % 32;
@@ -37,15 +49,13 @@ void gic_enable_intid(uint32_t intid) {
 
 void gic_disable_intid(uint32_t intid) {
 
-    ASSERT(intid < (GIC_MAX_IRQ_WORDS * 32));
+    ASSERT(intid < GIC_MAX_IRQS);
 
     uint32_t intid_word = intid / 32;
     uint32_t intid_bit = intid % 32;
 
     GICD_BASE_VIRT->icenabler[intid_word] = BIT(intid_bit);
 }
-
-volatile uint8_t gic_got_irq = 0;
 
 void gic_irq_handler(uint32_t vector) {
 
@@ -56,16 +66,10 @@ void gic_irq_handler(uint32_t vector) {
 
     GICD_BASE_VIRT->icpendr[intid_word] = BIT(intid_bit);
 
-    uint32_t zero = 0;
-    WRITE_SYS_REG(CNTP_CTL_EL0, zero);
+    if (s_irq_handlers[intid] != NULL) {
+        s_irq_handlers[intid](intid);
+    }
 
     GICC_BASE_VIRT->eoir = intid;
-
-    gic_got_irq = 1;
-
-    //console_write("Got IRQ ");
-    //console_write_num(intid);
-    //console_endl();
-
-    //gtimer_start_downtimer(62500000, true);
 }
+
