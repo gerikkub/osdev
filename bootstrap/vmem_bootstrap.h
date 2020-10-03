@@ -111,12 +111,6 @@ typedef enum {
 } vmem_attr_t;
 
 
-void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
-_vmem_table* vmem_create_kernel_map(void);
-void vmem_set_l0_table(_vmem_table* table_ptr);
-void vmem_initialize(void);
-void vmem_enable_translations(void);
-void vmem_print_l0_table(_vmem_table* table_ptr);
-
+void setup_vmem_bootstrap(void);
 
 #endif

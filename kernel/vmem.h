@@ -7,6 +7,7 @@
 #include "kernel/bitutils.h"
 
 #define VMEM_4K_TABLE_ENTRIES (1 << 9)
+#define VMEM_PAGE_SIZE (4096)
 
 typedef uint64_t _vmem_entry_invalid_t;
 typedef uint64_t _vmem_entry_block_t ;
@@ -90,15 +91,15 @@ typedef uint64_t _vmem_ap_flags;
 #define VMEM_AP_ALLOW_UX(x) (((x) & VMEM_AP_U_E) != 0)
 #define VMEM_AP_ALLOW_PX(x) (((x) & VMEM_AP_P_E) != 0)
 
-#define VMEM_AP_EXTRACT(x) (0) //TODO
+#define VMEM_AP_EXTRACT(x) ((x & 0x3) << 6)
 
 enum {
-    VMEM_AP_U_R = 1,
-    VMEM_AP_U_W = 2,
+    VMEM_AP_P_RW = 0,
+    VMEM_AP_U_RW = 1,
+    VMEM_AP_P_RO = 2,
+    VMEM_AP_U_RO = 3,
     VMEM_AP_U_E = 4,
-    VMEM_AP_P_R = 8,
-    VMEM_AP_P_W = 16,
-    VMEM_AP_P_E = 32
+    VMEM_AP_P_E = 8
 };
 
 typedef enum {
@@ -109,6 +110,7 @@ typedef enum {
 
 _vmem_table* vmem_allocate_empty_table(void);
 void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
+void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
 _vmem_table* vmem_create_kernel_map(void);
 void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr);
 void vmem_initialize(void);

@@ -34,7 +34,7 @@ SOURCE_DIR := $(shell pwd)
 
 TOOLS_DIR = $(SOURCE_DIR)/../tools
 
-COMP_DIR = $(TOOLS_DIR)/aarch64-none-elf/
+COMP_DIR = $(TOOLS_DIR)/compiler/
 
 ######################################
 # source
@@ -59,7 +59,10 @@ kernel/vmem.c \
 kernel/pagefault.c \
 kernel/gtimer.c \
 kernel/gic.c \
-kernel/task.c
+kernel/task.c \
+kernel/syscall.c \
+kernel/memoryspace.c \
+kernel/kernelspace.c
 
 
 # C sources
@@ -83,7 +86,7 @@ CC = $(COMP_DIR)/bin/$(PREFIX)-gcc
 AS = $(COMP_DIR)/bin/$(PREFIX)-gcc -x assembler-with-cpp
 CP = $(COMP_DIR)/bin/$(PREFIX)-objcopy
 SZ = $(COMP_DIR)/bin/$(PREFIX)-size
-LD = $(COMP_DIR)/bin/$(PREFIX)-ld
+LD = $(COMP_DIR)/bin/$(PREFIX)-gcc
 BIN = $(CP) -O binary -S
  
 #######################################
@@ -118,7 +121,7 @@ C_INCLUDES =
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
-CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT)
+CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -ffreestanding -Wall -Werror
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
@@ -136,9 +139,9 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 LDSCRIPT = kernel.ld
 
 # libraries
-LIBS =
+LIBS = -lc
 LIBDIR = 
-LDFLAGS = $(MCU) -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Map=$(BUILD_DIR)/$(TARGET).map --cref --no-dynamic-linker
+LDFLAGS = $(MCU) -Wl,-T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map -ffreestanding -nostdlib
 
 # default action: build all
 all: $(BUILD_DIR)/$(TARGET).elf

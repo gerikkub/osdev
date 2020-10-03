@@ -14,7 +14,7 @@ ram_base = 0x40000000;
 ram_size = 256M;
 flash_size = 0x7000000;
 
-heap_size = 64M;
+heap_size = 512K;
 
 
 SECTIONS

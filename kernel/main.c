@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "drivers/pl011_uart.h"
 
@@ -13,6 +14,9 @@
 #include "kernel/gtimer.h"
 #include "kernel/gic.h"
 #include "kernel/task.h"
+#include "kernel/syscall.h"
+#include "kernel/memoryspace.h"
+#include "kernel/kernelspace.h"
 
 
 static volatile uint8_t timer_irq_fired;
@@ -20,8 +24,7 @@ static volatile uint8_t timer_irq_fired;
 void timer_handler(uint32_t intid) {
 
     // Turn off the timer
-    uint32_t zero;
-    WRITE_SYS_REG(CNTP_CTL_EL0, zero);
+    WRITE_SYS_REG(CNTP_CTL_EL0, 0);
 
     timer_irq_fired = 1;
 }
@@ -30,6 +33,16 @@ void my_task(void* ctx) {
 
     pl011_puts(VIRT_UART_VMEM, "In Thread!\n");
 
+    char* hello_str = "Hello from syscall\n";
+    uint64_t hello_str_int = (uint64_t)hello_str;
+    uint64_t hello_size = strlen(hello_str);
+
+    asm("mov x0, %[arg1]\n \
+         mov x1, %[arg2]\n \
+         svc #1"
+         : : [arg1] "r" (hello_str_int), [arg2] "r" (hello_size));
+
+    pl011_puts(VIRT_UART_VMEM, "Back In Thread!!!\n");
 
     volatile uint8_t* bad_ptr = 0;
 
@@ -47,6 +60,7 @@ void main() {
     pagefault_init();
     exception_init();
 
+    /*
     _vmem_table* vmem_l0_table = vmem_create_kernel_map();
 
     _vmem_ap_flags ap_flags = VMEM_AP_P_R |
@@ -57,26 +71,60 @@ void main() {
     vmem_map_address(vmem_l0_table, (addr_phy_t)VIRT_UART, (addr_virt_t)VIRT_UART_VMEM, ap_flags, VMEM_ATTR_DEVICE);
     vmem_map_address(vmem_l0_table, (addr_phy_t)GICD_BASE_PHYS, (addr_virt_t)GICD_BASE_VIRT, ap_flags, VMEM_ATTR_DEVICE);
     vmem_map_address(vmem_l0_table, (addr_phy_t)GICC_BASE_PHYS, (addr_virt_t)GICC_BASE_VIRT, ap_flags, VMEM_ATTR_DEVICE);
+    */
+
+    memspace_init_kernelspace();
+    memory_entry_device_t virtuart_device = {
+       .start = (uint64_t)VIRT_UART_VMEM,
+       .end = (uint64_t)VIRT_UART_VMEM + VMEM_PAGE_SIZE - 1,
+       .type = MEMSPACE_DEVICE,
+       .flags = MEMSPACE_FLAG_PERM_KRW,
+       .phy_addr = (uint64_t)VIRT_UART
+    };
+
+    memory_entry_device_t gicd_device = {
+       .start = (uint64_t)GICD_BASE_VIRT,
+       .end = (uint64_t)GICD_BASE_VIRT + VMEM_PAGE_SIZE - 1,
+       .type = MEMSPACE_DEVICE,
+       .flags = MEMSPACE_FLAG_PERM_KRW,
+       .phy_addr = (uint64_t)GICD_BASE_PHYS
+    };
+
+    memory_entry_device_t gicc_device = {
+       .start = (uint64_t)GICC_BASE_VIRT,
+       .end = (uint64_t)GICC_BASE_VIRT + VMEM_PAGE_SIZE - 1,
+       .type = MEMSPACE_DEVICE,
+       .flags = MEMSPACE_FLAG_PERM_KRW,
+       .phy_addr = (uint64_t)GICC_BASE_PHYS
+    };
+
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&virtuart_device);
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicd_device);
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicc_device);
+
+    _vmem_table* kernel_vmem_table = memspace_build_kernel_vmem();
+
+    //vmem_print_l0_table(kernel_vmem_table);
 
     _vmem_table* dummy_user_table = vmem_allocate_empty_table();
 
-    vmem_set_tables(vmem_l0_table, dummy_user_table);
+    vmem_set_tables(kernel_vmem_table, dummy_user_table);
 
     pl011_puts(VIRT_UART_VMEM, "UART_VMEM is Mapped!\n");
 
     gtimer_init();
-
+    syscall_init();
 
     task_init();
 
-    uint64_t tid = create_task(4096, my_task, NULL, NULL, true);
+    uint64_t tid = create_kernel_task(4096, my_task, NULL);
 
-    restore_context(tid);
+    schedule();
 
+    (void)tid;
     console_write("Should not get here\n");
 
 
-    create_task(4096, my_task, NULL, NULL, true);
 
 
     gic_set_irq_handler(timer_handler, 30);

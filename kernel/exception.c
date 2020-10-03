@@ -11,13 +11,13 @@ void unhandled_exception(uint64_t exception_num) {
     panic("Exception", exception_num, "Unhandled exception");
 }
 
-void exception_handler_sync(vector) {
+void exception_handler_sync(uint64_t vector) {
 
-    uint64_t esr;
+    uint32_t esr;
 
     READ_SYS_REG(ESR_EL1, esr);
 
-    uint64_t ec = (esr >> 26) & 0x3F;
+    uint32_t ec = (esr >> 26) & 0x3F;
 
     sync_handler handler = get_sync_handler(ec);
 

@@ -45,6 +45,7 @@ _vmem_entry_t vmem_entry_block(uint16_t attr_hi, uint16_t attr_lo, uintptr_t add
                1;
     } else {
         ASSERT(0);
+        return 0;
     }
 }
 
@@ -75,6 +76,7 @@ uint64_t vmem_get_block_addr(_vmem_entry_block_t block, uint8_t block_level) {
         return block & 0xFFFFFFE00000;
     } else {
         ASSERT(0);
+        return 0;
     }
 }
 
@@ -216,6 +218,26 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
     level_3_table_ptr[level_3_idx] = vmem_entry_page(attr_hi, attr_lo, addr_phy);
 }
 
+void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt,
+                            uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr) {
+
+    // Lengths must be multiples of 4K
+    ASSERT((len & (VMEM_PAGE_SIZE - 1)) == 0);
+
+    uint64_t pages = len / VMEM_PAGE_SIZE;
+
+    ASSERT(pages > 0);
+
+    int idx;
+    for (idx = 0; idx < pages; idx++) {
+        vmem_map_address(table_ptr,
+                         addr_phy + (idx * VMEM_PAGE_SIZE),
+                         addr_virt + (idx * VMEM_PAGE_SIZE),
+                         ap_flags, mem_attr);
+    }
+
+}
+
 void vmem_map_range_flat(_vmem_table* table_ptr, addr_phy_t addr_lo, addr_phy_t addr_hi, _vmem_ap_flags ap_flags) {
 
     ASSERT(table_ptr != NULL);
@@ -239,6 +261,7 @@ void vmem_map_range_flat(_vmem_table* table_ptr, addr_phy_t addr_lo, addr_phy_t 
 
 _vmem_table* vmem_create_kernel_map(void) {
 
+/*
     _vmem_table* level0_table_ptr = vmem_allocate_empty_table();
 
     ASSERT(level0_table_ptr != NULL);
@@ -255,7 +278,8 @@ _vmem_table* vmem_create_kernel_map(void) {
     }
     vmem_map_range_flat(level0_table_ptr, ((addr_phy_t)&_bss_start) & 0xFFFFFFFF, ((addr_phy_t)&_bss_end) & 0xFFFFFFFF, ap_flags);
 
-    return level0_table_ptr;
+    return level0_table_ptr;*/
+    return NULL;
 }
 
 void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr) {
@@ -317,6 +341,32 @@ void vmem_enable_translations(void) {
     WRITE_SYS_REG(SCTLR_EL1, sctlr_el1);
 
     asm ("ISB");
+}
+
+void vmem_free_table(_vmem_table* table_ptr, uint64_t level) {
+
+    ASSERT(table_ptr != NULL);
+    ASSERT(level < 3);
+    uint64_t idx;
+
+    if (level < 2) {
+        for (idx = 0; idx < VMEM_4K_TABLE_ENTRIES; idx++) {
+            _vmem_entry_t entry = table_ptr[idx];
+            if (VMEM_ENTRY_IS_TABLE(entry)) {
+                _vmem_table* next_table = vmem_get_table_addr(entry);
+                vmem_free_table(next_table, level+1);
+                kfree_phy((uint8_t*)next_table);
+            }
+        }
+    } else {
+        for (idx = 0; idx < VMEM_4K_TABLE_ENTRIES; idx++) {
+            _vmem_entry_t entry = table_ptr[idx];
+            if (VMEM_ENTRY_IS_TABLE(entry)) {
+                _vmem_table* next_table = vmem_get_table_addr(entry);
+                kfree_phy((uint8_t*)next_table);
+            }
+        }
+    }
 }
 
 void vmem_print_l0_table(_vmem_table* table_ptr) {

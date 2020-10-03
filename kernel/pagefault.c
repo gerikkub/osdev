@@ -5,10 +5,15 @@
 #include "kernel/pagefault.h"
 #include "kernel/assert.h"
 #include "kernel/panic.h"
+#include "kernel/console.h"
 
-void pagefault_handler(uint32_t vector, uint32_t esr) {
+void pagefault_handler(uint64_t vector, uint32_t esr) {
 
     uint32_t ec = esr >> 26;
+
+    console_write("Pagefault in vector ");
+    console_write_hex(vector);
+    console_endl();
 
     switch (ec) {
         case EC_INST_ABORT_LOWER:

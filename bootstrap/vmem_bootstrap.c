@@ -26,6 +26,8 @@ static _vmem_entry_t vmem_entry_block_bootstrap(uint16_t attr_hi, uint16_t attr_
                ((_vmem_entry_block_t)attr_lo) |
                (((_vmem_entry_block_t)addr) & 0xFFFFFFE00000) |
                1;
+    } else {
+        return 0;
     }
 }
 
