@@ -57,7 +57,7 @@ void kmalloc_init(void) {
     //s_next_ptr = (uintptr_t)&_heap_base;
 }
 
-uint8_t* kmalloc_phy(uint64_t bytes) {
+void* kmalloc_phy(uint64_t bytes) {
 
     uint64_t pagebytes = PAGEMEM(bytes);
     uint64_t idx = 0;
@@ -95,7 +95,7 @@ uint8_t* kmalloc_phy(uint64_t bytes) {
     return s_memblocks[idx].ptr;
 }
 
-void kfree_phy(uint8_t* ptr) {
+void kfree_phy(void* ptr) {
 
     uint64_t idx;
     for (idx = 0; idx < s_last_memblock; idx++) {

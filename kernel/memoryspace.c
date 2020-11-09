@@ -43,7 +43,27 @@ bool memspace_add_entry_to_memory(memory_space_t* space, memory_entry_t* entry) 
     return true;
 }
 
-static _vmem_ap_flags mempspace_vmem_get_vmem_flags(uint32_t flags) {
+/*
+bool memspace_space_to_phy(memory_space_t* space, uintptr_t vmem_addr, uintptr_t* phy_addr) {
+    ASSERT(space != NULL);
+    ASSERT(space->entries != NULL);
+
+    for (int idx = 0; idx < space->num; idx++) {
+        memory_entry_t* entry = &space->entries[idx];
+        if (vmem_addr >= entry->start &&
+            vmem_addr < entry->end) {
+            uint64_t offset = vmem_addr - entry->start;
+            if (phy_addr != NULL) {
+                *phy_addr = vmem_addr + offset;
+            }
+            return true;
+        }
+    }
+
+    return false;
+} */
+
+static _vmem_ap_flags memspace_vmem_get_vmem_flags(uint32_t flags) {
 
     _vmem_ap_flags vmem_flags = 0;
 
@@ -79,9 +99,9 @@ static bool memspace_vmem_add_phy(_vmem_table* table, memory_entry_phy_t* entry)
 
     ASSERT(entry->start < entry->end);
 
-    uint64_t len = entry->end - entry->start + 1;
+    uint64_t len = entry->end - entry->start;
 
-    _vmem_ap_flags vmem_flags = mempspace_vmem_get_vmem_flags(entry->flags);
+    _vmem_ap_flags vmem_flags = memspace_vmem_get_vmem_flags(entry->flags);
 
     vmem_map_address_range(table,
                            entry->phy_addr,
@@ -97,9 +117,9 @@ static bool memspace_vmem_add_device(_vmem_table* table, memory_entry_device_t* 
 
     ASSERT(entry->start < entry->end);
 
-    uint64_t len = entry->end - entry->start + 1;
+    uint64_t len = entry->end - entry->start;
 
-    _vmem_ap_flags vmem_flags = mempspace_vmem_get_vmem_flags(entry->flags);
+    _vmem_ap_flags vmem_flags = memspace_vmem_get_vmem_flags(entry->flags);
     if ((vmem_flags & VMEM_AP_U_E) ||
         (vmem_flags & VMEM_AP_P_E)) {
         // Don't want to execute device memory
@@ -113,6 +133,31 @@ static bool memspace_vmem_add_device(_vmem_table* table, memory_entry_device_t* 
                            vmem_flags,
                            VMEM_ATTR_DEVICE);
 
+    return true;
+}
+
+static bool memspace_vmem_add_stack(_vmem_table* table, memory_entry_stack_t* entry) {
+
+    ASSERT(entry->start < entry->end);
+    ASSERT(entry->base > entry->start && entry->base <= entry->end);
+    ASSERT(entry->limit >= entry->start && entry->limit < entry->end);
+    ASSERT(entry->maxlimit >= entry->start && entry->maxlimit < entry->end);
+
+    _vmem_ap_flags vmem_flags = memspace_vmem_get_vmem_flags(entry->flags);
+    if ((vmem_flags & VMEM_AP_U_E) ||
+        (vmem_flags & VMEM_AP_P_E)) {
+        // Don't want to execute device memory
+        return false;
+    }
+
+    uint64_t len = entry->base - entry->limit;
+    vmem_map_address_range(table,
+                           entry->phy_addr,
+                           entry->limit,
+                           len,
+                           vmem_flags,
+                           VMEM_ATTR_MEM);
+                        
     return true;
 }
 
@@ -130,10 +175,20 @@ _vmem_table* memspace_build_vmem(memory_space_t* space) {
             case MEMSPACE_DEVICE:
                 memspace_vmem_add_device(l0_table, (memory_entry_device_t*)&space->entries[idx]);
                 break;
+            case MEMSPACE_STACK:
+                memspace_vmem_add_stack(l0_table, (memory_entry_stack_t*)&space->entries[idx]);
+                break;
             default:
                 ASSERT(0);
         }
     }
 
     return l0_table;
+}
+
+void memspace_deallocate(memory_space_t* space) {
+
+    //TODO: Implement this
+    // We can always download more RAM...
+
 }

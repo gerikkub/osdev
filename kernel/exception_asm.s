@@ -122,7 +122,7 @@
     # Return to previous context
     eret
 
-.rept 13
+.rept 12
 .word 0
 .endr
 .endm
@@ -255,8 +255,8 @@ dummy_exception curr_el_sp_X_fiq 6
 dummy_exception curr_el_sp_X_serror 7
 
 # Exception while in user space
-save_context_asm curr_el_sp_64_sync SP_EL0 8 exception_handler_sync
-save_context_asm_irq curr_el_sp_64_irq SP_EL0 9 exception_handler_irq
+save_context_asm lower_el_sp_64_sync SP_EL0 8 exception_handler_sync
+save_context_asm_irq lower_el_sp_64_irq SP_EL0 9 exception_handler_irq
 dummy_exception lower_el_64_fiq 10
 dummy_exception lower_el_64_serror 11
 

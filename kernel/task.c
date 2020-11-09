@@ -8,12 +8,16 @@
 #include "kernel/kmalloc.h"
 #include "kernel/vmem.h"
 #include "kernel/exception.h"
+#include "kernel/memoryspace.h"
+#include "kernel/kernelspace.h"
 
 static task_t s_task_list[MAX_NUM_TASKS] = {0};
 
 static uint64_t s_active_task_idx;
 
 static uint64_t s_max_tid;
+
+static _vmem_table* s_dummy_user_table;
 
 void switch_to_kernel_stack_asm(uint64_t vector,
                                 uint64_t cpu_sp,
@@ -22,6 +26,8 @@ void switch_to_kernel_stack_asm(uint64_t vector,
 
 void task_init(void) {
     s_max_tid = 1;
+
+    s_dummy_user_table = vmem_allocate_empty_table();
 }
 
 task_t* get_active_task(void) {
@@ -87,6 +93,8 @@ void restore_context(uint64_t tid) {
     uint64_t sp = task->reg.sp;
     WRITE_SYS_REG(SP_EL0, sp);
 
+    vmem_set_user_table(task->low_vm_table);
+
     restore_context_asm(&task->reg);
 
     ASSERT(1); // Should not reach
@@ -97,7 +105,7 @@ uint64_t create_task(uint64_t* user_stack_base,
                      uint64_t* kernel_stack_base,
                      uint64_t kernel_stack_size,
                      task_reg_t* reg,
-                     _vmem_table* vm_table,
+                     memory_space_t* memspace,
                      bool kernel_task) {
 
     ASSERT(kernel_stack_base != NULL);
@@ -135,23 +143,38 @@ uint64_t create_task(uint64_t* user_stack_base,
 
     task->reg = *reg;
 
-    // Setup a stack frame for a malformed task
+    if (memspace != NULL) {
+        task->memory = *memspace;
+        task->low_vm_table = memspace_build_vmem(memspace);
+    } else {
+        memory_space_t null_memspace = {
+            .entries = NULL,
+            .num = 0,
+            .maxnum = 0
+        };
+        task->memory = null_memspace;
+        task->low_vm_table = s_dummy_user_table;
+    }
+
     if (!kernel_task) {
-        user_stack_base[-1] = (uint64_t)bad_task_return;
-        user_stack_base[-2] = (uint64_t)&user_stack_base[-2];
+        bool walk_ok;
+        uintptr_t user_stack_base_kmem;
+        walk_ok = vmem_walk_table(task->low_vm_table, (uint64_t)user_stack_base - 8, &user_stack_base_kmem);
+        ASSERT(walk_ok);
+        uint64_t* user_stack_base_kmem_ptr = (uint64_t*)(user_stack_base_kmem + 8);
+
+        // Setup a stack frame for a malformed task
+        user_stack_base_kmem_ptr[-1] = (uint64_t)bad_task_return;
+        user_stack_base_kmem_ptr[-2] = (uint64_t)&user_stack_base_kmem_ptr[-2];
+
+        task->reg.sp = (uint64_t)&user_stack_base[-2];
+        task->reg.gp[TASK_REG_FP] = (uint64_t)&user_stack_base[-2];
+    } else {
+        task->reg.sp = (uint64_t)&kernel_stack_base[-2];
+        task->reg.gp[TASK_REG_FP] = (uint64_t)&kernel_stack_base[-2];
     }
     kernel_stack_base[-1] = (uint64_t)bad_task_return;
     kernel_stack_base[-2] = (uint64_t)&kernel_stack_base[-2];
-
-    if (kernel_task) {
-        task->reg.sp = (uint64_t)&kernel_stack_base[-2];
-        task->reg.gp[TASK_REG_FP] = (uint64_t)&kernel_stack_base[-2];
-    } else {
-        task->reg.sp = (uint64_t)&user_stack_base[-2];
-        task->reg.gp[TASK_REG_FP] = (uint64_t)&user_stack_base[-2];
-    }
-
-    task->low_vm_table = vm_table;
 
     return task->tid;
 }
@@ -169,6 +192,67 @@ uint64_t create_kernel_task(uint64_t stack_size,
     reg.elr = (uint64_t)task_entry;
 
     return create_task(NULL, 0, stack_ptr, stack_size, &reg, NULL, true);
+}
+
+uint64_t create_system_task(uint64_t kernel_stack_size,
+                            uintptr_t user_stack_base,
+                            uint64_t user_stack_size,
+                            memory_space_t* memspace,
+                            task_f task_entry,
+                            void* ctx) {
+
+    uint64_t* kernel_stack_ptr = (uint64_t*)kmalloc_phy(kernel_stack_size);
+    ASSERT(kernel_stack_ptr != NULL);
+
+    memory_entry_stack_t  kernel_stack_entry = {
+        .start = (uintptr_t)kernel_stack_ptr,
+        .end = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size),
+        .type = MEMSPACE_PHY,
+        .flags = MEMSPACE_FLAG_PERM_URW,
+        .phy_addr = KSPACE_TO_PHY((uintptr_t)kernel_stack_ptr & 0xFFFFFFFFFFFF),
+        .base = (uintptr_t)kernel_stack_ptr,
+        .limit = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size),
+        .maxlimit = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size)
+    };
+
+    bool memspace_result;
+    memspace_result = memspace_add_entry_to_kernel_memory((memory_entry_t*)&kernel_stack_entry);
+    if (!memspace_result) {
+        kfree_phy((uint8_t*)kernel_stack_ptr);
+        return 0;
+    }
+
+    task_reg_t reg;
+    reg.gp[TASK_REG(0)] = (uint64_t)ctx;
+    reg.spsr = TASK_SPSR_M(0); // EL0t SP
+    reg.elr = (uint64_t)task_entry;
+
+    return create_task((uint64_t*)user_stack_base, user_stack_size,
+                       (uint64_t*)kernel_stack_entry.base, kernel_stack_size,
+                       &reg, memspace, false);
+}
+
+uint64_t create_user_task(uint64_t user_stack_size,
+                            uint64_t kernel_stack_size,
+                            memory_space_t memspace,
+                            task_f task_entry,
+                            void* ctx){
+    return 0;
+    /*
+    uint64_t* user_stack_ptr = (uint64_t*)kmalloc_phy(user_stack_size);
+    ASSERT(user_stack_ptr != NULL);
+    uint64_t* kernel_stack_ptr = (uint64_t*)kmalloc_phy(kernel_stack_size);
+    ASSERT(kernel_stack_ptr != NULL);
+
+    task_reg_t reg;
+    reg.gp[TASK_REG(0)] = (uint64_t)ctx;
+    reg.spsr = TASK_SPSR_M(0); // EL0t SP
+    reg.elr = (uint64_t)task_entry;
+
+    return create_task(user_stack_ptr, stack_size,
+                       kernel_stack_ptr, stack_size,
+                       &reg, memspace, false);
+    */
 }
 
 void schedule(void) {

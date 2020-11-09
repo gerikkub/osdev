@@ -7,6 +7,7 @@
 #include "kernel/bitutils.h"
 #include "kernel/assert.h"
 #include "kernel/console.h"
+#include "kernel/kernelspace.h"
 
 
 #define VMEM_ENTRY_IS_INVALID(x) (((x) & 1) == 0)
@@ -138,7 +139,7 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
     } else {
         ASSERT(VMEM_ENTRY_IS_TABLE(level_0_entry));
 
-        level_1_table_ptr = vmem_get_table_addr(level_0_entry);
+        level_1_table_ptr = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(level_0_entry));
     }
 
     ASSERT(level_1_table_ptr != NULL);
@@ -164,7 +165,7 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
     } else {
         ASSERT(VMEM_ENTRY_IS_TABLE(level_1_entry));
 
-        level_2_table_ptr = vmem_get_table_addr(level_1_entry);
+        level_2_table_ptr = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(level_1_entry));
     }
 
     ASSERT(level_2_table_ptr != NULL);
@@ -190,7 +191,7 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
     } else {
         ASSERT(VMEM_ENTRY_IS_TABLE(level_2_entry));
 
-        level_3_table_ptr = vmem_get_table_addr(level_2_entry);
+        level_3_table_ptr = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(level_2_entry));
     }
 
     ASSERT(level_3_table_ptr != NULL);
@@ -297,7 +298,18 @@ void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr) {
 
     WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
     WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
+}
 
+void vmem_set_user_table(_vmem_table* user_ptr) {
+
+    ASSERT(user_ptr != NULL);
+
+    uint64_t ttbr0_el1 = ((uintptr_t)user_ptr) | 
+                          0;
+
+    asm ("DSB SY");
+
+    WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
 }
 
 void vmem_initialize(void) { 
@@ -367,6 +379,47 @@ void vmem_free_table(_vmem_table* table_ptr, uint64_t level) {
             }
         }
     }
+}
+
+bool vmem_walk_table(_vmem_table* table_ptr, uint64_t vmem_addr, uint64_t* phy_addr) {
+    
+    ASSERT(table_ptr != NULL);
+    
+    uint64_t l0_idx = (vmem_addr >> 39) & 0x1FF;
+    uint64_t l1_idx = (vmem_addr >> 30) & 0x1FF;
+    uint64_t l2_idx = (vmem_addr >> 21) & 0x1FF;
+    uint64_t l3_idx = (vmem_addr >> 12) & 0x1FF;
+    uint64_t page_offset = vmem_addr & 0xFFF;
+
+    _vmem_entry_t l0_entry = table_ptr[l0_idx];
+    if (!VMEM_ENTRY_IS_TABLE(l0_entry)) {
+        return false;
+    }
+    _vmem_table* l1_table = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(l0_entry));
+
+    _vmem_entry_t l1_entry = l1_table[l1_idx];
+    if (!VMEM_ENTRY_IS_TABLE(l1_entry)) {
+        return false;
+    }
+    _vmem_table* l2_table = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(l1_entry));
+
+    _vmem_entry_t l2_entry = l2_table[l2_idx];
+    if (!VMEM_ENTRY_IS_TABLE(l2_entry)) {
+        return false;
+    }
+    _vmem_table* l3_table = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(l2_entry));
+
+    _vmem_entry_t l3_entry = l3_table[l3_idx];
+    if (!VMEM_ENTRY_IS_PAGE(l3_entry)) {
+        return false;
+    }
+
+    uintptr_t page_addr = PHY_TO_KSPACE(vmem_get_page_addr(l3_entry));
+    if (phy_addr != NULL) {
+        *phy_addr = page_addr + page_offset;
+    }
+
+    return true;
 }
 
 void vmem_print_l0_table(_vmem_table* table_ptr) {

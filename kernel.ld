@@ -42,6 +42,7 @@ SECTIONS
         *(.exception_vector)
         . = ALIGN(4096);
         _text_end = .;
+        . = ALIGN(4096);
     }
 
     . = highmem_base + ram_base + bootstrap_data_size;
@@ -57,7 +58,6 @@ SECTIONS
 
     .bss (NOLOAD) :
     {
-        . = ALIGN(4096);
         _bss_start = .;
         *(.bss*)
         . = ALIGN(4096);

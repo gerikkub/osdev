@@ -12,6 +12,12 @@
 
 #define MAX_NUM_TASKS 1024
 
+#define TASK_STD_STACK_SIZE 8192
+#define KERNEL_STD_STACK_SIZE 8192
+
+#define GET_CURR_TID(x) \
+    READ_SYS_REG("TPIDR_EL1", x)
+
 typedef void (*task_f)(void* ctx);
 
 typedef struct __attribute__((packed)) {
@@ -26,12 +32,26 @@ typedef enum {
     TASK_WAIT
 } run_state_t;
 
+typedef enum {
+    WAIT_LOCK
+} wait_reason_t;
+
+typedef struct {
+    //lock_t* lock_ptr;
+    void* dummy;
+} wait_lock_t;
+
+typedef union {
+    wait_lock_t lock;
+} wait_ctx_t;
 
 typedef struct {
 
     uint32_t tid;
     uint8_t asid;
     run_state_t run_state;
+    wait_reason_t wait_reason;
+    wait_ctx_t wait_ctx;
 
     uint64_t* user_stack_base;
     uint64_t user_stack_size;
@@ -54,11 +74,19 @@ uint64_t create_task(uint64_t* user_stack_base,
                      uint64_t* kernel_stack_base,
                      uint64_t kernel_stack_size,
                      task_reg_t* reg,
-                     _vmem_table* vm_table,
+                     memory_space_t* vm_table,
                      bool kernel_task);
 uint64_t create_kernel_task(uint64_t stack_size, task_f task_entry, void* ctx);
-uint64_t create_user_task(uint64_t user_stack_size, uint64_t kernel_stack_size, task_f task_entry, void* ctx);
+uint64_t create_system_task(uint64_t kernel_stack_size,
+                            uintptr_t user_stack_base,
+                            uint64_t user_stack_size,
+                            memory_space_t* memspace,
+                            task_f task_entry,
+                            void* ctx);
+//uint64_t create_user_task(uint64_t user_stack_size, uint64_t kernel_stack_size, memory_space_t memspace, task_f task_entry, void* ctx);
 void restore_context_asm(task_reg_t* reg);
+
+void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx);
 
 void schedule(void);
 

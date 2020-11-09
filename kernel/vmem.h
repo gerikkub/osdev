@@ -9,6 +9,8 @@
 #define VMEM_4K_TABLE_ENTRIES (1 << 9)
 #define VMEM_PAGE_SIZE (4096)
 
+#define PAGE_CEIL(x) (((x) + VMEM_PAGE_SIZE - 1) & (~(VMEM_PAGE_SIZE - 1)))
+
 typedef uint64_t _vmem_entry_invalid_t;
 typedef uint64_t _vmem_entry_block_t ;
 typedef uint64_t _vmem_entry_table_t ;
@@ -113,8 +115,10 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
 void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
 _vmem_table* vmem_create_kernel_map(void);
 void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr);
+void vmem_set_user_table(_vmem_table* user_table);
 void vmem_initialize(void);
 void vmem_enable_translations(void);
+bool vmem_walk_table(_vmem_table* table_ptr, uint64_t vmem_addr, uint64_t* phy_addr);
 void vmem_print_l0_table(_vmem_table* table_ptr);
 
 

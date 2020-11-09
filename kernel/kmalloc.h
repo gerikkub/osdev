@@ -5,8 +5,8 @@
 
 void kmalloc_init(void);
 
-uint8_t* kmalloc_phy(uint64_t bytes);
+void* kmalloc_phy(uint64_t bytes);
 
-void kfree_phy(uint8_t* ptr);
+void kfree_phy(void* ptr);
 
 #endif

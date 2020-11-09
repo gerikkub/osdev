@@ -17,6 +17,7 @@
 #include "kernel/syscall.h"
 #include "kernel/memoryspace.h"
 #include "kernel/kernelspace.h"
+#include "kernel/modules.h"
 
 
 static volatile uint8_t timer_irq_fired;
@@ -74,9 +75,10 @@ void main() {
     */
 
     memspace_init_kernelspace();
+    memspace_init_systemspace();
     memory_entry_device_t virtuart_device = {
        .start = (uint64_t)VIRT_UART_VMEM,
-       .end = (uint64_t)VIRT_UART_VMEM + VMEM_PAGE_SIZE - 1,
+       .end = (uint64_t)VIRT_UART_VMEM + VMEM_PAGE_SIZE,
        .type = MEMSPACE_DEVICE,
        .flags = MEMSPACE_FLAG_PERM_KRW,
        .phy_addr = (uint64_t)VIRT_UART
@@ -84,7 +86,7 @@ void main() {
 
     memory_entry_device_t gicd_device = {
        .start = (uint64_t)GICD_BASE_VIRT,
-       .end = (uint64_t)GICD_BASE_VIRT + VMEM_PAGE_SIZE - 1,
+       .end = (uint64_t)GICD_BASE_VIRT + VMEM_PAGE_SIZE,
        .type = MEMSPACE_DEVICE,
        .flags = MEMSPACE_FLAG_PERM_KRW,
        .phy_addr = (uint64_t)GICD_BASE_PHYS
@@ -92,7 +94,7 @@ void main() {
 
     memory_entry_device_t gicc_device = {
        .start = (uint64_t)GICC_BASE_VIRT,
-       .end = (uint64_t)GICC_BASE_VIRT + VMEM_PAGE_SIZE - 1,
+       .end = (uint64_t)GICC_BASE_VIRT + VMEM_PAGE_SIZE,
        .type = MEMSPACE_DEVICE,
        .flags = MEMSPACE_FLAG_PERM_KRW,
        .phy_addr = (uint64_t)GICC_BASE_PHYS
@@ -103,8 +105,6 @@ void main() {
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicc_device);
 
     _vmem_table* kernel_vmem_table = memspace_build_kernel_vmem();
-
-    //vmem_print_l0_table(kernel_vmem_table);
 
     _vmem_table* dummy_user_table = vmem_allocate_empty_table();
 
@@ -117,11 +117,17 @@ void main() {
 
     task_init();
 
-    uint64_t tid = create_kernel_task(4096, my_task, NULL);
+    modules_init_list();
+    modules_start();
+
+    //uint64_t tid = create_kernel_task(4096, my_task, NULL);
+    //task_f ext2_task_ptr;
+    //GET_ABS_SYM(ext2_task_ptr, ext2_task);
+    //uint64_t tid = create_system_task(4096, ext2_task_ptr, NULL);
+    //(void)tid;
 
     schedule();
 
-    (void)tid;
     console_write("Should not get here\n");
 
 

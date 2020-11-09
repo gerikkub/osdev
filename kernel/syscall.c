@@ -7,6 +7,8 @@
 #include "kernel/task.h"
 #include "kernel/assert.h"
 #include "kernel/console.h"
+#include "kernel/vmem.h"
+#include "kernel/kernelspace.h"
 
 typedef uint64_t (*syscall_handler)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
 
@@ -25,9 +27,19 @@ static uint64_t syscall_console_print(uint64_t msg_intptr,
                                       uint64_t x2,
                                       uint64_t x3) {
 
-    // THIS IS BAD FOR SOOOO MANY REASONS
-    // DELETE THIS AFTER PROOF OF CONCEPT!!!
-    console_write((char*)msg_intptr);
+    task_t* task = get_active_task();
+
+    bool walk_ok;
+    uint64_t phy_msg_addr;
+    walk_ok = vmem_walk_table(task->low_vm_table, msg_intptr, &phy_msg_addr);
+    if (walk_ok) {
+
+        uint8_t* msg_kmem = (uint8_t*)PHY_TO_KSPACE(phy_msg_addr);
+
+        // THIS IS BAD FOR SOOOO MANY REASONS
+        // DELETE THIS AFTER PROOF OF CONCEPT!!!
+        console_write((char*)msg_kmem);
+    }
 
     return 0;
 }
