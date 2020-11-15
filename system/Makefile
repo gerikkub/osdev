@@ -19,7 +19,7 @@ C_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.c)),$(MOD)/$(SR
 
 ASM_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.s)),$(MOD)/$(SRC))
 
-ASM_SOURCES := system_entry.s
+ASM_SOURCES += system_entry.s
 
 
 #######################################
@@ -40,6 +40,8 @@ BIN = $(CP) -O binary -S
 #######################################
 # cpu
 CPU = 
+
+DEBUG = 1
 
 # fpu
 # NONE for Cortex-M0/M0+/M3

@@ -227,12 +227,14 @@ restore_most_reg:
 # x3: Function to call at the end
 switch_to_kernel_stack_asm:
 
-    # Save this stack pointer value
-    mov sp, x1
-    # Setup the stack point value for SP_EL0
-    msr SP_EL0, x2
-    # Switch the stack pointer
-    msr SPSel, xzr
+    mov x2, sp
+
+    # # Save this stack pointer value
+    # mov sp, x1
+    # # Setup the stack point value for SP_EL0
+    # msr SP_EL0, x2
+    # # Switch the stack pointer
+    # msr SPSel, xzr
 
     # Call the function
     blr x3
