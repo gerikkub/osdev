@@ -66,6 +66,11 @@ static elf_result_t elf_add_memspace_entry(memory_space_t* memspace, _elf64_phdr
     ASSERT(memspace != NULL);
     ASSERT(phdr != NULL);
 
+    // Return early if the PHDR entry is empty
+    if (phdr->p_memsz == 0 && phdr->p_filesz == 0) {
+        return ELF_EMPTYPHDR;
+    }
+
     // Validate permissions of the segment. No Write Execute allowed
     if (!((phdr->p_flags & PF_PERM_MASK) == (PF_R) ||         // Read Only
           (phdr->p_flags & PF_PERM_MASK) == (PF_R | PF_W) ||  // Read Write
@@ -169,6 +174,9 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
         switch (phdr[idx].p_type) {
             case PT_LOAD:
                 tmp_result = elf_add_memspace_entry(&elf_space, &phdr[idx], elf_data, elf_size);
+                if (tmp_result == ELF_EMPTYPHDR) {
+                    continue;
+                }
                 break;
             case PT_NULL:
                 tmp_result = ELF_VALID;

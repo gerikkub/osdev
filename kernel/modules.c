@@ -38,6 +38,7 @@ typedef struct {
 static modules_list_t elf_module_list[MODULES_MAX_NUM];
 
 DEFINE_MODULE(_binary_system_build_ext2_ext2_elf)
+DEFINE_MODULE(_binary_system_build_vfs_vfs_elf)
 
 void modules_init_list(void) {
 
@@ -46,6 +47,7 @@ void modules_init_list(void) {
         elf_module_list[idx].tid = 0;
     }
     ADD_MODULE(0, _binary_system_build_ext2_ext2_elf)
+    ADD_MODULE(1, _binary_system_build_vfs_vfs_elf)
 }
 
 static void start_module(modules_list_t* mod) {

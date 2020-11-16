@@ -14,6 +14,7 @@ typedef enum {
     ELF_BADPHDR = 5,
     ELF_UNHANDLED_PHDR = 6,
     ELF_BADTASK = 7,
+    ELF_EMPTYPHDR = 8,
 } elf_result_t;
 
 

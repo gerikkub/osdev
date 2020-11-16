@@ -81,7 +81,8 @@ kernel/high_start.s \
 kernel/exception_asm.s
 
 SYS_MODS = \
-$(SYSTEMS_DIR)/ext2
+$(SYSTEMS_DIR)/ext2 \
+$(SYSTEMS_DIR)/vfs
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 

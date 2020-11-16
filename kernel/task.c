@@ -97,7 +97,7 @@ void restore_context(uint64_t tid) {
     uint64_t sp = task->reg.sp;
     WRITE_SYS_REG(SP_EL0, sp);
 
-    vmem_set_user_table(task->low_vm_table);
+    vmem_set_user_table((_vmem_table*)KSPACE_TO_PHY(task->low_vm_table), tid);
 
     restore_context_asm(&task->reg, s_exstack);
 
@@ -261,16 +261,22 @@ uint64_t create_user_task(uint64_t user_stack_size,
 
 void schedule(void) {
 
-    uint64_t task_idx = 0;
+    ASSERT(s_active_task_idx < MAX_NUM_TASKS);
+    uint64_t task_count;
+    uint64_t task_idx;
 
-    for (task_idx = 0; task_idx < MAX_NUM_TASKS; task_idx++) {
+    // Round Robin
+    for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
+        task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
         if (s_task_list[task_idx].tid != 0 &&
             s_task_list[task_idx].run_state == TASK_RUNABLE)  {
                 break;
         }
     }
 
-    ASSERT(task_idx < MAX_NUM_TASKS);
+    ASSERT(task_count < MAX_NUM_TASKS);
+
+    s_active_task_idx = task_idx;
 
     restore_context(s_task_list[task_idx].tid);
 }

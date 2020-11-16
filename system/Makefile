@@ -15,9 +15,11 @@ TARGET = $(BUILD_DIR)/$(MOD)/$(MOD).elf
 
 MOD_SRC_DIR = $(SYSTEMS_DIR)/$(MOD)
 
-C_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.c)),$(MOD)/$(SRC))
+#C_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.c)),$(MOD)/$(SRC))
+C_SOURCES = $(foreach SRC,$(notdir $(wildcard $(MOD_SRC_DIR)/*.c)),$(MOD)/$(SRC))
 
-ASM_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.s)),$(MOD)/$(SRC))
+#ASM_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.s)),$(MOD)/$(SRC))
+ASM_SOURCES = $(foreach SRC,$(notdir $(wildcard $(MOD_SRC_DIR)/*.s)),$(MOD)/$(SRC))
 
 ASM_SOURCES += system_entry.s
 

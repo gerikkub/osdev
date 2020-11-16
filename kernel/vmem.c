@@ -301,12 +301,12 @@ void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr) {
     WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
 }
 
-void vmem_set_user_table(_vmem_table* user_ptr) {
+void vmem_set_user_table(_vmem_table* user_ptr, uint8_t asid) {
 
     ASSERT(user_ptr != NULL);
 
-    uint64_t ttbr0_el1 = ((uintptr_t)user_ptr) | 
-                          0;
+    uint64_t ttbr0_el1 = (((uintptr_t)user_ptr) & 0xFFFFFFFFFFFF) |
+                          ((uint64_t)asid << 56);
 
     asm ("DSB SY");
 
