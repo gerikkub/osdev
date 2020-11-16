@@ -150,6 +150,7 @@ static bool memspace_vmem_add_stack(_vmem_table* table, memory_entry_stack_t* en
         return false;
     }
 
+    ASSERT(entry->base > entry->limit);
     uint64_t len = entry->base - entry->limit;
     vmem_map_address_range(table,
                            entry->phy_addr,

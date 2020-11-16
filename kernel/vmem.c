@@ -225,9 +225,10 @@ void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_vi
     // Lengths must be multiples of 4K
     ASSERT((len & (VMEM_PAGE_SIZE - 1)) == 0);
 
-    uint64_t pages = len / VMEM_PAGE_SIZE;
+    uint64_t pages = PAGE_CEIL(len) / VMEM_PAGE_SIZE;
 
     ASSERT(pages > 0);
+    ASSERT(pages < 0x80000000);
 
     int idx;
     for (idx = 0; idx < pages; idx++) {

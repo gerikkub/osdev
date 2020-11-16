@@ -18,6 +18,7 @@
 #include "kernel/memoryspace.h"
 #include "kernel/kernelspace.h"
 #include "kernel/modules.h"
+#include "kernel/elf.h"
 
 
 static volatile uint8_t timer_irq_fired;
@@ -104,6 +105,22 @@ void main() {
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicd_device);
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicc_device);
 
+    uint64_t* exstack_mem = kmalloc_phy(KSPACE_EXSTACK_SIZE);
+    ASSERT(exstack_mem != NULL);
+
+    memory_entry_stack_t exstack_entry = {
+        .start = 0xFFFF800000000000,
+        .end = 0xFFFF800000000000 + KSPACE_EXSTACK_SIZE + (2*USER_STACK_GUARD_PAGES),
+        .type = MEMSPACE_STACK,
+        .flags = MEMSPACE_FLAG_PERM_KRW,
+        .phy_addr = (uint64_t)exstack_mem,
+        .base = 0xFFFF800000000000 + KSPACE_EXSTACK_SIZE + USER_STACK_GUARD_PAGES,
+        .limit = 0xFFFF800000000000 + USER_STACK_GUARD_PAGES,
+        .maxlimit = 0xFFFF800000000000 + USER_STACK_GUARD_PAGES,
+    };
+
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&exstack_entry);
+
     _vmem_table* kernel_vmem_table = memspace_build_kernel_vmem();
 
     _vmem_table* dummy_user_table = vmem_allocate_empty_table();
@@ -115,7 +132,7 @@ void main() {
     gtimer_init();
     syscall_init();
 
-    task_init();
+    task_init((uint64_t*)exstack_entry.base);
 
     modules_init_list();
     modules_start();

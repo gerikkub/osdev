@@ -131,7 +131,10 @@
 
 # Restore a task from the state_fp structure
 # x0: Pointer to the state_fp structure
+# x1: Stack pointer for SP_EL1. This will be the stack pointer on the
+#     next exception
 restore_context_asm:
+    mov sp, x1
     mov x30, x0
     ldp x3, x1, [x30], #16
     ldr x2, [x30], #8

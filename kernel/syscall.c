@@ -19,6 +19,7 @@ static uint64_t syscall_yield(uint64_t x0,
                               uint64_t x2,
                               uint64_t x3) {
 
+    console_write("yield\n");
     return 0;
 }
 

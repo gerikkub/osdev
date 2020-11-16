@@ -19,15 +19,19 @@ static uint64_t s_max_tid;
 
 static _vmem_table* s_dummy_user_table;
 
+static uint64_t* s_exstack;
+
 void switch_to_kernel_stack_asm(uint64_t vector,
                                 uint64_t cpu_sp,
                                 uint64_t task_sp,
                                 exception_handler func);
 
-void task_init(void) {
-    s_max_tid = 1;
+void task_init(uint64_t* exstack) {
+    ASSERT(exstack != NULL);
 
+    s_max_tid = 1;
     s_dummy_user_table = vmem_allocate_empty_table();
+    s_exstack = exstack;
 }
 
 task_t* get_active_task(void) {
@@ -95,7 +99,7 @@ void restore_context(uint64_t tid) {
 
     vmem_set_user_table(task->low_vm_table);
 
-    restore_context_asm(&task->reg);
+    restore_context_asm(&task->reg, s_exstack);
 
     ASSERT(1); // Should not reach
 }

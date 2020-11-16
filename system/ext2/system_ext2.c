@@ -13,11 +13,12 @@ void main(void* parameters) {
 
     char* my_str = "Hello Userspace!\n";
 
-    state_test_asm();
 
     SYSCALL_CALL(SYSCALL_PRINT, (uintptr_t)my_str, 0, 0, 0);
 
     (void)dummy;
 
-    while(1);
+    while(1) {
+        SYSCALL_CALL(SYSCALL_YIELD, 0, 0, 0, 0);
+    }
 }

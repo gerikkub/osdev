@@ -66,7 +66,7 @@ typedef struct {
 
 } task_t;
 
-void task_init(void);
+void task_init(uint64_t* exstack);
 task_t* get_active_task(void);
 void restore_context(uint64_t tid);
 uint64_t create_task(uint64_t* user_stack_base,
@@ -84,7 +84,7 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
                             task_f task_entry,
                             void* ctx);
 //uint64_t create_user_task(uint64_t user_stack_size, uint64_t kernel_stack_size, memory_space_t memspace, task_f task_entry, void* ctx);
-void restore_context_asm(task_reg_t* reg);
+void restore_context_asm(task_reg_t* reg, uint64_t* exstack);
 
 void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx);
 
