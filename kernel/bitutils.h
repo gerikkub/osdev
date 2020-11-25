@@ -26,6 +26,11 @@
           movk %[out], #:abs_g1_nc:" #sym  "\n \
           movk %[out], #:abs_g0_nc:" #sym \
           : [out] "=r" (x))
+
+#define MEM_ISB() asm volatile ("isb SY")
+#define MEM_DMB() asm volatile ("dmb SY")
+#define MEM_DSB() asm volatile ("dsb SY")
+
 /*
 #define GET_ABS_SYM(x, sym) \
     asm ("movz %[out], #:abs_g0_nc:" #sym  "\n \

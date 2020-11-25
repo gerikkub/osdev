@@ -3,11 +3,16 @@
 
 #include <stdint.h>
 
-//#define SYSCALL_CALL(NUM, x0, x1, x2, x3)
+#define SYSCALL_CALL(NUM, x0, x1, x2, x3) \
+{ \
+   uint64_t dummy; \
+   SYSCALL_CALL_HELPER(NUM, x0, x1, x2, x3, dummy) \
+   (void)dummy; \
+}
 
-#define SYSCALL_CALL(NUM, x0, x1, x2, x3) SYSCALL_CALL_HELPER(NUM, x0, x1, x2, x3)
+#define SYSCALL_CALL_RET(NUM, x0, x1, x2, x3, ret) SYSCALL_CALL_HELPER(NUM, x0, x1, x2, x3, ret)
 
-#define SYSCALL_CALL_HELPER(NUM, x0, x1, x2, x3) \
+#define SYSCALL_CALL_HELPER(NUM, x0, x1, x2, x3, ret_arg) \
     { \
     uint64_t _x0, _x1, _x2, _x3; \
     uint64_t _ret; \
@@ -26,6 +31,7 @@
          [arg1] "r" (_x0), [arg2] "r" (_x1), \
          [arg3] "r" (_x2), [arg4] "r" (_x3)); \
  \
+    ret_arg = _ret; \
     }
 
 

@@ -9,12 +9,14 @@
 #include "kernel/console.h"
 #include "kernel/vmem.h"
 #include "kernel/kernelspace.h"
+#include "kernel/messages.h"
+#include "kernel/modules.h"
 
-typedef uint64_t (*syscall_handler)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
+typedef int64_t (*syscall_handler)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
 
 static syscall_handler s_syscall_table[MAX_SYSCALL_NUM] = {0};
 
-static uint64_t syscall_yield(uint64_t x0,
+static int64_t syscall_yield(uint64_t x0,
                               uint64_t x1,
                               uint64_t x2,
                               uint64_t x3) {
@@ -23,7 +25,7 @@ static uint64_t syscall_yield(uint64_t x0,
     return 0;
 }
 
-static uint64_t syscall_console_print(uint64_t msg_intptr,
+static int64_t syscall_console_print(uint64_t msg_intptr,
                                       uint64_t x1,
                                       uint64_t x2,
                                       uint64_t x3) {
@@ -63,6 +65,26 @@ void syscall_sync_handler(uint64_t vector, uint32_t esr) {
     task_t* task_ptr = get_active_task();
     uint64_t ret;
 
+    /*
+    console_write("syscall ");
+    console_write_num(syscall_num);
+    console_write(" tid ");
+    console_write_num(task_ptr->tid);
+    console_endl();
+    console_write(" x0: ");
+    console_write_hex_fixed(task_ptr->reg.gp[0], 16);
+    console_endl();
+    console_write(" x1: ");
+    console_write_hex_fixed(task_ptr->reg.gp[1], 16);
+    console_endl();
+    console_write(" x2: ");
+    console_write_hex_fixed(task_ptr->reg.gp[2], 16);
+    console_endl();
+    console_write(" x3: ");
+    console_write_hex_fixed(task_ptr->reg.gp[3], 16);
+    console_endl();
+    */
+
     ret = handler(task_ptr->reg.gp[0],
                   task_ptr->reg.gp[1],
                   task_ptr->reg.gp[2],
@@ -79,6 +101,9 @@ void syscall_init(void) {
 
     s_syscall_table[SYSCALL_YIELD] = syscall_yield;
     s_syscall_table[SYSCALL_PRINT] = syscall_console_print;
+    s_syscall_table[SYSCALL_GETMSGS] = syscall_getmsgs;
+    s_syscall_table[SYSCALL_SENDMSG] = syscall_sendmsg;
+    s_syscall_table[SYSCALL_GETMOD] = syscall_getmod;
 
     set_sync_handler(EC_SVC, syscall_sync_handler);
 }

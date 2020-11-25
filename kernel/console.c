@@ -44,20 +44,15 @@ void console_write_num(int64_t num) {
 void console_write_hex(uint64_t hex) {
     const char* hex_lookup = "0123456789abcdef";
 
-    uint8_t idx = 15;
+    int8_t idx = 15;
     while ((hex >> (idx*4) & 0xF) == 0 && idx > 0) {
         idx--;
     }
 
-    if (idx == 0) {
-        console_putc('0');
-    } else {
-        do {
-            console_putc(hex_lookup[(hex >> (idx*4)) & 0xF]);
-            idx--;
-        } while (idx > 0);
-        console_putc(hex_lookup[hex & 0xF]);
-    }
+    do {
+        console_putc(hex_lookup[(hex >> (idx*4)) & 0xF]);
+        idx--;
+    } while (idx >= 0);
 }
 
 void console_write_hex_fixed(uint64_t hex, uint8_t digits) {

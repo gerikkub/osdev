@@ -34,7 +34,8 @@ SOURCE_DIR := $(shell pwd)
 
 TOOLS_DIR = $(SOURCE_DIR)/../tools
 
-COMP_DIR = $(TOOLS_DIR)/compiler/
+#COMP_DIR = $(TOOLS_DIR)/compiler/bin
+COMP_DIR = /usr/local/bin
 
 SYSTEMS_DIR = system
 
@@ -68,11 +69,15 @@ kernel/syscall.c \
 kernel/memoryspace.c \
 kernel/kernelspace.c \
 kernel/modules.c \
-kernel/elf.c
+kernel/elf.c \
+kernel/messages.c
+
+C_SRC_LIBS = \
+stdlib/string.c
 
 
 # C sources
-C_SOURCES = ${C_SRC_BOOTSTRAP} ${C_SRC_KERNEL} ${C_SRC_DRIVERS}
+C_SOURCES = ${C_SRC_BOOTSTRAP} ${C_SRC_KERNEL} ${C_SRC_DRIVERS} ${C_SRC_LIBS}
 
 # ASM sources
 ASM_SOURCES =  \
@@ -92,11 +97,11 @@ MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)
 PREFIX = aarch64-none-elf
 # The gcc compiler bin path can be either defined in make command via GCC_PATH variable (> make GCC_PATH=xxx)
 # either it can be added to the PATH environment variable.
-CC = $(COMP_DIR)/bin/$(PREFIX)-gcc
-AS = $(COMP_DIR)/bin/$(PREFIX)-gcc -x assembler-with-cpp
-CP = $(COMP_DIR)/bin/$(PREFIX)-objcopy
-SZ = $(COMP_DIR)/bin/$(PREFIX)-size
-LD = $(COMP_DIR)/bin/$(PREFIX)-gcc
+CC = $(COMP_DIR)/$(PREFIX)-gcc
+AS = $(COMP_DIR)/$(PREFIX)-gcc -x assembler-with-cpp
+CP = $(COMP_DIR)/$(PREFIX)-objcopy
+SZ = $(COMP_DIR)/$(PREFIX)-size
+LD = $(COMP_DIR)/$(PREFIX)-gcc
 BIN = $(CP) -O binary -S
  
 #######################################
@@ -119,19 +124,23 @@ MCU = $(CPU) $(FPU) $(FLOAT-ABI)
 AS_DEFS = 
 
 # C defines
-C_DEFS = -I .
+C_DEFS = 
 
 
 # AS includes
 AS_INCLUDES = 
 
 # C includes
-C_INCLUDES = 
+C_INCLUDES = -I . -I stdlib
+#-I $(TOOLS_DIR)/aarch64-none-elf/include
 
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
-CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -ffreestanding -Wall -Werror -mno-pc-relative-literal-loads
+CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) \
+	     -ffreestanding -Wall -Werror \
+		 -mno-pc-relative-literal-loads \
+		 -mgeneral-regs-only
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
@@ -151,10 +160,10 @@ SYSTEMS_CFLAGS = $(CFLAGS)
 LDSCRIPT = kernel.ld
 
 # libraries
-LIBS = -lc
+LIBS = 
 LIBDIR = 
 LDFLAGS = $(MCU) -Wl,-T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map -ffreestanding -nostdlib
-
+ #-specs=$(TOOLS_DIR)/aarch64-none-elf/lib/nosys.specs
 # default action: build all
 all: $(BUILD_DIR)/$(TARGET).elf
 
@@ -179,7 +188,7 @@ $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
 	$(AS) -c $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/%.elf.o: %.elf Makefile | $(BUILD_DIR)
-	$(CP) --input-target=binary --output-target=elf64-littleaarch64 $< $@
+	$(CP) --input-target=binary --output-target=elf64-littleaarch64 --binary-architecture aarch64 $< $@
 	#$(COMP_DIR)/bin/$(PREFIX)-ld -r -b binary $< -o $@
 
 $(MODULES_BUILD)/%.elf: FORCE

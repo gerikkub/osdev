@@ -44,7 +44,7 @@ void bad_task_return(void) {
     ASSERT(0);
 }
 
-static task_t* get_task_for_tid(uint64_t tid) {
+task_t* get_task_for_tid(uint64_t tid) {
 
     uint64_t idx;
     for (idx = 0; idx < MAX_NUM_TASKS; idx++) {
@@ -147,6 +147,8 @@ uint64_t create_task(uint64_t* user_stack_base,
 
     task->reg = *reg;
 
+    msg_queue_init(&task->msgs);
+
     if (memspace != NULL) {
         task->memory = *memspace;
         task->low_vm_table = memspace_build_vmem(memspace);
@@ -227,6 +229,9 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
     }
 
     task_reg_t reg;
+    for (uint64_t idx = 0; idx < 31; idx++) {
+        reg.gp[TASK_REG(idx)] = 0;
+    }
     reg.gp[TASK_REG(0)] = (uint64_t)ctx;
     reg.spsr = TASK_SPSR_M(0); // EL0t SP
     reg.elr = (uint64_t)task_entry;
@@ -242,21 +247,30 @@ uint64_t create_user_task(uint64_t user_stack_size,
                             task_f task_entry,
                             void* ctx){
     return 0;
-    /*
-    uint64_t* user_stack_ptr = (uint64_t*)kmalloc_phy(user_stack_size);
-    ASSERT(user_stack_ptr != NULL);
-    uint64_t* kernel_stack_ptr = (uint64_t*)kmalloc_phy(kernel_stack_size);
-    ASSERT(kernel_stack_ptr != NULL);
+}
 
-    task_reg_t reg;
-    reg.gp[TASK_REG(0)] = (uint64_t)ctx;
-    reg.spsr = TASK_SPSR_M(0); // EL0t SP
-    reg.elr = (uint64_t)task_entry;
+void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun) {
+    ASSERT(task != NULL);
 
-    return create_task(user_stack_ptr, stack_size,
-                       kernel_stack_ptr, stack_size,
-                       &reg, memspace, false);
-    */
+    task->run_state = TASK_WAIT;
+    task->wait_reason = reason;
+    task->wait_ctx = ctx;
+    task->wait_wakeup_fun = wakeup_fun;
+
+    schedule();
+}
+
+void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_fun) {
+    ASSERT(task != NULL);
+
+    if ((task->run_state == TASK_RUNABLE) ||
+        (task->wait_reason != reason)) {
+        return;
+    }
+
+    if (can_wake_fun(&task->wait_ctx)) {
+        task->run_state = TASK_AWAKE;
+    }
 }
 
 void schedule(void) {
@@ -269,7 +283,8 @@ void schedule(void) {
     for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
         task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
         if (s_task_list[task_idx].tid != 0 &&
-            s_task_list[task_idx].run_state == TASK_RUNABLE)  {
+            ((s_task_list[task_idx].run_state == TASK_RUNABLE) ||
+             (s_task_list[task_idx].run_state == TASK_AWAKE)))  {
                 break;
         }
     }
@@ -278,5 +293,21 @@ void schedule(void) {
 
     s_active_task_idx = task_idx;
 
-    restore_context(s_task_list[task_idx].tid);
+    int64_t reg_x0;
+    switch (s_task_list[task_idx].run_state) {
+        case TASK_RUNABLE:
+            restore_context(s_task_list[task_idx].tid);
+            break;
+        case TASK_AWAKE:
+            reg_x0 = s_task_list[task_idx].wait_wakeup_fun(&s_task_list[task_idx]);
+            s_task_list[task_idx].reg.gp[TASK_REG(0)] = reg_x0;
+            s_task_list[task_idx].run_state = TASK_RUNABLE;
+            restore_context(s_task_list[task_idx].tid);
+            break;
+        default:
+            ASSERT(0);
+            break;
+    }
+
+    ASSERT(0);
 }
