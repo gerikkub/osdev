@@ -16,6 +16,11 @@ typedef int64_t (*syscall_handler)(uint64_t arg0, uint64_t arg1, uint64_t arg2, 
 
 static syscall_handler s_syscall_table[MAX_SYSCALL_NUM] = {0};
 
+const char* syscall_print_table[] = {
+    "Yield", "Print", "SendMsg",
+    "GetMsgs", "GetMod"
+};
+
 static int64_t syscall_yield(uint64_t x0,
                               uint64_t x1,
                               uint64_t x2,
@@ -65,24 +70,13 @@ void syscall_sync_handler(uint64_t vector, uint32_t esr) {
     task_t* task_ptr = get_active_task();
     uint64_t ret;
 
-    /*
-    console_write("syscall ");
-    console_write_num(syscall_num);
-    console_write(" tid ");
-    console_write_num(task_ptr->tid);
-    console_endl();
-    console_write(" x0: ");
-    console_write_hex_fixed(task_ptr->reg.gp[0], 16);
-    console_endl();
-    console_write(" x1: ");
-    console_write_hex_fixed(task_ptr->reg.gp[1], 16);
-    console_endl();
-    console_write(" x2: ");
-    console_write_hex_fixed(task_ptr->reg.gp[2], 16);
-    console_endl();
-    console_write(" x3: ");
-    console_write_hex_fixed(task_ptr->reg.gp[3], 16);
-    console_endl();
+/*
+    console_printf("Syscall %s Tid %u\n", syscall_print_table[syscall_num], task_ptr->tid);
+    console_printf(" ELR: %16h\n", task_ptr->reg.elr);
+    console_printf(" x0: %16h\n", task_ptr->reg.gp[0]);
+    console_printf(" x1: %16h\n", task_ptr->reg.gp[1]);
+    console_printf(" x2: %16h\n", task_ptr->reg.gp[2]);
+    console_printf(" x3: %16h\n", task_ptr->reg.gp[3]);
     */
 
     ret = handler(task_ptr->reg.gp[0],

@@ -14,14 +14,14 @@ void pl011_init(PL011_Struct* dev) {
 }
 
 
-void pl011_putc(PL011_Struct* dev, char c) {
+void pl011_putc(PL011_Struct* dev, const char c) {
 
     while (dev->fr & PL011_FR_TXFF);
 
     dev->dr = (uint32_t)c;
 }
 
-void pl011_puts(PL011_Struct* dev, char* str) {
+void pl011_puts(PL011_Struct* dev, const char* str) {
 
     while(*str) {
         pl011_putc(dev, *str);

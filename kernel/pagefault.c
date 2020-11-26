@@ -12,36 +12,25 @@ void pagefault_handler(uint64_t vector, uint32_t esr) {
 
     uint32_t ec = esr >> 26;
 
-    console_write("Pagefault in vector ");
-    console_write_hex(vector);
-    console_endl();
+    console_printf("Pagefault in vector %u\n", vector);
 
-    console_write("ESR ");
-    console_write_hex(esr);
-    console_endl();
+    console_printf("ESR %h\n", esr);
 
     if ((esr & (1 << 10)) == 0) {
-        console_write("FAR ");
         uint64_t far;
         READ_SYS_REG(FAR_EL1, far);
-        console_write_hex(far);
-        console_endl();
+        console_printf("FAR %h\n", far);
     } else {
-        console_write("FAR Invalid");
-        console_endl();
+        console_printf("FAR Invalid\n");
     }
 
     uint64_t elr;
-    console_write("Fault Addr ");
     READ_SYS_REG(ELR_EL1, elr);
-    console_write_hex(elr);
-    console_endl();
+    console_printf("Fault Addr %h\n", elr);
 
     task_t* active_task = get_active_task();
 
-    console_write("tid ");
-    console_write_hex(active_task->tid);
-    console_endl();
+    console_printf("tid %u\n", active_task->tid);
 
     switch (ec) {
         case EC_INST_ABORT_LOWER:

@@ -21,15 +21,15 @@
     _x2 = x2; \
     _x3 = x3; \
  \
-    asm("mov x0, %[arg1]\n \
-         mov x1, %[arg2]\n \
-         mov x2, %[arg3]\n \
-         mov x3, %[arg4]\n \
-         svc " # NUM  "\n \
-         mov %[ret], x0" \
-         : [ret] "=r" (_ret) : \
-         [arg1] "r" (_x0), [arg2] "r" (_x1), \
-         [arg3] "r" (_x2), [arg4] "r" (_x3)); \
+    asm volatile ("mov x0, %[arg1]\n \
+                   mov x1, %[arg2]\n \
+                   mov x2, %[arg3]\n \
+                   mov x3, %[arg4]\n \
+                   svc " # NUM  "\n \
+                   mov %[ret], x0" \
+                   : [ret] "=r" (_ret) : \
+                   [arg1] "r" (_x0), [arg2] "r" (_x1), \
+                   [arg3] "r" (_x2), [arg4] "r" (_x3)); \
  \
     ret_arg = _ret; \
     }

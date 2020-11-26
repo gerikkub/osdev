@@ -1,7 +1,8 @@
-#ifndef __CONSOLE_H__
-#define __CONSOLE_H__
 
-#define CONSOLE KERNEL
+#ifndef __SYSTEM_CONSOLE_H__
+#define __SYSTEM_CONSOLE_H__
+
+#define CONSOLE SYSTEM
 
 #include <stdint.h>
 #include <stdbool.h>

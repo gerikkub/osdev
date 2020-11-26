@@ -13,7 +13,7 @@
 
 static task_t s_task_list[MAX_NUM_TASKS] = {0};
 
-static uint64_t s_active_task_idx;
+static volatile uint64_t s_active_task_idx;
 
 static uint64_t s_max_tid;
 

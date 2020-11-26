@@ -73,7 +73,8 @@ kernel/elf.c \
 kernel/messages.c
 
 C_SRC_LIBS = \
-stdlib/string.c
+stdlib/string.c \
+stdlib/printf.c
 
 
 # C sources

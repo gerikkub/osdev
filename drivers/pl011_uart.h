@@ -63,8 +63,8 @@ typedef struct __attribute__((__packed__)) {
 
 void pl011_init(PL011_Struct* dev);
 
-void pl011_putc(PL011_Struct* dev, char c);
+void pl011_putc(PL011_Struct* dev, const char c);
 
-void pl011_puts(PL011_Struct* dev, char* str);
+void pl011_puts(PL011_Struct* dev, const char* str);
 
 #endif

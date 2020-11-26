@@ -12,6 +12,8 @@ void syscall_init(void);
 #define SYSCALL_GETMSGS 3
 #define SYSCALL_GETMOD 4
 
+const char* syscall_print_table[MAX_SYSCALL_NUM];
+
 enum {
     SYSCALL_ERROR_OK = 0,
     SYSCALL_ERROR_BADARG = -1,
