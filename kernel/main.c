@@ -3,7 +3,10 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "stdlib/bitutils.h"
+
 #include "drivers/pl011_uart.h"
+#include "drivers/qemu_fw_cfg.h"
 
 #include "kernel/console.h"
 #include "kernel/kmalloc.h"
@@ -101,9 +104,18 @@ void main() {
        .phy_addr = (uint64_t)GICC_BASE_PHYS
     };
 
+    memory_entry_device_t qemu_fw_cfg_device = {
+        .start = (uint64_t)QEMU_FW_CFG_VIRT,
+        .end = (uint64_t)QEMU_FW_CFG_VIRT + VMEM_PAGE_SIZE,
+        .type = MEMSPACE_DEVICE,
+        .flags = MEMSPACE_FLAG_PERM_KRW,
+        .phy_addr = (uint64_t)QEMU_FW_CFG_PHY
+    };
+
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&virtuart_device);
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicd_device);
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicc_device);
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&qemu_fw_cfg_device);
 
     uint64_t* exstack_mem = kmalloc_phy(KSPACE_EXSTACK_SIZE);
     ASSERT(exstack_mem != NULL);
@@ -127,7 +139,7 @@ void main() {
 
     vmem_set_tables(kernel_vmem_table, dummy_user_table);
 
-    pl011_puts(VIRT_UART_VMEM, "UART_VMEM is Mapped!\n");
+    console_log(LOG_DEBUG, "UART_VMEM is Mapped\n");
 
     gtimer_init();
     syscall_init();
@@ -143,6 +155,7 @@ void main() {
     //uint64_t tid = create_system_task(4096, ext2_task_ptr, NULL);
     //(void)tid;
 
+    while(1);
     schedule();
 
     console_write("Should not get here\n");

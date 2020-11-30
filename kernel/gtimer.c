@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "kernel/gtimer.h"
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 #include "kernel/assert.h"
 
 

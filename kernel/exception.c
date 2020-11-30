@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 #include "kernel/exception.h"
 #include "kernel/panic.h"
 #include "kernel/gic.h"

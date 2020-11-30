@@ -5,7 +5,7 @@
 
 #include "kernel/modules.h"
 
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 #include "kernel/elf.h"
 #include "kernel/assert.h"
 #include "kernel/syscall.h"

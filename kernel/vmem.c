@@ -4,7 +4,7 @@
 
 #include "kernel/vmem.h"
 #include "kernel/kmalloc.h"
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 #include "kernel/assert.h"
 #include "kernel/console.h"
 #include "kernel/kernelspace.h"

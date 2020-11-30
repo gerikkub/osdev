@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "kernel/assert.h"
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 
 void * memcpy(void *restrict dst, const void *restrict src, size_t n) {
     uint8_t *restrict dst_8 = dst;

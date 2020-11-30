@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#include "stdlib/printf.h"
+
 void console_putc(const char c);
 void console_endl(void);
 void console_write(const char* s);
@@ -59,9 +61,8 @@ void console_write_hex_fixed(uint64_t hex, uint8_t digits) {
     } while (idx > 0);
     console_putc(hex_lookup[hex & 0xF]);
 }
-void console_printf(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
+
+void console_printf_helper(const char* fmt, va_list args) {
 
     while (*fmt != '\0') {
         if (*fmt == '%') {
@@ -141,8 +142,36 @@ void console_printf(const char* fmt, ...) {
             console_write_len(start_ptr, len);
         }
     }
+}
 
-    console_flush();
-
+void console_printf(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    console_printf_helper(fmt, args);
     va_end(args);
+}
+
+static console_log_level_t s_max_level = LOG_DEBUG;
+
+void console_set_log_level(console_log_level_t level) {
+    if (level <= LOG_DEBUG) {
+        s_max_level = level;
+    }
+}
+
+void console_log(console_log_level_t level, const char* fmt, ...) {
+    const char* log_strings[] = {
+        "EMERG", "ALERT", "CRIT",
+        "ERROR", "WARNING", "NOTICE",
+        "INFO", "DEBUG"
+    };
+    if (level <= s_max_level) {
+        console_printf("[%s] ", log_strings[level]);
+        va_list args;
+        va_start(args, fmt);
+        console_printf_helper(fmt, args);
+        va_end(args);
+
+        console_flush();
+    }
 }

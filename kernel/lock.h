@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 
 #define BEGIN_CRITICAL(x) \
     do { \

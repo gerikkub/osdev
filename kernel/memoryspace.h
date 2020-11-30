@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 #include "kernel/vmem.h"
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 
 typedef enum {
     MEMSPACE_PHY,

@@ -51,7 +51,8 @@ bootstrap/vmem_bootstrap.c
 
 C_SRC_DRIVERS = \
 drivers/cortex_a57_gic.c \
-drivers/pl011_uart.c
+drivers/pl011_uart.c \
+drivers/qemu_fw_cfg.c
 
 C_SRC_KERNEL = \
 kernel/main.c \
@@ -74,7 +75,8 @@ kernel/messages.c
 
 C_SRC_LIBS = \
 stdlib/string.c \
-stdlib/printf.c
+stdlib/printf.c \
+stdlib/bitutils.c
 
 
 # C sources
@@ -141,7 +143,8 @@ ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffuncti
 CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) \
 	     -ffreestanding -Wall -Werror \
 		 -mno-pc-relative-literal-loads \
-		 -mgeneral-regs-only
+		 -mgeneral-regs-only \
+		 -march=armv8.2-a
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
@@ -223,10 +226,10 @@ clean:
 
 
 run: $(BUILD_DIR)/$(TARGET).elf
-	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $<
+	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $< -fw_cfg opt/cfg1,string=hello
 
 debug: $(BUILD_DIR)/$(TARGET).elf
-	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $<
+	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $< -fw_cfg opt/cfg1,string=hello
 
 .PHONY: run debug
 

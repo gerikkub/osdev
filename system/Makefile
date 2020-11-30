@@ -77,7 +77,8 @@ ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffuncti
 CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) \
         -ffreestanding -Wall -Werror \
 		-mno-pc-relative-literal-loads \
-		-mgeneral-regs-only
+		-mgeneral-regs-only \
+		-march=armv8.2-a
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2

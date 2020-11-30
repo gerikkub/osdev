@@ -8,7 +8,7 @@
 #include <kernel/task.h>
 #include <kernel/kernelspace.h>
 #include <kernel/vmem.h>
-#include <kernel/bitutils.h>
+#include <stdlib/bitutils.h>
 #include <kernel/syscall.h>
 
 

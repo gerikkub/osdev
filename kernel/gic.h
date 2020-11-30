@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 
 typedef void (*irq_handler)(uint32_t intid);
 

@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 
 #define VMEM_4K_TABLE_ENTRIES (1 << 9)
 

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 
 #define NUM_EXCEPTION_EC (BITSIZE(9))
 

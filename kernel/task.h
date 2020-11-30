@@ -7,7 +7,7 @@
 
 #include "kernel/vmem.h"
 #include "kernel/exception.h"
-#include "kernel/bitutils.h"
+#include "stdlib/bitutils.h"
 #include "kernel/memoryspace.h"
 #include "kernel/messages.h"
 
