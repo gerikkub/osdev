@@ -464,6 +464,9 @@ void vmem_print_l0_table(_vmem_table* table_ptr) {
             }
         }
     }
+}
 
+void vmem_deallocate_table(_vmem_table* table_ptr) {
+    // One day...
 }
 

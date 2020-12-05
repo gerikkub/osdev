@@ -4,23 +4,16 @@
 
 #include <stdint.h>
 
+#include "include/k_messages.h"
+
 #define MSG_QUEUE_MAXSIZE 64
 #define MSG_MAX_DSTS 1024
 
-typedef struct __attribute__((packed)) {
-    uint64_t msg[4];
-} msg_placeholder;
-
 typedef struct {
-    msg_placeholder buffer[MSG_QUEUE_MAXSIZE];
+    msg_placeholder_t buffer[MSG_QUEUE_MAXSIZE];
     uint64_t read_idx, write_idx;
     uint64_t size;
 } msg_queue;
-
-typedef enum {
-    MSG_TYPE_PAYLOAD = 1,
-    MSG_TYPE_MEMORY = 2
-} msg_type_t;
 
 void msg_queue_init(msg_queue* queue);
 

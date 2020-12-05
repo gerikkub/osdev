@@ -155,7 +155,6 @@ void main() {
     //uint64_t tid = create_system_task(4096, ext2_task_ptr, NULL);
     //(void)tid;
 
-    while(1);
     schedule();
 
     console_write("Should not get here\n");

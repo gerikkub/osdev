@@ -36,12 +36,6 @@
 uint16_t en_swap_16(uint16_t a);
 uint32_t en_swap_32(uint32_t a);
 uint64_t en_swap_64(uint64_t a);
-/*
-#define GET_ABS_SYM(x, sym) \
-    asm ("movz %[out], #:abs_g0_nc:" #sym  "\n \
-          movk %[out], #:abs_g1:" #sym \
-          : [out] "=r" (x))
-          */
 
 #endif
 

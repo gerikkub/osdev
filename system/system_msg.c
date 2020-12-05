@@ -4,7 +4,8 @@
 
 #include "system/system_msg.h"
 #include "system/system_lib.h"
-#include "kernel/syscall.h"
+
+#include "include/k_syscall.h"
 
 static module_union_handlers_t s_handlers;
 static module_class_t s_class;
@@ -39,7 +40,7 @@ int64_t system_get_dst(module_class_t class, char* subclass) {
     return ret;
 }
 
-int64_t system_send_msg(system_msg* msg) {
+int64_t system_send_msg(system_msg_t* msg) {
     uint64_t x0, x1, x2, x3;
     char* msg_8 = (char*)msg;
     memcpy(&x0, &msg_8[0], sizeof(uint64_t));
@@ -52,36 +53,39 @@ int64_t system_send_msg(system_msg* msg) {
     return ret;
 }
 
-int64_t system_recv_msg_raw(system_msg* msg) {
-    uint64_t msg_len = sizeof(system_msg);
+int64_t system_recv_msg_raw(system_msg_t* msg) {
+    uint64_t msg_len = sizeof(system_msg_t);
     
     int64_t ret;
     SYSCALL_CALL_RET(SYSCALL_GETMSGS, (uintptr_t)msg, msg_len, 0, 0, ret)
     return ret;
 }
 
-void system_send_msg_vfs(system_msg* msg) {
+void system_send_msg_vfs(system_msg_t* msg) {
     module_vfs_handlers_t h = s_handlers.vfs;
     switch (msg->port) {
         case MOD_VFS_INFO:
-            h.info((system_msg_payload*)msg);
+            h.info((system_msg_payload_t*)msg);
             break;
         case MOD_VFS_GETINFO:
-            h.getinfo((system_msg_payload*)msg);
+            h.getinfo((system_msg_payload_t*)msg);
             break;
         default:
             break;
     }
 }
 
-void system_send_msg_fs(system_msg* msg) {
+void system_send_msg_fs(system_msg_t* msg) {
     module_fs_handlers_t h = s_handlers.fs;
     switch (msg->port) {
         case MOD_FS_INFO:
-            h.info((system_msg_payload*)msg);
+            h.info((system_msg_payload_t*)msg);
             break;
         case MOD_FS_GETINFO:
-            h.getinfo((system_msg_payload*)msg);
+            h.getinfo((system_msg_payload_t*)msg);
+            break;
+        case MOD_FS_STR:
+            h.printstr((system_msg_memory_t*)msg);
             break;
         default:
             break;
@@ -89,7 +93,7 @@ void system_send_msg_fs(system_msg* msg) {
 }
 
 int64_t system_recv_msg(void) {
-    system_msg msg;
+    system_msg_t msg;
     int64_t ret;
 
     ret = system_recv_msg_raw(&msg);

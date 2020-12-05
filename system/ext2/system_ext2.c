@@ -7,22 +7,22 @@
 #include "system/system_console.h"
 #include "system/system_assert.h"
 
-#include "kernel/syscall.h"
-#include "kernel/messages.h"
-#include "kernel/modules.h"
+#include "include/k_syscall.h"
+#include "include/k_messages.h"
+#include "include/k_modules.h"
 
 #include "stdlib/printf.h"
 
 static uint64_t my_id;
 
-void ext2_info(system_msg_payload* msg) {
+void ext2_info(system_msg_payload_t* msg) {
     console_printf("Ext2 Info: %c\n", msg->payload[0]);
     console_flush();
 
     int64_t vfs_dst = system_get_dst(MOD_CLASS_VFS, "");
     SYS_ASSERT(vfs_dst >= 0);
 
-    system_msg_payload info = {
+    system_msg_payload_t info = {
         .type = MSG_TYPE_PAYLOAD,
         .flags = 0,
         .dst = vfs_dst,
@@ -31,13 +31,13 @@ void ext2_info(system_msg_payload* msg) {
         .payload = {0}
     }; 
 
-    int64_t ret = system_send_msg((system_msg*)&info);
+    int64_t ret = system_send_msg((system_msg_t*)&info);
     SYS_ASSERT(ret >= 0);
 }
 
-void ext2_getinfo(system_msg_payload* msg) {
+void ext2_getinfo(system_msg_payload_t* msg) {
 
-    system_msg_payload info = {
+    system_msg_payload_t info = {
         .type = MSG_TYPE_PAYLOAD,
         .flags = 0,
         .dst = msg->src,
@@ -46,12 +46,19 @@ void ext2_getinfo(system_msg_payload* msg) {
         .payload = {'E', 0}
     };
 
-    system_send_msg((system_msg*)&info);
+    system_send_msg((system_msg_t*)&info);
+}
+
+void ext2_printstr(system_msg_memory_t* msg) {
+
+    console_printf("Msg Recv'd: %s\n", msg->ptr);
+    console_flush();
 }
 
 static module_fs_handlers_t handlers = {
     .info = ext2_info,
-    .getinfo = ext2_getinfo
+    .getinfo = ext2_getinfo,
+    .printstr = ext2_printstr
 };
 
 
@@ -75,7 +82,8 @@ void main(void* parameters) {
     int64_t vfs_dst = system_get_dst(MOD_CLASS_VFS, "");
     SYS_ASSERT(vfs_dst >= 0);
 
-    system_msg_payload info = {
+    /*
+    system_msg_payload_t info = {
         .type = MSG_TYPE_PAYLOAD,
         .flags = 0,
         .dst = vfs_dst,
@@ -84,8 +92,9 @@ void main(void* parameters) {
         .payload = {0}
     }; 
 
-    int64_t ret = system_send_msg((system_msg*)&info);
+    int64_t ret = system_send_msg((system_msg_t*)&info);
     SYS_ASSERT(ret >= 0);
+    */
 
     while(1) {
         system_recv_msg();

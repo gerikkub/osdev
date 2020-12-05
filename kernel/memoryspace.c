@@ -3,7 +3,9 @@
 
 #include "kernel/memoryspace.h"
 #include "kernel/vmem.h"
+#include "kernel/task.h"
 #include "kernel/assert.h"
+#include "kernel/elf.h"
 
 memory_entry_t* memspace_get_entry_at_addr(memory_space_t* space, void* addr_ptr) {
 
@@ -185,6 +187,27 @@ _vmem_table* memspace_build_vmem(memory_space_t* space) {
     }
 
     return l0_table;
+}
+
+bool memspace_alloc_space(memory_space_t* space, uint64_t len, memory_entry_t* entry_out) {
+    ASSERT(space != NULL);
+    ASSERT(entry_out != NULL);
+
+    uint64_t guard_range = PAGE_CEIL(len) + 2 * USER_GUARD_PAGES;
+
+    uintptr_t start_addr = space->valloc_ctx.systemspace_end + USER_GUARD_PAGES;
+    uintptr_t stop_addr = start_addr + PAGE_CEIL(len);
+
+    if ((stop_addr + USER_GUARD_PAGES) > USER_ADDRSPACE_TOP) {
+        return false;
+    }
+
+    entry_out->start = start_addr;
+    entry_out->end = stop_addr;
+
+    space->valloc_ctx.systemspace_end += guard_range;
+
+    return true;
 }
 
 void memspace_deallocate(memory_space_t* space) {

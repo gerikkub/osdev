@@ -11,10 +11,10 @@ highmem_base = 0xFFFF000000000000;
 
 ram_base = 0x40000000;
 
-ram_size = 256M;
+ram_size = 128M;
 flash_size = 0x7000000;
 
-heap_size = 512K;
+heap_size = 8M;
 
 
 SECTIONS

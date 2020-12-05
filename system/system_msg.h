@@ -3,37 +3,12 @@
 #define __SYSTEM_MSG_H__
 
 #include <stdint.h>
-#include "kernel/modules.h"
 
-typedef struct {
-    uint8_t type;
-    uint8_t flags;
-    uint16_t dst;
-    uint16_t src;
-    uint16_t port;
-    uint8_t msg[24];
-} system_msg;
+#include "include/k_modules.h"
+#include "include/k_messages.h"
 
-typedef struct {
-    uint8_t type;
-    uint8_t flags;
-    uint16_t dst;
-    uint16_t src;
-    uint16_t port;
-    uint8_t payload[24];
-} system_msg_payload;
-
-typedef struct {
-    uint8_t type;
-    uint8_t flags;
-    uint16_t dst;
-    uint16_t src;
-    uint16_t port;
-    uint64_t ptr[2];
-    uint8_t payload[8];
-} system_msg_memory;
-
-typedef void (*msg_payload_fun)(system_msg_payload*);
+typedef void (*msg_payload_fun)(system_msg_payload_t*);
+typedef void (*msg_memory_fun)(system_msg_memory_t*);
 
 typedef struct {
     msg_payload_fun info;
@@ -43,6 +18,7 @@ typedef struct {
 typedef struct {
     msg_payload_fun info;
     msg_payload_fun getinfo;
+    msg_memory_fun printstr;
 } module_fs_handlers_t;
 
 typedef union {
@@ -52,7 +28,7 @@ typedef union {
 
 void system_register_handler(module_union_handlers_t handlers, module_class_t class);
 int64_t system_get_dst(module_class_t class, char* subclass);
-int64_t system_send_msg(system_msg* msg);
+int64_t system_send_msg(system_msg_t* msg);
 int64_t system_recv_msg(void);
 
 

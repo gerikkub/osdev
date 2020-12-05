@@ -34,5 +34,6 @@
     ret_arg = _ret; \
     }
 
+void* system_map_device(uintptr_t device, uint64_t len);
 
 #endif

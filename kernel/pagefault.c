@@ -14,19 +14,19 @@ void pagefault_handler(uint64_t vector, uint32_t esr) {
 
     console_printf("Pagefault in vector %u\n", vector);
 
-    console_printf("ESR %h\n", esr);
+    console_printf("ESR %x\n", esr);
 
     if ((esr & (1 << 10)) == 0) {
         uint64_t far;
         READ_SYS_REG(FAR_EL1, far);
-        console_printf("FAR %h\n", far);
+        console_printf("FAR %x\n", far);
     } else {
         console_printf("FAR Invalid\n");
     }
 
     uint64_t elr;
     READ_SYS_REG(ELR_EL1, elr);
-    console_printf("Fault Addr %h\n", elr);
+    console_printf("Fault Addr %x\n", elr);
 
     task_t* active_task = get_active_task();
 

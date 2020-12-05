@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "kernel/syscall.h"
+#include "include/k_syscall.h"
 
 #include "system/system_console.h"
 #include "system/system_assert.h"

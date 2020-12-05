@@ -158,6 +158,7 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
     elf_space.entries = kmalloc_phy(ELF_MAX_MEMSPACE_ENTRIES * sizeof(memory_entry_t));
     elf_space.num = 0;
     elf_space.maxnum = ELF_MAX_MEMSPACE_ENTRIES;
+    elf_space.valloc_ctx.systemspace_end = USER_ADDRSPACE_SYSTEM;
 
     if (elf_space.entries == NULL) {
         if (result != NULL) {

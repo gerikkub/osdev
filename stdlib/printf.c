@@ -96,7 +96,7 @@ void console_printf_helper(const char* fmt, va_list args) {
                     console_write_unum(u);
                     fmt++;
                     break;
-                case 'h':
+                case 'x':
                     u = va_arg(args, uint64_t);
                     if (digits != 0) {
                         console_write_hex_fixed(u, digits);
@@ -151,7 +151,8 @@ void console_printf(const char* fmt, ...) {
     va_end(args);
 }
 
-static console_log_level_t s_max_level = LOG_DEBUG;
+// static console_log_level_t s_max_level = LOG_DEBUG;
+static console_log_level_t s_max_level = LOG_INFO;
 
 void console_set_log_level(console_log_level_t level) {
     if (level <= LOG_DEBUG) {

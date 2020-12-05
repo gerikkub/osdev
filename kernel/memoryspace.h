@@ -62,9 +62,14 @@ typedef struct __attribute__((packed)) {
 } memory_entry_stack_t;
 
 typedef struct {
+    uint64_t systemspace_end;
+} memory_valloc_ctx_t;
+
+typedef struct {
     memory_entry_t* entries;
     uint64_t num;
     uint64_t maxnum;
+    memory_valloc_ctx_t valloc_ctx;
 } memory_space_t;
 
 #define MEMSPACE_FLAG_PERM_MASK (0x7)
@@ -84,6 +89,8 @@ typedef struct {
 memory_entry_t* memspace_get_entry_at_addr(memory_space_t* space, void* addr_ptr);
 bool memspace_add_entry_to_memory(memory_space_t* space, memory_entry_t* entry);
 _vmem_table* memspace_build_vmem(memory_space_t* space);
+bool memspace_remove_entry_from_memory(memory_space_t* space, memory_entry_t* entry);
+bool memspace_alloc_space(memory_space_t* space, uint64_t len, memory_entry_t* entry_out);
 void memspace_deallocate(memory_space_t* space);
 
 

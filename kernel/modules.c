@@ -55,6 +55,7 @@ static module_subclass_t module_subclass_table[MOD_SUBCLASS_MAX];
 
 DEFINE_MODULE(_binary_system_build_ext2_ext2_elf)
 DEFINE_MODULE(_binary_system_build_vfs_vfs_elf)
+DEFINE_MODULE(_binary_system_build_dtb_dtb_elf)
 
 void modules_init_list(void) {
 
@@ -72,8 +73,12 @@ void modules_init_list(void) {
     module_subclass_table[1].class = MOD_CLASS_FS;
     strncpy(module_subclass_table[1].subclass_name, "ext2", MOD_SUBCLASS_STRLEN);
 
+    module_subclass_table[2].class = MOD_CLASS_DISCOVERY;
+    strncpy(module_subclass_table[2].subclass_name, "dtb", MOD_SUBCLASS_STRLEN);
+
     ADD_MODULE(0, _binary_system_build_vfs_vfs_elf, MOD_CLASS_VFS, 0)
     ADD_MODULE(1, _binary_system_build_ext2_ext2_elf, MOD_CLASS_FS, 1)
+    //ADD_MODULE(2, _binary_system_build_dtb_dtb_elf, MOD_CLASS_DISCOVERY, 2)
 }
 
 static void start_module(modules_list_t* mod) {

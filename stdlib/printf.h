@@ -14,8 +14,8 @@ void console_write_hex_fixed(uint64_t hex, uint8_t digits);
  * %s - string
  * %d - int64_t
  * %u - uint64_t
- * %h - hex
- * %[0-9]+h - hex with fixed width
+ * %x - hex
+ * %[0-9]+x - hex with fixed width
  * %% - %
  */
 
