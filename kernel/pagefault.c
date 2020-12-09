@@ -31,6 +31,7 @@ void pagefault_handler(uint64_t vector, uint32_t esr) {
     task_t* active_task = get_active_task();
 
     console_printf("tid %u\n", active_task->tid);
+    console_printf("name %s\n", active_task->name);
 
     switch (ec) {
         case EC_INST_ABORT_LOWER:

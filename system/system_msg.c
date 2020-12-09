@@ -4,13 +4,15 @@
 
 #include "system/system_msg.h"
 #include "system/system_lib.h"
+#include "system/system_assert.h"
+#include "system/system_dtb.h"
 
 #include "include/k_syscall.h"
 
-static module_union_handlers_t s_handlers;
+static module_handlers_t s_handlers;
 static module_class_t s_class;
 
-void system_register_handler(module_union_handlers_t handlers, module_class_t class) {
+void system_register_handler(module_handlers_t handlers, module_class_t class) {
     s_handlers = handlers;
     switch (class) {
         case MOD_CLASS_VFS:
@@ -23,20 +25,28 @@ void system_register_handler(module_union_handlers_t handlers, module_class_t cl
     }
 }
 
-int64_t system_get_dst(module_class_t class, char* subclass) {
-    uint64_t x1, x2;
-    x1 = 0;
-    x2 = 0;
-    if (strnlen(subclass, 16) <= 8) {
-        strncpy((char*)&x1, subclass, 8);
-        x2 = 0;
-    } else {
-        strncpy((char*)&x1, subclass, 8);
-        strncpy((char*)&x2, &subclass[8], 8);
-    }
+int64_t system_startmod_class(module_class_t class, char* subclass) {
+    module_startmod_t startmod;
+
+    startmod.startsel = MOD_STARTSEL_CLASS;
+    startmod.data.class_subclass.class = class;
+    strncpy(startmod.data.class_subclass.subclass_name, subclass, MOD_SUBCLASS_STRLEN);
 
     int64_t ret;
-    SYSCALL_CALL_RET(SYSCALL_GETMOD, class, x1, x2, 0, ret)
+    SYSCALL_CALL_RET(SYSCALL_STARTMOD, (uintptr_t)&startmod, 0, 0, 0, ret)
+    return ret;
+}
+
+int64_t system_startmod_compat(char* compat) {
+    SYS_ASSERT(compat != NULL);
+
+    module_startmod_t startmod;
+
+    startmod.startsel = MOD_STARTSEL_COMPAT;
+    strncpy(startmod.data.compat.compat_name, compat, MAX_DTB_NODE_NAME);
+
+    int64_t ret;
+    SYSCALL_CALL_RET(SYSCALL_STARTMOD, (uintptr_t)&startmod, 0, 0, 0, ret)
     return ret;
 }
 
@@ -61,14 +71,28 @@ int64_t system_recv_msg_raw(system_msg_t* msg) {
     return ret;
 }
 
-void system_send_msg_vfs(system_msg_t* msg) {
-    module_vfs_handlers_t h = s_handlers.vfs;
+void system_send_msg_generic(system_msg_t* msg) {
+    module_generic_handlers_t* h = &s_handlers.generic;
     switch (msg->port) {
-        case MOD_VFS_INFO:
-            h.info((system_msg_payload_t*)msg);
+        case MOD_GENERIC_INFO:
+            h->info((system_msg_payload_t*)msg);
             break;
-        case MOD_VFS_GETINFO:
-            h.getinfo((system_msg_payload_t*)msg);
+        case MOD_GENERIC_GETINFO:
+            h->getinfo((system_msg_payload_t*)msg);
+            break;
+        case MOD_GENERIC_DTB:
+            h->dtb((system_msg_memory_t*)msg);
+            break;
+        default:
+            break;
+    }
+}
+
+void system_send_msg_vfs(system_msg_t* msg) {
+    module_vfs_handlers_t h = s_handlers.class.vfs;
+    switch (msg->port) {
+        case MOD_VFS_DUMMY:
+            h.dummy((system_msg_payload_t*)msg);
             break;
         default:
             break;
@@ -76,14 +100,8 @@ void system_send_msg_vfs(system_msg_t* msg) {
 }
 
 void system_send_msg_fs(system_msg_t* msg) {
-    module_fs_handlers_t h = s_handlers.fs;
+    module_fs_handlers_t h = s_handlers.class.fs;
     switch (msg->port) {
-        case MOD_FS_INFO:
-            h.info((system_msg_payload_t*)msg);
-            break;
-        case MOD_FS_GETINFO:
-            h.getinfo((system_msg_payload_t*)msg);
-            break;
         case MOD_FS_STR:
             h.printstr((system_msg_memory_t*)msg);
             break;
@@ -101,15 +119,20 @@ int64_t system_recv_msg(void) {
         return ret;
     }
 
-    switch (s_class) {
-        case MOD_CLASS_VFS:
-            system_send_msg_vfs(&msg);
-            break;
-        case MOD_CLASS_FS:
-            system_send_msg_fs(&msg);
-            break;
-        default:
-            break;
+    if (msg.port < MAX_MOD_GENERIC_PORT) {
+        system_send_msg_generic(&msg);
+    } else {
+
+        switch (s_class) {
+            case MOD_CLASS_VFS:
+                system_send_msg_vfs(&msg);
+                break;
+            case MOD_CLASS_FS:
+                system_send_msg_fs(&msg);
+                break;
+            default:
+                break;
+        }
     }
 
     return 0;

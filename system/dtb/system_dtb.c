@@ -6,6 +6,7 @@
 #include "system/system_msg.h"
 #include "system/system_console.h"
 #include "system/system_assert.h"
+#include "system/system_dtb.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -16,7 +17,6 @@
 
 #define MAX_DTB_PROPERTIES 1024
 #define MAX_DTB_NODES 128
-#define MAX_DTB_NODE_NAME 64
 #define MAX_DTB_NODE_PROPERTIES 32
 #define MAX_DTB_NODE_CHILDREN 64
 #define MAX_DTB_PROPERTY_LEN 64
@@ -294,6 +294,9 @@ void print_node(uint8_t* dtbmem, fdt_header_t* header, fdt_node_t* node, uint64_
         fdt_property_t* prop = &s_fdt_property_list[node->properties_list[idx]];
         char* prop_name = get_fdt_string(header, dtbmem, prop->nameoff);
 
+        /*if (strncmp(prop_name, "compatible", 10) != 0) {
+            continue;
+        }*/
         print_node_padding(sub_padding);
         console_printf("PROP %s: \n", prop_name);
         print_node_padding(sub_padding + 2);
@@ -337,8 +340,7 @@ void print_node(uint8_t* dtbmem, fdt_header_t* header, fdt_node_t* node, uint64_
     console_flush();
 }
 
-void main(void* parameters) {
-
+void main(uint64_t my_tid, module_ctx_t* ctx) {
 
     console_printf("DTB\n");
     console_flush();
@@ -373,10 +375,58 @@ void main(void* parameters) {
 
     get_fdt_node(dtb_tree, root_node);
 
-    print_node(devicetree, &header, root_node, 0);
+    //print_node(devicetree, &header, root_node, 0);
 
-    console_printf("DONE\n");
-    console_flush();
+    //console_printf("DONE\n");
+    //console_flush();
+
+    int64_t idx;
+    for (idx = 0; idx < root_node->num_children; idx++) {
+        fdt_node_t* child_node = &s_fdt_node_list[root_node->children_list[idx]];
+
+        // Check if a compatiblity property is present
+        int64_t prop_idx;
+        fdt_property_t* prop;
+        for (prop_idx = 0; prop_idx < child_node->num_properties; prop_idx++) {
+            prop = &s_fdt_property_list[child_node->properties_list[prop_idx]];
+            char* prop_name = get_fdt_string(&header, devicetree, prop->nameoff);
+            if (strncmp(prop_name, "compatible", strlen("compatible")+1) == 0) {
+                break;
+            }
+        }
+        if (prop_idx == child_node->num_properties) {
+            continue;
+        }
+        if (prop->type != FDT_PROP_TYPE_STR) {
+            continue;
+        }
+
+        // The property data may not have a nul terminator
+        char wellformed_compat[MAX_DTB_PROPERTY_LEN + 1] = {0};
+        memcpy(wellformed_compat, prop->data.str.data, prop->data.str.len);
+
+        // Found a compatiblity node. Start a module
+        int64_t mod_tid = system_startmod_compat(wellformed_compat);
+
+        if (mod_tid > 0) {
+            // Got a handle to a module. Now send it
+            // a DTB message
+
+            system_msg_memory_t dtb_msg = {
+                .type = MSG_TYPE_MEMORY,
+                .flags = 0,
+                .dst = mod_tid,
+                .src = my_tid,
+                .port = MOD_GENERIC_DTB,
+                .ptr = (uintptr_t)child_node->name,
+                .len = MAX_DTB_NODE_NAME,
+                .payload = {0}
+            };
+
+            system_send_msg((system_msg_t*)&dtb_msg);
+        }
+    }
+
 
     while (1) {
         system_recv_msg();

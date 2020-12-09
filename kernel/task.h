@@ -16,6 +16,8 @@
 #define TASK_STD_STACK_SIZE 8192
 #define KERNEL_STD_STACK_SIZE 8192
 
+#define MAX_TASK_NAME_LEN 16
+
 #define GET_CURR_TID(x) \
     READ_SYS_REG("TPIDR_EL1", x)
 
@@ -62,6 +64,7 @@ typedef struct task_t_ {
 
     uint32_t tid;
     uint8_t asid;
+    char name[MAX_TASK_NAME_LEN];
 
     run_state_t run_state;
     wait_reason_t wait_reason;
@@ -93,14 +96,16 @@ uint64_t create_task(uint64_t* user_stack_base,
                      uint64_t kernel_stack_size,
                      task_reg_t* reg,
                      memory_space_t* vm_table,
-                     bool kernel_task);
+                     bool kernel_task,
+                     char* name);
 uint64_t create_kernel_task(uint64_t stack_size, task_f task_entry, void* ctx);
 uint64_t create_system_task(uint64_t kernel_stack_size,
                             uintptr_t user_stack_base,
                             uint64_t user_stack_size,
                             memory_space_t* memspace,
                             task_f task_entry,
-                            void* ctx);
+                            void* ctx,
+                            char* name);
 //uint64_t create_user_task(uint64_t user_stack_size, uint64_t kernel_stack_size, memory_space_t memspace, task_f task_entry, void* ctx);
 void restore_context_asm(task_reg_t* reg, uint64_t* exstack);
 

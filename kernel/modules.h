@@ -8,9 +8,9 @@ void modules_init_list(void);
 
 void modules_start(void);
 
-int64_t syscall_getmod(uint64_t class,
-                       uint64_t subclass0,
-                       uint64_t subclass1,
-                       uint64_t x3);
+int64_t syscall_startmod(uint64_t startmod_struct,
+                         uint64_t x1,
+                         uint64_t x2,
+                         uint64_t x3);
 
 #endif

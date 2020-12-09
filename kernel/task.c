@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "kernel/task.h"
 #include "kernel/assert.h"
@@ -110,7 +111,8 @@ uint64_t create_task(uint64_t* user_stack_base,
                      uint64_t kernel_stack_size,
                      task_reg_t* reg,
                      memory_space_t* memspace,
-                     bool kernel_task) {
+                     bool kernel_task,
+                     char* name) {
 
     ASSERT(kernel_stack_base != NULL);
     ASSERT(kernel_stack_size > 0);
@@ -182,6 +184,11 @@ uint64_t create_task(uint64_t* user_stack_base,
     kernel_stack_base[-1] = (uint64_t)bad_task_return;
     kernel_stack_base[-2] = (uint64_t)&kernel_stack_base[-2];
 
+    strncpy(task->name, name, MAX_TASK_NAME_LEN);
+
+    // Populate x0 with the task's tid
+    task->reg.gp[TASK_REG(0)] = task->tid;
+
     return task->tid;
 }
 
@@ -193,11 +200,11 @@ uint64_t create_kernel_task(uint64_t stack_size,
     ASSERT(stack_ptr != NULL);
 
     task_reg_t reg;
-    reg.gp[TASK_REG(0)] = (uint64_t)ctx;
+    reg.gp[TASK_REG(1)] = (uint64_t)ctx;
     reg.spsr = TASK_SPSR_M(4); // EL1t SP
     reg.elr = (uint64_t)task_entry;
 
-    return create_task(NULL, 0, stack_ptr, stack_size, &reg, NULL, true);
+    return create_task(NULL, 0, stack_ptr, stack_size, &reg, NULL, true, "kernel");
 }
 
 uint64_t create_system_task(uint64_t kernel_stack_size,
@@ -205,7 +212,8 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
                             uint64_t user_stack_size,
                             memory_space_t* memspace,
                             task_f task_entry,
-                            void* ctx) {
+                            void* ctx,
+                            char* name) {
 
     uint64_t* kernel_stack_ptr = (uint64_t*)kmalloc_phy(kernel_stack_size);
     ASSERT(kernel_stack_ptr != NULL);
@@ -232,13 +240,13 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
     for (uint64_t idx = 0; idx < 31; idx++) {
         reg.gp[TASK_REG(idx)] = 0;
     }
-    reg.gp[TASK_REG(0)] = (uint64_t)ctx;
+    reg.gp[TASK_REG(1)] = (uint64_t)ctx;
     reg.spsr = TASK_SPSR_M(0); // EL0t SP
     reg.elr = (uint64_t)task_entry;
 
     return create_task((uint64_t*)user_stack_base, user_stack_size,
                        (uint64_t*)kernel_stack_entry.base, kernel_stack_size,
-                       &reg, memspace, false);
+                       &reg, memspace, false, name);
 }
 
 uint64_t create_user_task(uint64_t user_stack_size,

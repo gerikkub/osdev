@@ -19,20 +19,6 @@ void ext2_info(system_msg_payload_t* msg) {
     console_printf("Ext2 Info: %c\n", msg->payload[0]);
     console_flush();
 
-    int64_t vfs_dst = system_get_dst(MOD_CLASS_VFS, "");
-    SYS_ASSERT(vfs_dst >= 0);
-
-    system_msg_payload_t info = {
-        .type = MSG_TYPE_PAYLOAD,
-        .flags = 0,
-        .dst = vfs_dst,
-        .src = my_id,
-        .port = MOD_FS_GETINFO,
-        .payload = {0}
-    }; 
-
-    int64_t ret = system_send_msg((system_msg_t*)&info);
-    SYS_ASSERT(ret >= 0);
 }
 
 void ext2_getinfo(system_msg_payload_t* msg) {
@@ -42,7 +28,7 @@ void ext2_getinfo(system_msg_payload_t* msg) {
         .flags = 0,
         .dst = msg->src,
         .src = my_id,
-        .port = MOD_FS_INFO,
+        .port = MOD_GENERIC_INFO,
         .payload = {'E', 0}
     };
 
@@ -55,31 +41,38 @@ void ext2_printstr(system_msg_memory_t* msg) {
     console_flush();
 }
 
-static module_fs_handlers_t handlers = {
-    .info = ext2_info,
-    .getinfo = ext2_getinfo,
-    .printstr = ext2_printstr
+void ext2_dtb(system_msg_memory_t* msg) {
+    console_printf("Fake Ext2 node name: %s\n", msg->ptr);
+    console_flush();
+}
+
+static module_handlers_t s_handlers = {
+    { // generic
+        .info = ext2_info,
+        .getinfo = ext2_getinfo,
+        .ioctl = NULL,
+        .dtb = ext2_dtb
+    },
+    { // class
+        .fs = {
+            .printstr = ext2_printstr
+        }
+    }
 };
 
-
-void main(void* parameters) {
+void main(uint64_t my_tid, module_ctx_t* ctx) {
 
     console_write("Ext2 Hello\n");
     console_flush();
 
-    int64_t me_src;
-    me_src = system_get_dst(MOD_CLASS_FS, "ext2");
-    SYS_ASSERT(me_src >= 0);
-    my_id = me_src;
+    my_id = my_tid;
 
-    module_union_handlers_t u_handlers;
-    u_handlers.fs = handlers;
-    system_register_handler(u_handlers, MOD_CLASS_FS);
+    system_register_handler(s_handlers, MOD_CLASS_FS);
 
     console_printf("EXT2\n");
     console_flush();
 
-    int64_t vfs_dst = system_get_dst(MOD_CLASS_VFS, "");
+    int64_t vfs_dst = system_startmod_class(MOD_CLASS_VFS, "");
     SYS_ASSERT(vfs_dst >= 0);
 
     /*

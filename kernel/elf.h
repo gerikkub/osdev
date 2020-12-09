@@ -52,7 +52,7 @@ typedef enum {
 
 #define USER_GUARD_PAGES (4096UL)
 
-uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* result, bool system_task);
+uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* result, bool system_task, char* name);
 
 #define ELF_MAX_MEMSPACE_ENTRIES 128
 

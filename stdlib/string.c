@@ -108,5 +108,9 @@ int strncmp(const char *s1, const char *s2, size_t n) {
     uint8_t* u1 = (uint8_t*)s1;
     uint8_t* u2 = (uint8_t*)s2;
 
-    return (*u1) > (*u2);
+    if ((*u1) > (*u2)) {
+        return 1;
+    } else {
+        return -1;
+    }
 }

@@ -18,7 +18,7 @@ static syscall_handler s_syscall_table[MAX_SYSCALL_NUM] = {0};
 
 const char* syscall_print_table[] = {
     "Yield", "Print", "SendMsg",
-    "GetMsgs", "GetMod", "MapDev"
+    "GetMsgs", "StartMod", "MapDev"
 };
 
 static int64_t syscall_yield(uint64_t x0,
@@ -130,7 +130,7 @@ void syscall_init(void) {
     s_syscall_table[SYSCALL_PRINT] = syscall_console_print;
     s_syscall_table[SYSCALL_GETMSGS] = syscall_getmsgs;
     s_syscall_table[SYSCALL_SENDMSG] = syscall_sendmsg;
-    s_syscall_table[SYSCALL_GETMOD] = syscall_getmod;
+    s_syscall_table[SYSCALL_STARTMOD] = syscall_startmod;
     s_syscall_table[SYSCALL_MAPDEV] = syscall_mapdev;
 
     set_sync_handler(EC_SVC, syscall_sync_handler);

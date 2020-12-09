@@ -137,7 +137,7 @@ static elf_result_t elf_add_memspace_entry(memory_space_t* memspace, _elf64_phdr
     return ELF_VALID;
 }
 
-uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* result, bool system_task) {
+uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* result, bool system_task, char* name) {
 
     ASSERT(elf_data != NULL);
     ASSERT(elf_size > 0);
@@ -237,7 +237,8 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
                                  USER_STACK_SIZE,
                                  &elf_space,
                                  (task_f)header->e_entry,
-                                 NULL);
+                                 NULL,
+                                 name);
     } else {
         ASSERT(0);
         tid = 0;
