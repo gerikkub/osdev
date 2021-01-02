@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "system/system_lib.h"
-#include "system/system_msg.h"
-#include "system/system_console.h"
-#include "system/system_assert.h"
-#include "system/system_dtb.h"
+#include "system/lib/system_lib.h"
+#include "system/lib/system_msg.h"
+#include "system/lib/system_console.h"
+#include "system/lib/system_assert.h"
+#include "system/lib/system_dtb.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -19,7 +19,7 @@
 #define MAX_DTB_NODES 128
 #define MAX_DTB_NODE_PROPERTIES 32
 #define MAX_DTB_NODE_CHILDREN 64
-#define MAX_DTB_PROPERTY_LEN 64
+#define MAX_DTB_PROPERTY_LEN 128
 
 typedef struct __attribute__((packed)) {
     uint32_t magic;
@@ -375,10 +375,10 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
 
     get_fdt_node(dtb_tree, root_node);
 
-    //print_node(devicetree, &header, root_node, 0);
+    // print_node(devicetree, &header, root_node, 0);
 
-    //console_printf("DONE\n");
-    //console_flush();
+    console_printf("DTB DONE\n");
+    console_flush();
 
     int64_t idx;
     for (idx = 0; idx < root_node->num_children; idx++) {
@@ -412,14 +412,18 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
             // Got a handle to a module. Now send it
             // a DTB message
 
+            module_ctx_t dtb_ctx;
+            dtb_ctx.startsel = MOD_STARTSEL_COMPAT;
+            strncpy(dtb_ctx.ctx.dtb.name, child_node->name, 64);
+
             system_msg_memory_t dtb_msg = {
                 .type = MSG_TYPE_MEMORY,
                 .flags = 0,
                 .dst = mod_tid,
                 .src = my_tid,
-                .port = MOD_GENERIC_DTB,
-                .ptr = (uintptr_t)child_node->name,
-                .len = MAX_DTB_NODE_NAME,
+                .port = MOD_GENERIC_CTX,
+                .ptr = (uintptr_t)&dtb_ctx,
+                .len = sizeof(dtb_ctx),
                 .payload = {0}
             };
 

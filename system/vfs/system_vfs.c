@@ -2,10 +2,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "system/system_lib.h"
-#include "system/system_msg.h"
-#include "system/system_console.h"
-#include "system/system_assert.h"
+#include "system/lib/system_lib.h"
+#include "system/lib/system_msg.h"
+#include "system/lib/system_console.h"
+#include "system/lib/system_assert.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -39,7 +39,7 @@ static module_handlers_t s_handlers = {
         .info = vfs_info,
         .getinfo = vfs_getinfo,
         .ioctl = NULL,
-        .dtb = NULL
+        .ctx = NULL
     },
     { // class
         .vfs = {

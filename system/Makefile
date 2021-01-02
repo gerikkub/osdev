@@ -4,7 +4,8 @@ SOURCE_DIR := $(shell pwd)/
 
 TOOLS_DIR = $(SOURCE_DIR)/../tools
 
-COMP_DIR = $(TOOLS_DIR)/compiler/bin
+#COMP_DIR = $(TOOLS_DIR)/compiler/bin
+COMP_DIR = /usr/local/bin
 
 SYSTEMS_DIR = $(SOURCE_DIR)/system
 STDLIB_DIR = $(SOURCE_DIR)/stdlib
@@ -18,7 +19,7 @@ MOD_SRC_DIR = $(SYSTEMS_DIR)/$(MOD)
 
 #C_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.c)),$(MOD)/$(SRC))
 C_SOURCES = $(foreach SRC,$(notdir $(wildcard $(MOD_SRC_DIR)/*.c)),$(MOD)/$(SRC))
-C_SYS_SOURCES = $(foreach SRC,$(notdir $(wildcard $(SYSTEMS_DIR)/*.c)),$(SYSTEMS_DIR)/$(SRC))
+C_SYS_SOURCES = $(foreach SRC,$(notdir $(wildcard $(SYSTEMS_DIR)/lib/*.c)),$(SYSTEMS_DIR)/lib/$(SRC))
 C_SYS_SOURCES += $(foreach SRC,$(notdir $(wildcard $(STDLIB_DIR)/*.c)),$(STDLIB_DIR)/$(SRC))
 
 #ASM_SOURCES = $(foreach SRC,$(notdir $(shell echo $(MOD_SRC_DIR)/*.s)),$(MOD)/$(SRC))
@@ -110,12 +111,12 @@ all: $(TARGET)
 OBJECTS = $(addprefix $(BUILD_DIR)/$(MOD)/,$(notdir $(C_SOURCES:.c=.o)))
 vpath %.c $(MOD_SRC_DIR)
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(C_SYS_SOURCES:.c=.o)))
-vpath %.c $(SYSTEMS_DIR)
+vpath %.c $(SYSTEMS_DIR)/lib
 vpath %.c $(STDLIB_DIR)
 # list of ASM program objects
 OBJECTS += $(addprefix $(BUILD_DIR)/$(MOD)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(MOD_SRC_DIR)
-vpath %.s $(SYSTEMS_DIR)
+vpath %.s $(SYSTEMS_DIR)/lib
 
 
 

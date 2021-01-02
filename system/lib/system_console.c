@@ -6,9 +6,9 @@
 
 #include "include/k_syscall.h"
 
-#include "system/system_console.h"
-#include "system/system_assert.h"
-#include "system/system_lib.h"
+#include "system/lib/system_console.h"
+#include "system/lib/system_assert.h"
+#include "system/lib/system_lib.h"
 
 #define CONSOLE_BUFFER_SIZE 512
 

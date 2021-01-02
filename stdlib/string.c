@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "kernel/assert.h"
@@ -30,6 +31,17 @@ int memcmp(const void *s1, const void *s2, size_t n) {
     }
 
     return 0;
+}
+
+void* memset(void* b, int c, size_t len) {
+    uint8_t c_8 = c;
+    uint8_t* b_8 = b;
+
+    while (len--) {
+        *b_8++ = c_8;
+    }
+
+    return b;
 }
 
 size_t strlen(const char *s) {
@@ -113,4 +125,44 @@ int strncmp(const char *s1, const char *s2, size_t n) {
     } else {
         return -1;
     }
+}
+
+uint64_t hextou64(const char* s1, size_t n, bool* valid) {
+
+    uint64_t res = 0;
+    bool valid_res = true;
+
+    if (*s1 == '\0') {
+        if (valid != NULL) {
+            *valid = false;
+        }
+        return 0;
+    }
+
+    while (*s1 != '\0' && n-- && valid_res) {
+        if (*s1 >= '0' &&
+            *s1 <= '9') {
+
+            res *= 16;
+            res += (*s1 - '0');
+        } else if (*s1 >= 'a' &&
+                   *s1 <= 'f') {
+            
+            res *= 16;
+            res += (*s1 - 'a' + 10);
+        } else if (*s1 >= 'A' &&
+                   *s1 <= 'F') {
+            
+            res *= 16;
+            res += (*s1 - 'A' + 10);
+        } else {
+            valid_res = false;
+        }
+        s1++;
+    }
+
+    if (valid != NULL) {
+        *valid = valid_res;
+    }
+    return res;
 }
