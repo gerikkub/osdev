@@ -4,6 +4,8 @@
 
 #include "kernel/assert.h"
 
+#include "stdlib/bitutils.h"
+
 #ifdef DEBUG
 #include "kernel/console.h"
 #endif
@@ -86,12 +88,15 @@ void* kmalloc_phy(uint64_t bytes) {
         s_last_memblock++;
         ASSERT(s_last_memblock < NUM_MEM_BLOCKS)
 
+        s_memblocks[idx].size = pagebytes;
+
         s_memblocks[s_last_memblock].ptr = s_memblocks[idx].ptr + pagebytes;
         s_memblocks[s_last_memblock].size = leftover_pagebytes;
         s_memblocks[s_last_memblock].flags = 0;
     } 
 
     s_memblocks[idx].flags |= MEMBLOCK_FLAG_ALLOCATED;
+    MEM_DMB();
     return s_memblocks[idx].ptr;
 }
 
@@ -107,4 +112,5 @@ void kfree_phy(void* ptr) {
     ASSERT(idx < s_last_memblock)
 
     s_memblocks[idx].flags &= ~(MEMBLOCK_FLAG_ALLOCATED);
+    MEM_DMB();
 }

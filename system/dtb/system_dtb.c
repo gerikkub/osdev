@@ -7,6 +7,7 @@
 #include "system/system_console.h"
 #include "system/system_assert.h"
 #include "system/system_dtb.h"
+#include "system/system_malloc.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -343,6 +344,24 @@ void print_node(uint8_t* dtbmem, fdt_header_t* header, fdt_node_t* node, uint64_
 void main(uint64_t my_tid, module_ctx_t* ctx) {
 
     console_printf("DTB\n");
+    console_flush();
+
+    malloc_init();
+
+    void* ptr_1 = malloc(30);
+    void* ptr_2 = malloc(77);
+    void* ptr_3 = malloc(90);
+
+    console_printf("1: %x\n2: %x\n3: %x\n",
+                   (uintptr_t)ptr_1,
+                   (uintptr_t)ptr_2,
+                   (uintptr_t)ptr_3);
+    console_flush();
+    
+    free(ptr_1);
+
+    void* ptr_4 = malloc(19);
+    console_printf("\n4: %x\n", (uintptr_t)ptr_4);
     console_flush();
 
     fdt_header_t header;

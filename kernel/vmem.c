@@ -470,3 +470,7 @@ void vmem_deallocate_table(_vmem_table* table_ptr) {
     // One day...
 }
 
+void vmem_flush_tlb(void) {
+    asm volatile("TLBI VMALLE1");
+    MEM_DSB();
+}

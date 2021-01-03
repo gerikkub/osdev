@@ -10,6 +10,7 @@
 #define SYSCALL_GETMSGS 3
 #define SYSCALL_STARTMOD 4
 #define SYSCALL_MAPDEV 5
+#define SYSCALL_SBRK 6
 
 
 enum {

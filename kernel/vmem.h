@@ -122,5 +122,7 @@ bool vmem_walk_table(_vmem_table* table_ptr, uint64_t vmem_addr, uint64_t* phy_a
 void vmem_print_l0_table(_vmem_table* table_ptr);
 void vmem_deallocate_table(_vmem_table* table_ptr);
 
+void vmem_flush_tlb(void);
+
 
 #endif

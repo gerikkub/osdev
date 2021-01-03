@@ -151,7 +151,7 @@ void console_printf(const char* fmt, ...) {
     va_end(args);
 }
 
-// static console_log_level_t s_max_level = LOG_DEBUG;
+//static console_log_level_t s_max_level = LOG_DEBUG;
 static console_log_level_t s_max_level = LOG_INFO;
 
 void console_set_log_level(console_log_level_t level) {
