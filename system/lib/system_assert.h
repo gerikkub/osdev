@@ -2,7 +2,7 @@
 #ifndef __SYSTEM_ASSERT_H__
 #define __SYSTEM_ASSERT_H__
 
-#include "system/system_console.h"
+#include "system/lib/system_console.h"
 #include "stdlib/printf.h"
 
 #define SYS_ASSERT(X)  \

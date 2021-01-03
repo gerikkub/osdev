@@ -34,8 +34,8 @@ SOURCE_DIR := $(shell pwd)
 
 TOOLS_DIR = $(SOURCE_DIR)/../tools
 
-COMP_DIR = $(TOOLS_DIR)/compiler/bin
-#COMP_DIR = /usr/local/bin
+#COMP_DIR = $(TOOLS_DIR)/compiler/bin
+COMP_DIR = /usr/local/bin
 
 SYSTEMS_DIR = system
 
@@ -91,7 +91,10 @@ kernel/exception_asm.s
 SYS_MODS = \
 $(SYSTEMS_DIR)/ext2 \
 $(SYSTEMS_DIR)/vfs \
-$(SYSTEMS_DIR)/dtb
+$(SYSTEMS_DIR)/dtb \
+$(SYSTEMS_DIR)/virtio_mmio \
+$(SYSTEMS_DIR)/pcie \
+$(SYSTEMS_DIR)/virtio_pci_blk
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 
@@ -227,10 +230,12 @@ clean:
 
 
 run: $(BUILD_DIR)/$(TARGET).elf
-	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $< -fw_cfg opt/cfg1,string=hello
+	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $< \
+	-drive file=test_ext2.qcow2,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
 debug: $(BUILD_DIR)/$(TARGET).elf
-	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $< -fw_cfg opt/cfg1,string=hello
+	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $< \
+	-drive file=test_ext2.qcow2,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
 .PHONY: run debug
 

@@ -14,7 +14,7 @@ typedef struct {
     msg_payload_fun info;
     msg_payload_fun getinfo;
     msg_payload_fun ioctl;
-    msg_memory_fun dtb;
+    msg_memory_fun ctx;
 } module_generic_handlers_t;
 
 typedef struct {
@@ -39,6 +39,7 @@ int64_t system_recv_msg(void);
 
 int64_t system_startmod_class(module_class_t class, char* subclass);
 int64_t system_startmod_compat(char* compat);
+int64_t system_startmod_pci(uint16_t vendor, uint16_t device);
 
 
 #endif

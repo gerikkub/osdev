@@ -2,10 +2,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "system/system_msg.h"
-#include "system/system_lib.h"
-#include "system/system_assert.h"
-#include "system/system_dtb.h"
+#include "system/lib/system_msg.h"
+#include "system/lib/system_lib.h"
+#include "system/lib/system_assert.h"
+#include "system/lib/system_dtb.h"
 
 #include "include/k_syscall.h"
 
@@ -50,6 +50,19 @@ int64_t system_startmod_compat(char* compat) {
     return ret;
 }
 
+int64_t system_startmod_pci(uint16_t vendor, uint16_t device) {
+
+    uint32_t vendor_device = ((uint32_t)vendor) << 16 | ((uint32_t)device & 0xFFFF);
+
+    module_startmod_t startmod;
+    startmod.startsel = MOD_STARTSEL_PCI;
+    startmod.data.pci_vendor_device = vendor_device;
+
+    int64_t ret;
+    SYSCALL_CALL_RET(SYSCALL_STARTMOD, (uintptr_t)&startmod, 0, 0, 0, ret)
+    return ret;
+}
+
 int64_t system_send_msg(system_msg_t* msg) {
     uint64_t x0, x1, x2, x3;
     char* msg_8 = (char*)msg;
@@ -80,8 +93,8 @@ void system_send_msg_generic(system_msg_t* msg) {
         case MOD_GENERIC_GETINFO:
             h->getinfo((system_msg_payload_t*)msg);
             break;
-        case MOD_GENERIC_DTB:
-            h->dtb((system_msg_memory_t*)msg);
+        case MOD_GENERIC_CTX:
+            h->ctx((system_msg_memory_t*)msg);
             break;
         default:
             break;

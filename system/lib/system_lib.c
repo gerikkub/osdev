@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "system/system_lib.h"
+#include "system/lib/system_lib.h"
 #include "include/k_syscall.h"
 
 void* system_map_device(uintptr_t device, uint64_t len) {

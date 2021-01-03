@@ -2,10 +2,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "system/system_lib.h"
-#include "system/system_msg.h"
-#include "system/system_console.h"
-#include "system/system_assert.h"
+#include "system/lib/system_lib.h"
+#include "system/lib/system_msg.h"
+#include "system/lib/system_console.h"
+#include "system/lib/system_assert.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -41,7 +41,7 @@ void ext2_printstr(system_msg_memory_t* msg) {
     console_flush();
 }
 
-void ext2_dtb(system_msg_memory_t* msg) {
+void ext2_ctx(system_msg_memory_t* msg) {
     console_printf("Fake Ext2 node name: %s\n", msg->ptr);
     console_flush();
 }
@@ -51,7 +51,7 @@ static module_handlers_t s_handlers = {
         .info = ext2_info,
         .getinfo = ext2_getinfo,
         .ioctl = NULL,
-        .dtb = ext2_dtb
+        .ctx = ext2_ctx
     },
     { // class
         .fs = {
