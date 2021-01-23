@@ -201,12 +201,14 @@ void syscall_sync_handler(uint64_t vector, uint32_t esr) {
     task_t* task_ptr = get_active_task();
     uint64_t ret;
 
+    /*
     console_log(LOG_DEBUG, "Syscall %s Tid %u\n", syscall_print_table[syscall_num], task_ptr->tid);
     console_log(LOG_DEBUG, " ELR: %16x\n", task_ptr->reg.elr);
     console_log(LOG_DEBUG, " x0: %16x\n", task_ptr->reg.gp[0]);
     console_log(LOG_DEBUG, " x1: %16x\n", task_ptr->reg.gp[1]);
     console_log(LOG_DEBUG, " x2: %16x\n", task_ptr->reg.gp[2]);
     console_log(LOG_DEBUG, " x3: %16x\n", task_ptr->reg.gp[3]);
+    */
 
     ret = handler(task_ptr->reg.gp[0],
                   task_ptr->reg.gp[1],

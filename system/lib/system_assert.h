@@ -7,7 +7,7 @@
 
 #define SYS_ASSERT(X)  \
 if (!(X)) { \
-    console_printf("panic: %s:%u " #X "\n", __FILE__, __LINE__); \
+    console_printf("panic: %s:%u %s\n", __FILE__, __LINE__, #X ); \
     console_flush(); \
     while (1); \
 }

@@ -81,10 +81,6 @@ typedef struct {
 } module_startmod_t;
 
 typedef struct {
-    char name[64];
-} module_dtb_ctx_t;
-
-typedef struct {
     uintptr_t header_phy;
 
     uintptr_t io_base;
@@ -104,11 +100,6 @@ typedef struct {
 
 typedef struct {
     module_startsel_t startsel;
-
-    union {
-        module_dtb_ctx_t dtb;
-        module_pci_ctx_t pci;
-    } ctx;
 } module_ctx_t;
 
 #endif

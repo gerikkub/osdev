@@ -19,7 +19,7 @@ typedef struct __attribute__((packed)) {
     uint32_t type;
     uint32_t flags;
     uint64_t phy_addr;
-    uint64_t args[5];
+    uint64_t args[4];
 } memory_entry_t;
 
 // MEMSPACE_PHY
@@ -31,7 +31,7 @@ typedef struct __attribute__((packed)) {
     uint32_t flags;     // Permissions
     uint64_t phy_addr;  // Physical address of the page range
     uint64_t kmem_addr; // Address of the page in kernel space
-    uint64_t res[2];
+    uint64_t res[3];
 } memory_entry_phy_t;
 
 // MEMSPACE_DEVICE
@@ -42,7 +42,7 @@ typedef struct __attribute__((packed)) {
     uint32_t type;      // MEMSPACE_DEVICE
     uint32_t flags;     // Permissions
     uint64_t phy_addr;  // Physical address of the page range
-    uint64_t res[3];
+    uint64_t res[4];
 } memory_entry_device_t;
 
 // MEMSPACE_STACK

@@ -2,16 +2,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "system/system_lib.h"
-#include "system/system_assert.h"
+#include "system/lib/system_lib.h"
+#include "system/lib/system_assert.h"
 
 #include "stdlib/bitutils.h"
 
 #include "include/k_syscall.h"
 
-#define MIN_LEFTOVER_SIZE 1024
+#define MIN_LEFTOVER_SIZE 64
 #define MALLOC_MAGIC (0xA5A51F1FBCBC9393ULL)
-#define MIN_MALLOC_SBRK_SIZE 4096
+#define MIN_MALLOC_SBRK_SIZE 32768
 
 struct _malloc_entry_t;
 
@@ -44,7 +44,22 @@ malloc_state_t s_malloc_state;
  * chunk is designated with a NULL next pointer
  */
 
+void malloc_check_structure_p(malloc_state_t* state) {
 
+    SYS_ASSERT(state->magic == MALLOC_MAGIC);
+
+    malloc_entry_t* curr_entry = state->first_entry;
+    do {
+        SYS_ASSERT(curr_entry->magic == MALLOC_MAGIC);
+        if (curr_entry->next != NULL) {
+            SYS_ASSERT(curr_entry->next == (curr_entry->chunk_start + curr_entry->size));
+        } else {
+            SYS_ASSERT(state->limit == (uintptr_t)(curr_entry->chunk_start + curr_entry->size));
+        }
+
+        curr_entry = curr_entry->next;
+    } while(curr_entry != NULL);
+}
 
 void malloc_init_p(malloc_state_t* state) {
     SYS_ASSERT(state != NULL);
@@ -77,11 +92,19 @@ void malloc_add_mem_p(uint64_t req_size, malloc_state_t* state) {
     SYS_ASSERT(state != NULL);
     SYS_ASSERT(state->magic == MALLOC_MAGIC);
 
+    console_log(LOG_INFO, "Sbrk %d bytes\n", req_size);
+
     uint64_t size = req_size > MIN_MALLOC_SBRK_SIZE ? req_size : MIN_MALLOC_SBRK_SIZE;
+
+    static uint64_t add_count = 0;
 
     int64_t new_limit;
     SYSCALL_CALL_RET(SYSCALL_SBRK, size, 0, 0, 0, new_limit);
     SYS_ASSERT(new_limit > 0);
+
+    add_count++;
+    console_printf("Add count: %d\n", add_count);
+    console_flush();
 
     uintptr_t old_limit = state->limit;
     state->limit = new_limit;
@@ -96,7 +119,7 @@ void malloc_add_mem_p(uint64_t req_size, malloc_state_t* state) {
         malloc_entry_t* new_last_entry = (malloc_entry_t*)old_limit;
         new_last_entry->magic = MALLOC_MAGIC;
         new_last_entry->next = NULL;
-        new_last_entry->size = old_limit - new_limit - sizeof(malloc_entry_t);
+        new_last_entry->size = new_limit - old_limit - sizeof(malloc_entry_t);
         new_last_entry->inuse = false;
         new_last_entry->chunk_start = new_last_entry + 1;
 
@@ -106,14 +129,17 @@ void malloc_add_mem_p(uint64_t req_size, malloc_state_t* state) {
         uint64_t last_entry_size = (uintptr_t)new_limit - (uintptr_t)last_entry->chunk_start;
         last_entry->size = last_entry_size;
     }
+
+    malloc_check_structure_p(state);
 }
 
 void* malloc_p(uint64_t size, malloc_state_t* state) {
     SYS_ASSERT(state != NULL);
     SYS_ASSERT(state->magic == MALLOC_MAGIC);
 
+    //console_log(LOG_INFO, "malloc %d bytes\n", size);
+
     uint64_t size_align = (size + sizeof(uint64_t) - 1) & (~(sizeof(uint64_t) - 1));
-    console_log(LOG_DEBUG, "malloc of size: %x. Aligned %x\n", size, size_align);
 
     malloc_entry_t* curr_entry = state->first_entry;
 
@@ -139,9 +165,10 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
         uint64_t leftover = curr_entry->size - size_align;
         curr_entry->inuse = true;
 
-        if (leftover > MIN_LEFTOVER_SIZE) {
+        if (leftover < MIN_LEFTOVER_SIZE) {
             // Don't fragment the memory space too much. If we have less than
             // MIN_LEFTOVER_SIZE bytes left in the entry, just use the entire entry
+            malloc_check_structure_p(state);
             return curr_entry->chunk_start;
         } else {
             // Need to split the chunk into two
@@ -155,9 +182,11 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
             new_entry->inuse = false;
             new_entry->chunk_start = new_entry + 1;
 
+            curr_entry->size = size_align;
             curr_entry->next = new_entry;
         }
 
+        malloc_check_structure_p(state);
         return curr_entry->chunk_start;
     }
 }
@@ -185,6 +214,8 @@ void free_p(void* mem, malloc_state_t* state) {
         // Something is wrong with the entry. Give up
         SYS_ASSERT(false);
     }
+
+    malloc_check_structure_p(state);
 }
 
 

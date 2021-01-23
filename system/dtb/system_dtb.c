@@ -7,6 +7,8 @@
 #include "system/lib/system_console.h"
 #include "system/lib/system_assert.h"
 #include "system/lib/system_dtb.h"
+#include "system/lib/system_malloc.h"
+#include "system/lib/libdtb.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -20,68 +22,6 @@
 #define MAX_DTB_NODE_PROPERTIES 32
 #define MAX_DTB_NODE_CHILDREN 64
 #define MAX_DTB_PROPERTY_LEN 128
-
-typedef struct __attribute__((packed)) {
-    uint32_t magic;
-    uint32_t totalsize;
-    uint32_t off_dt_struct;
-    uint32_t off_dt_strings;
-    uint32_t off_mem_rsvmap;
-    uint32_t version;
-    uint32_t last_comp_version;
-    uint32_t boot_cpuid_phys;
-    uint32_t size_dt_strings;
-    uint32_t size_dt_struct;
-} fdt_header_t;
-
-typedef enum {
-    FDT_TOKEN_BEGIN_NODE = 0x1,
-    FDT_TOKEN_END_NODE = 0x2,
-    FDT_TOKEN_PROP = 0x3,
-    FDT_TOKEN_NOP = 0x4,
-    FDT_TOKEN_END = 0x9
-} fdt_token_t;
-
-typedef struct __attribute__((packed)) {
-    uint32_t token;
-    uint32_t len;
-    uint32_t nameoff;
-} fdt_property_token_t;
-
-typedef enum {
-    FDT_PROP_TYPE_UNKNOWN = 0,
-    FDT_PROP_TYPE_EMPTY,
-    FDT_PROP_TYPE_U8,
-    FDT_PROP_TYPE_U16,
-    FDT_PROP_TYPE_U32,
-    FDT_PROP_TYPE_U64,
-    FDT_PROP_TYPE_STR
-} fdt_property_type_t;
-
-typedef struct {
-    union {
-        uint8_t u8;
-        uint16_t u16;
-        uint32_t u32;
-        uint64_t u64;
-        struct {
-            char data[MAX_DTB_PROPERTY_LEN];
-            int64_t len;
-        } str;
-    } data;
-    fdt_property_type_t type;
-
-    uint32_t nameoff;
-} fdt_property_t;
-
-typedef struct {
-    char name[MAX_DTB_NODE_NAME];
-    bool name_valid;
-    uint64_t properties_list[MAX_DTB_NODE_PROPERTIES];
-    int64_t num_properties;
-    uint64_t children_list[MAX_DTB_NODE_CHILDREN];
-    int64_t num_children;
-} fdt_node_t;
 
 static fdt_property_t s_fdt_property_list[MAX_DTB_PROPERTIES] = {0};
 static int64_t s_fdt_property_idx = 0;
@@ -118,12 +58,6 @@ void get_fdt_header(fdt_header_t* header_out) {
     *header_out = header_fix;
 }
 
-char* get_fdt_string(fdt_header_t* header, uint8_t* dtbmem, uint32_t stroff) {
-    SYS_ASSERT(header != NULL);
-    
-    return (char*)&dtbmem[header->off_dt_strings + stroff];
-}
-
 bool is_token_nop(uint32_t token) {
     return en_swap_32(token) == FDT_TOKEN_NOP;
 }
@@ -144,37 +78,8 @@ uint8_t* get_fdt_property(uint8_t* dtb_ptr, fdt_property_t* property) {
     uint32_t prop_len = en_swap_32(token.len);
 
     property->nameoff = en_swap_32(token.nameoff);
-    switch (prop_len) {
-        case 0:
-            property->type = FDT_PROP_TYPE_EMPTY;
-            break;
-        case 1:
-            property->type = FDT_PROP_TYPE_U8;
-            property->data.u8 = *prop_value_ptr;
-            break;
-        case 2:
-            property->type = FDT_PROP_TYPE_U16;
-            property->data.u16 = en_swap_16(*(uint16_t*)prop_value_ptr);
-            break;
-        case 4:
-            property->type = FDT_PROP_TYPE_U32;
-            property->data.u32 = en_swap_32(*(uint32_t*)prop_value_ptr);
-            break;
-        case 8:
-            property->type = FDT_PROP_TYPE_U64;
-            property->data.u64 = en_swap_64(*(uint64_t*)prop_value_ptr);
-            break;
-        default:
-            property->type = FDT_PROP_TYPE_STR;
-            if (prop_len < MAX_DTB_PROPERTY_LEN) {
-                memcpy(property->data.str.data, prop_value_ptr, prop_len);
-                property->data.str.len = prop_len;
-            } else {
-                // Not enough storage space
-                property->data.str.len = -1;
-            }
-            break;
-    }
+    property->data_len = prop_len;
+    property->data_ptr = prop_value_ptr;
 
     // Skip over padding added to the property
     // to align the next token to a uint32_t
@@ -188,6 +93,8 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
     SYS_ASSERT(dtb_ptr != NULL);
     SYS_ASSERT(node != NULL);
 
+    console_printf("get_fdt_node: %x %x\n", dtb_ptr, node);
+
     uint32_t* token_ptr = (uint32_t*)dtb_ptr;
     uint32_t token = en_swap_32(*token_ptr);
     SYS_ASSERT(token == FDT_TOKEN_BEGIN_NODE);
@@ -196,7 +103,11 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
 
     // Read in the name as a null terminated string
     char* node_name_ptr = (char*)token_ptr;
-    strncpy(node->name, node_name_ptr, MAX_DTB_NODE_NAME);
+    if (node->name == NULL) {
+        node_name_ptr[0] = '\0';
+    } else {
+        strncpy(node->name, node_name_ptr, MAX_DTB_NODE_NAME);
+    }
 
     uint64_t node_name_len = 0;
     while (*node_name_ptr != '\0') {
@@ -223,6 +134,7 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
     // of the node
     token_ptr = (uint32_t*)node_name_padded;
 
+    node->properties_list = malloc(sizeof(uint64_t) * MAX_DTB_NODE_PROPERTIES);
     node->num_properties = 0;
 
     // Parse all properties first. These are guaranteed to be
@@ -242,6 +154,8 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
             token_ptr = (uint32_t*)get_fdt_property((uint8_t*)token_ptr, prop);
         }
     }
+
+    node->children_list = malloc(sizeof(uint64_t) * MAX_DTB_NODE_CHILDREN);
 
     // Parse all child nodes
     while (is_token_value_or_nop(*token_ptr, FDT_TOKEN_BEGIN_NODE)) {
@@ -273,72 +187,73 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
     return (uint8_t*)token_ptr;
 }
 
-void print_node_padding(uint64_t padding) {
-    for (uint64_t idx = 0; idx < padding; idx++) {
-        console_putc(' ');
-    }
-}
+// void print_node_padding(uint64_t padding) {
+//     for (uint64_t idx = 0; idx < padding; idx++) {
+//         console_putc(' ');
+//     }
+// }
 
-void print_node(uint8_t* dtbmem, fdt_header_t* header, fdt_node_t* node, uint64_t padding) {
+// void print_node(uint8_t* dtbmem, fdt_header_t* header, fdt_node_t* node, uint64_t padding) {
 
-    SYS_ASSERT(dtbmem != NULL);
-    SYS_ASSERT(header != NULL);
-    SYS_ASSERT(node != NULL);
+//     SYS_ASSERT(dtbmem != NULL);
+//     SYS_ASSERT(header != NULL);
+//     SYS_ASSERT(node != NULL);
 
-    print_node_padding(padding);
-    console_printf("NODE: %s %c\n", node->name, node->name_valid ? 'v' : 'x');
+//     print_node_padding(padding);
+//     console_printf("NODE: %s %c\n", node->name, node->name_valid ? 'v' : 'x');
 
-    // Print all properties
-    uint64_t sub_padding = padding + 2;
-    for (uint64_t idx = 0; idx < node->num_properties; idx++) {
-        fdt_property_t* prop = &s_fdt_property_list[node->properties_list[idx]];
-        char* prop_name = get_fdt_string(header, dtbmem, prop->nameoff);
+//     // Print all properties
+//     uint64_t sub_padding = padding + 2;
+//     for (uint64_t idx = 0; idx < node->num_properties; idx++) {
+//         fdt_property_t* prop = &s_fdt_property_list[node->properties_list[idx]];
+//         char* prop_name = get_fdt_string(header, dtbmem, prop->nameoff);
 
-        /*if (strncmp(prop_name, "compatible", 10) != 0) {
-            continue;
-        }*/
-        print_node_padding(sub_padding);
-        console_printf("PROP %s: \n", prop_name);
-        print_node_padding(sub_padding + 2);
-        switch(prop->type) {
-            case FDT_PROP_TYPE_UNKNOWN:
-                console_printf("UNKNOWN\n");
-                break;
-            case FDT_PROP_TYPE_EMPTY:
-                console_printf("EMPTY\n");
-                break;
-            case FDT_PROP_TYPE_U8:
-                console_printf("u8: %2x\n", prop->data.u8);
-                break;
-            case FDT_PROP_TYPE_U16:
-                console_printf("u16: %4x\n", prop->data.u16);
-                break;
-            case FDT_PROP_TYPE_U32:
-                console_printf("u32: %8x\n", prop->data.u32);
-                break;
-            case FDT_PROP_TYPE_U64:
-                console_printf("u64: %16x\n", prop->data.u64);
-                break;
-            case FDT_PROP_TYPE_STR:
-                console_printf("str: %s OR ", prop->data.str.data);
-                for (int i = 0; i < prop->data.str.len; i++) {
-                    console_printf("%2x ", prop->data.str.data[i]);
-                }
-                console_printf("\n");
-                break;
-            default:
-                SYS_ASSERT(0);
-        }
-    }
+//         /*if (strncmp(prop_name, "compatible", 10) != 0) {
+//             continue;
+//         }*/
+//         print_node_padding(sub_padding);
+//         console_printf("PROP %s: \n", prop_name);
+//         print_node_padding(sub_padding + 2);
+//         /*
+//         switch(prop->type) {
+//             case FDT_PROP_TYPE_UNKNOWN:
+//                 console_printf("UNKNOWN\n");
+//                 break;
+//             case FDT_PROP_TYPE_EMPTY:
+//                 console_printf("EMPTY\n");
+//                 break;
+//             case FDT_PROP_TYPE_U8:
+//                 console_printf("u8: %2x\n", prop->data.u8);
+//                 break;
+//             case FDT_PROP_TYPE_U16:
+//                 console_printf("u16: %4x\n", prop->data.u16);
+//                 break;
+//             case FDT_PROP_TYPE_U32:
+//                 console_printf("u32: %8x\n", prop->data.u32);
+//                 break;
+//             case FDT_PROP_TYPE_U64:
+//                 console_printf("u64: %16x\n", prop->data.u64);
+//                 break;
+//             case FDT_PROP_TYPE_STR:
+//                 console_printf("str: %s OR ", prop->data.str.data);
+//                 for (int i = 0; i < prop->data.str.len; i++) {
+//                     console_printf("%2x ", prop->data.str.data[i]);
+//                 }
+//                 console_printf("\n");
+//                 break;
+//             default:
+//                 SYS_ASSERT(0);
+//         }*/
+//     }
 
-    // Print all children nodes
-    for (uint64_t idx = 0; idx < node->num_children; idx++ ) {
-        fdt_node_t* child = &s_fdt_node_list[node->children_list[idx]];
-        print_node(dtbmem, header, child, padding + 2);
-    }
+//     // Print all children nodes
+//     for (uint64_t idx = 0; idx < node->num_children; idx++ ) {
+//         fdt_node_t* child = &s_fdt_node_list[node->children_list[idx]];
+//         print_node(dtbmem, header, child, padding + 2);
+//     }
 
-    console_flush();
-}
+//     console_flush();
+// }
 
 void main(uint64_t my_tid, module_ctx_t* ctx) {
 
@@ -398,6 +313,17 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
     console_printf("DTB DONE\n");
     console_flush();
 
+    fdt_ctx_t fdt_ctx = {
+        .fdt = devicetree,
+        .header = &header,
+        .property_list = s_fdt_property_list,
+        .num_properties = s_fdt_property_idx,
+        .node_list = s_fdt_node_list,
+        .num_nodes = s_fdt_node_idx
+    };
+
+    dt_block_t* block = dt_build_block(root_node, &fdt_ctx);
+
     int64_t idx;
     for (idx = 0; idx < root_node->num_children; idx++) {
         fdt_node_t* child_node = &s_fdt_node_list[root_node->children_list[idx]];
@@ -407,7 +333,7 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
         fdt_property_t* prop;
         for (prop_idx = 0; prop_idx < child_node->num_properties; prop_idx++) {
             prop = &s_fdt_property_list[child_node->properties_list[prop_idx]];
-            char* prop_name = get_fdt_string(&header, devicetree, prop->nameoff);
+            char* prop_name = fdt_get_string(&header, devicetree, prop->nameoff);
             if (strncmp(prop_name, "compatible", strlen("compatible")+1) == 0) {
                 break;
             }
@@ -415,13 +341,10 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
         if (prop_idx == child_node->num_properties) {
             continue;
         }
-        if (prop->type != FDT_PROP_TYPE_STR) {
-            continue;
-        }
 
         // The property data may not have a nul terminator
         char wellformed_compat[MAX_DTB_PROPERTY_LEN + 1] = {0};
-        memcpy(wellformed_compat, prop->data.str.data, prop->data.str.len);
+        memcpy(wellformed_compat, prop->data_ptr, prop->data_len);
 
         // Found a compatiblity node. Start a module
         int64_t mod_tid = system_startmod_compat(wellformed_compat);
@@ -430,9 +353,9 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
             // Got a handle to a module. Now send it
             // a DTB message
 
-            module_ctx_t dtb_ctx;
-            dtb_ctx.startsel = MOD_STARTSEL_COMPAT;
-            strncpy(dtb_ctx.ctx.dtb.name, child_node->name, 64);
+            module_ctx_t compat_ctx = {
+                .startsel = MOD_STARTSEL_COMPAT
+            };
 
             system_msg_memory_t dtb_msg = {
                 .type = MSG_TYPE_MEMORY,
@@ -440,10 +363,13 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
                 .dst = mod_tid,
                 .src = my_tid,
                 .port = MOD_GENERIC_CTX,
-                .ptr = (uintptr_t)&dtb_ctx,
-                .len = sizeof(dtb_ctx),
+                .ptr = (uintptr_t)block,
+                .len = sizeof(dt_block_t) + block->len,
                 .payload = {0}
             };
+
+            SYS_ASSERT(sizeof(compat_ctx) <= sizeof(dtb_msg.payload));
+            memcpy(dtb_msg.payload, &compat_ctx, sizeof(compat_ctx));
 
             system_send_msg((system_msg_t*)&dtb_msg);
         }

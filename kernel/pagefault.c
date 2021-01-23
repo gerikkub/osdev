@@ -18,6 +18,8 @@ void pagefault_print_backtrace(task_t* task) {
 
     console_printf("Backtrace:\n");
 
+    console_printf("%16x ", task->reg.elr);
+
     uint64_t frame_addr = task->reg.gp[29];
 
     uint64_t depth = 0;
@@ -27,13 +29,15 @@ void pagefault_print_backtrace(task_t* task) {
         walk_ok = vmem_walk_table(task->low_vm_table, frame_addr, &phy_addr);
         if (walk_ok) {
             struct stackframe_t* frame_ptr = (struct stackframe_t*)PHY_TO_KSPACE(phy_addr);
-            console_printf(" %16x\n", frame_ptr->lr);
+            console_printf("%16x ", frame_ptr->lr - 4);
             frame_addr = frame_ptr->fp;
         } else {
             break;
         }
         depth++;
     }
+
+    console_printf("\n");
 }
 
 void pagefault_handler(uint64_t vector, uint32_t esr) {
@@ -63,14 +67,35 @@ void pagefault_handler(uint64_t vector, uint32_t esr) {
 
     pagefault_print_backtrace(active_task);
 
+    console_printf("Registers:\n");
+    for (uint32_t idx = 0; idx < 31; idx++) {
+        if (idx < 10) {
+            console_printf("X%d:  %16x ",
+                           idx, active_task->reg.gp[idx]);
+        } else {
+            console_printf("X%d: %16x ",
+                           idx, active_task->reg.gp[idx]);
+        }
+
+        if (idx%2 == 1) {
+            console_printf("\n");
+        }
+    }
+
+    console_printf("\n");
+
     switch (ec) {
         case EC_INST_ABORT_LOWER:
+            PANIC("Userspace Pagefault on instruction");
+            break;
         case EC_INST_ABORT:
-            PANIC("Pagefault on instruction");
+            PANIC("Kernelspace Pagefault on instruction");
             break;
         case EC_DATA_ABORT_LOWER:
+            PANIC("Userspace Pagefault on data");
+            break;
         case EC_DATA_ABORT:
-            PANIC("Pagefault on data");
+            PANIC("Kernelspace Pagefault on data");
             break;
         default:
             PANIC("Unknown Pagefault");

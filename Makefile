@@ -34,8 +34,8 @@ SOURCE_DIR := $(shell pwd)
 
 TOOLS_DIR = $(SOURCE_DIR)/../tools
 
-#COMP_DIR = $(TOOLS_DIR)/compiler/bin
-COMP_DIR = /usr/local/bin
+COMP_DIR = $(TOOLS_DIR)/compiler/bin
+#COMP_DIR = /usr/local/bin
 
 SYSTEMS_DIR = system
 
