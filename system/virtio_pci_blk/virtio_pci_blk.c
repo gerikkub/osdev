@@ -69,7 +69,7 @@ static void virtio_pci_blk_ctx(system_msg_memory_t* ctx_msg) {
     console_write("virtio-pci-blk got ctx\n");
     console_flush();
 
-    module_pci_ctx_t* pci_ctx = &((module_ctx_t*)ctx_msg->ptr)->ctx.pci;
+    module_pci_ctx_t* pci_ctx = (module_pci_ctx_t*)ctx_msg->ptr;
 
     pci_alloc_device_from_context(&s_pci_device, pci_ctx);
 

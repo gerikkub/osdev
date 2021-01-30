@@ -7,6 +7,7 @@
 #include "system/lib/system_console.h"
 #include "system/lib/system_assert.h"
 #include "system/lib/libpci.h"
+#include "system/lib/libdtb.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -342,18 +343,15 @@ void create_pci_device(pci_header0_t* header, uintptr_t header_phy) {
         }
     }
     
-    module_ctx_t ctx;
-    ctx.startsel = MOD_STARTSEL_PCI;
-    ctx.ctx.pci = device_ctx;
-
     system_msg_memory_t ctx_msg = {
         .type = MSG_TYPE_MEMORY,
         .flags = 0,
         .dst = driver_id,
         .src = my_id,
         .port = MOD_GENERIC_CTX,
-        .ptr = (uintptr_t)&ctx,
-        .len = sizeof(ctx)
+        .ptr = (uintptr_t)&device_ctx,
+        .len = sizeof(module_pci_ctx_t),
+        .payload = {MOD_STARTSEL_PCI}
     };
 
     system_send_msg((system_msg_t*)&ctx_msg);
@@ -375,39 +373,97 @@ void discover_pcie(void* pcie_mem, uint64_t len) {
     }
 }
 
+
+pci_range_t pcie_parse_ranges(dt_block_t* dt_block) {
+
+    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+
+    SYS_ASSERT(dt_node->std_properties_mask & DT_PROP_RANGES);
+    dt_prop_range_entry_t* dt_ranges = (dt_prop_range_entry_t*)&dt_block->data[dt_node->ranges.range_entries_off];
+    uint64_t dt_num_ranges = dt_node->ranges.num_ranges;
+
+    pci_range_t ranges = {0};
+
+    for (uint64_t idx = 0; idx < dt_num_ranges; idx++) {
+        dt_prop_range_entry_t* this_dt_range = &dt_ranges[idx];
+        uint64_t space = this_dt_range->pci_hi_addr & PCI_ADDR_HI_SPACE_MASK;
+
+        pci_addr_t* pci_addr;
+
+        switch (space) {
+            case PCI_ADDR_HI_SPACE_CONFIG:
+                break;
+            case PCI_ADDR_HI_SPACE_IO:
+                pci_addr = &ranges.io_pci_addr;
+                ranges.io_mem_addr = this_dt_range->parent_addr;
+                ranges.io_size = this_dt_range->size;
+                pci_addr->space = PCI_SPACE_IO;
+                break;
+            case PCI_ADDR_HI_SPACE_M32:
+                pci_addr = &ranges.m32_pci_addr;
+                ranges.m32_mem_addr = this_dt_range->parent_addr;
+                ranges.m32_size = this_dt_range->size;
+                pci_addr->space = PCI_SPACE_M32;
+                break;
+            case PCI_ADDR_HI_SPACE_M64:
+                pci_addr = &ranges.m64_pci_addr;
+                ranges.m64_mem_addr = this_dt_range->parent_addr;
+                ranges.m64_size = this_dt_range->size;
+                pci_addr->space = PCI_SPACE_M64;
+                break;
+            default:
+                SYS_ASSERT(false);
+        }
+
+        pci_addr->relocatable = this_dt_range->pci_hi_addr & PCI_ADDR_HI_RELOCATABLE;
+        pci_addr->prefetchable = this_dt_range->pci_hi_addr & PCI_ADDR_HI_PREFETCHABLE;
+        pci_addr->aliased = this_dt_range->pci_hi_addr & PCI_ADDR_HI_ALIASED;
+        pci_addr->bus = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_BUS_MASK) >> PCI_ADDR_HI_BUS_SHIFT;
+        pci_addr->device = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_DEVICE_MASK) >> PCI_ADDR_HI_DEVICE_SHIFT;
+        pci_addr->function = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_FUNCTION_MASK) >> PCI_ADDR_HI_FUNCTION_SHIFT;
+        pci_addr->reg = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_REGISTER_MASK) >> PCI_ADDR_HI_REGISTER_SHIFT;
+        pci_addr->addr = this_dt_range->child_addr;
+    }
+
+    return ranges;
+}
+
+void* pcie_parse_allocate_reg(dt_block_t* dt_block) {
+
+    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+
+    SYS_ASSERT(dt_node->std_properties_mask & DT_PROP_REG);
+    uint64_t dt_num_reg = dt_node->reg.num_regs;
+    SYS_ASSERT(dt_num_reg == 1);
+    dt_prop_reg_entry_t* dt_reg = (dt_prop_reg_entry_t*)&dt_block->data[dt_node->reg.reg_entries_off];
+
+    return system_map_device(dt_reg->addr, dt_reg->size);
+}
+
 void pcie_ctx(system_msg_memory_t* ctx_msg) {
 
-    module_ctx_t* ctx = (module_ctx_t*)ctx_msg->ptr;
-    if (ctx->startsel != MOD_STARTSEL_COMPAT &&
+    console_printf("Got ctx\n");
+    console_flush();
+
+    if (ctx_msg->payload[0] != MOD_STARTSEL_COMPAT &&
         ctx_msg->len >= sizeof(module_ctx_t)) {
         return;
     }
-    char* name = (char*)ctx->ctx.dtb.name;
+
+    dt_block_t* dt_block = (dt_block_t*)ctx_msg->ptr;
+
+    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+
+    char* name = (char*)&dt_block->data[dt_node->name_off];
 
     console_printf("Got name: %s\n", name);
+    console_printf("Address: %16x\n", dt_node->address);
     console_flush();
 
-    if (strncmp("pcie@", name, 5) != 0) {
-        console_printf("Invalid name: %s\n", name);
-        console_flush();
-        return;
-    }
+    pci_range_t dtb_ranges = pcie_parse_ranges(dt_block);
+    void* pcie_ptr = pcie_parse_allocate_reg(dt_block);
 
-    uint64_t name_len = strnlen(name, 64);
-    char* loc_s = name + 5;
-    uint64_t loc_len = name_len - 5;
-
-    bool loc_valid;
-    uint64_t loc = hextou64(loc_s, loc_len, &loc_valid);
-    if (!loc_valid) {
-        console_printf("Invalid location: %s\n", loc);
-        console_flush();
-        return;
-    }
-
-    loc = 0x4010000000;
-    void* pcie_ptr = system_map_device(loc, 0x10000000);
-
+    /*
     pci_range_t dtb_ranges = {
         .io_pci_addr = {
             .relocatable = false,
@@ -451,6 +507,7 @@ void pcie_ctx(system_msg_memory_t* ctx_msg) {
         .m64_mem_addr = 0x8000000000ULL,
         .m64_size = 0x8000000000ULL
     };
+    */
 
     s_pci_ranges = dtb_ranges;
     s_dtb_alloc.range_ctx = &s_pci_ranges;

@@ -103,6 +103,7 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
 
     // Read in the name as a null terminated string
     char* node_name_ptr = (char*)token_ptr;
+    node->name = malloc(MAX_DTB_NODE_NAME);
     if (node->name == NULL) {
         node_name_ptr[0] = '\0';
     } else {
@@ -325,33 +326,30 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
     dt_block_t* block = dt_build_block(root_node, &fdt_ctx);
 
     int64_t idx;
-    for (idx = 0; idx < root_node->num_children; idx++) {
-        fdt_node_t* child_node = &s_fdt_node_list[root_node->children_list[idx]];
+    dt_node_t* dt_root_node = (dt_node_t*)block->data;
+    SYS_ASSERT(dt_root_node->node_list_off < block->len);
+    uint64_t* node_list = (uint64_t*)&block->data[dt_root_node->node_list_off];
+    for (idx = 0; idx < dt_root_node->num_nodes; idx++) {
+        uint64_t child_node_off = node_list[idx];
+        SYS_ASSERT(child_node_off < block->len);
+        dt_node_t* child_node = (dt_node_t*)&block->data[child_node_off];
 
         // Check if a compatiblity property is present
-        int64_t prop_idx;
-        fdt_property_t* prop;
-        for (prop_idx = 0; prop_idx < child_node->num_properties; prop_idx++) {
-            prop = &s_fdt_property_list[child_node->properties_list[prop_idx]];
-            char* prop_name = fdt_get_string(&header, devicetree, prop->nameoff);
-            if (strncmp(prop_name, "compatible", strlen("compatible")+1) == 0) {
-                break;
-            }
-        }
-        if (prop_idx == child_node->num_properties) {
+        if (!(child_node->std_properties_mask & DT_PROP_COMPAT)) {
             continue;
         }
 
-        // The property data may not have a nul terminator
-        char wellformed_compat[MAX_DTB_PROPERTY_LEN + 1] = {0};
-        memcpy(wellformed_compat, prop->data_ptr, prop->data_len);
+        SYS_ASSERT(child_node->compat.compat_off < block->len);
+        char* compat_str = (char*)&block->data[child_node->compat.compat_off];
 
         // Found a compatiblity node. Start a module
-        int64_t mod_tid = system_startmod_compat(wellformed_compat);
+        int64_t mod_tid = system_startmod_compat(compat_str);
 
         if (mod_tid > 0) {
             // Got a handle to a module. Now send it
             // a DTB message
+
+            block->node_off = child_node_off;
 
             module_ctx_t compat_ctx = {
                 .startsel = MOD_STARTSEL_COMPAT
@@ -365,7 +363,7 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
                 .port = MOD_GENERIC_CTX,
                 .ptr = (uintptr_t)block,
                 .len = sizeof(dt_block_t) + block->len,
-                .payload = {0}
+                .payload = {MOD_STARTSEL_COMPAT}
             };
 
             SYS_ASSERT(sizeof(compat_ctx) <= sizeof(dtb_msg.payload));

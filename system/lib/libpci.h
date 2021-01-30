@@ -7,6 +7,25 @@
 
 #include "include/k_modules.h"
 
+#define PCI_ADDR_HI_RELOCATABLE (1 << 31)
+#define PCI_ADDR_HI_PREFETCHABLE (1 << 30)
+#define PCI_ADDR_HI_ALIASED (1 << 29)
+
+#define PCI_ADDR_HI_SPACE_MASK (3 << 24)
+#define PCI_ADDR_HI_SPACE_CONFIG (0 << 24)
+#define PCI_ADDR_HI_SPACE_IO (1 << 24)
+#define PCI_ADDR_HI_SPACE_M32 (2 << 24)
+#define PCI_ADDR_HI_SPACE_M64 (3 << 24)
+
+#define PCI_ADDR_HI_BUS_MASK (0xFF << 16)
+#define PCI_ADDR_HI_BUS_SHIFT (16)
+#define PCI_ADDR_HI_DEVICE_MASK (0x1F << 11)
+#define PCI_ADDR_HI_DEVICE_SHIFT (11)
+#define PCI_ADDR_HI_FUNCTION_MASK (7 << 8)
+#define PCI_ADDR_HI_FUNCTION_SHIFT (8)
+#define PCI_ADDR_HI_REGISTER_MASK (0xFF << 0)
+#define PCI_ADDR_HI_REGISTER_SHIFT (0)
+
 #define MAX_PCI_BAR 6
 
 typedef struct {

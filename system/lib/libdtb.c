@@ -156,7 +156,7 @@ static int dt_build_props(dt_node_t* node, fdt_node_t* fdt_node, void* block_dat
             uint64_t entry_size = node->parent_cells.addr + node->parent_cells.size;
             SYS_ASSERT(fdt_prop->data_len % entry_size == 0);
 
-            uint64_t num_entries = fdt_prop->data_len / entry_size;
+            uint64_t num_entries = fdt_prop->data_len / (entry_size * 4);
 
             // Allocate memory for each entry
             dt_prop_reg_entry_t* entry_ptr = block_data + *block_free_offset;
@@ -199,7 +199,7 @@ static int dt_build_props(dt_node_t* node, fdt_node_t* fdt_node, void* block_dat
             uint64_t entry_size = node->cells.addr + node->parent_cells.addr + node->cells.size;
             SYS_ASSERT(fdt_prop->data_len % entry_size == 0);
 
-            uint64_t num_entries = fdt_prop->data_len / entry_size;
+            uint64_t num_entries = fdt_prop->data_len / (entry_size * 4);
 
             // Allocate memory for each entry
             dt_prop_range_entry_t* entry_ptr = block_data + *block_free_offset;
@@ -267,7 +267,7 @@ static int dt_build_props(dt_node_t* node, fdt_node_t* fdt_node, void* block_dat
             uint64_t entry_size = node->cells.addr + node->parent_cells.addr + node->cells.size;
             SYS_ASSERT(fdt_prop->data_len % entry_size == 0);
 
-            uint64_t num_entries = fdt_prop->data_len / entry_size;
+            uint64_t num_entries = fdt_prop->data_len / (entry_size * 4);
 
             // Allocate memory for each entry
             dt_prop_dma_range_entry_t* entry_ptr = block_data + *block_free_offset;
@@ -375,28 +375,35 @@ static int dt_build_node(dt_node_t* node, fdt_node_t* fdt_node, dt_prop_cells_t*
         name_len = strnlen(fdt_node->name, 128) + 1;
         SYS_ASSERT(name_len != 128);
 
+        char* name_copy = malloc(name_len);
+        strncpy(name_copy, fdt_node->name, name_len);
+
         // Split the name based on a @ character, if present
         uint64_t idx = 0;
         bool have_address = false;
         char* address_str;
-        while (fdt_node->name[idx] != '\0') {
-            char* char_ptr = &fdt_node->name[idx];
+        while (name_copy[idx] != '\0') {
+            char* char_ptr = &name_copy[idx];
             if (*char_ptr == '@') {
                 have_address = true;
                 *char_ptr = '\0';
                 address_str = char_ptr + 1;
-                name_len = idx;
+                name_len = idx + 1;
                 break;
             }
+            idx++;
         }
+
         if (have_address) {
             bool valid_address;
             node->address = hextou64(address_str, 16, &valid_address);
             SYS_ASSERT(valid_address);
         }
 
-        node->name_off = dt_build_copy_mem(fdt_node->name, name_len, block_data,
+        node->name_off = dt_build_copy_mem(name_copy, name_len, block_data,
                                         block_free_offset, block_size);
+        free(name_copy);
+
     } else {
         node->name_off = dt_build_copy_mem("", 1, block_data,
                                            block_free_offset, block_size);
@@ -410,6 +417,7 @@ static int dt_build_node(dt_node_t* node, fdt_node_t* fdt_node, dt_prop_cells_t*
     uint64_t node_off_list_len = sizeof(uint64_t) * node->num_nodes;
     uint64_t* node_off_list;
     node_off_list = block_data + *block_free_offset;
+    node->node_list_off = *block_free_offset;
     *block_free_offset += node_off_list_len;
     SYS_ASSERT(*block_free_offset <= block_size);
 
