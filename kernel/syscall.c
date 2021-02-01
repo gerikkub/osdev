@@ -58,13 +58,23 @@ static int64_t syscall_console_print(uint64_t msg_intptr,
 
 static int64_t syscall_mapdev(uint64_t phy_addr,
                               uint64_t len,
-                              uint64_t x2,
-                              uint64_t x3) {
+                              uint64_t flags,
+                              uint64_t ctx) {
     memory_entry_device_t device_entry;
 
     task_t* task = get_active_task();
 
     memory_space_t* memspace = &task->memory;
+
+    uint64_t ctx_phy;
+    bool walk_ok;
+    walk_ok = vmem_walk_table(task->low_vm_table, ctx, &ctx_phy);
+    if (!walk_ok) {
+        return SYSCALL_ERROR_BADARG;
+    }
+    syscall_mapdev_ctx_t* return_ctx = (syscall_mapdev_ctx_t*)(PHY_TO_KSPACE(ctx_phy));
+    return_ctx->virt_addr = 0;
+    return_ctx->phy_addr = 0;
 
     bool valid;
     valid = memspace_alloc_space(memspace, len, (memory_entry_t*)&device_entry);
@@ -72,11 +82,16 @@ static int64_t syscall_mapdev(uint64_t phy_addr,
         return SYSCALL_ERROR_NOSPACE;
     }
 
-    device_entry.type = MEMSPACE_DEVICE;
+    if (flags & SYSCALL_MAPDEV_ANYPHY) {
+        device_entry.type = MEMSPACE_DEVICE;
+        device_entry.phy_addr = (uintptr_t)kmalloc_phy(len);
+    } else {
+        //TODO: This lets userspace map any memory range into their
+        //      memory. Potential security issue...
+        device_entry.type = MEMSPACE_DEVICE;
+        device_entry.phy_addr = phy_addr;
+    }
     device_entry.flags = MEMSPACE_FLAG_PERM_URW;
-    //TODO: This lets userspace map any memory range into their
-    //      memory. Potential security issue...
-    device_entry.phy_addr = phy_addr;
 
     valid = memspace_add_entry_to_memory(memspace, (memory_entry_t*)&device_entry);
     if (!valid) {
@@ -87,8 +102,9 @@ static int64_t syscall_mapdev(uint64_t phy_addr,
     vmem_deallocate_table(task->low_vm_table);
     task->low_vm_table = memspace_build_vmem(memspace);
 
-    uint64_t start_addr = device_entry.start;
-    return start_addr;
+    return_ctx->virt_addr = device_entry.start;
+    return_ctx->phy_addr = device_entry.phy_addr;
+    return SYSCALL_ERROR_OK;
 }
 
 /**

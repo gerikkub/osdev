@@ -20,4 +20,14 @@ enum {
     SYSCALL_ERROR_NOSPACE = -3,
 };
 
+enum {
+    SYSCALL_MAPDEV_ANYPHY = 1
+};
+
+typedef struct {
+    uintptr_t virt_addr;
+    uintptr_t phy_addr;
+} syscall_mapdev_ctx_t;
+
+
 #endif

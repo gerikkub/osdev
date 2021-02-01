@@ -11,6 +11,7 @@
 #define BIT(x) (1UL << (x))
 #define BITSIZE(x) BIT(x)
 
+#define ARR_ELEMENTS(arr) (sizeof(arr)/sizeof(arr[0]))
 
 #define WRITE_SYS_REG(reg, x) \
     do { \

@@ -159,6 +159,7 @@ typedef enum {
 typedef struct __attribute__((__packed__)) {
     uint8_t cap;
     uint8_t next;
+    uint8_t payload[];
 } pci_generic_capability_t;
 
 typedef struct __attribute__((__packed__)) {
@@ -184,9 +185,12 @@ typedef struct __attribute__((__packed__)) {
 
 void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* module_ctx);
 
+pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx);
+
 void print_pci_header(pci_device_ctx_t* device_ctx);
 void print_pci_capabilities(pci_device_ctx_t* device_ctx);
 void print_pci_capability_msix(pci_device_ctx_t* device_ctx, pci_msix_capability_t* cap_ptr);
 void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr);
+
 
 #endif

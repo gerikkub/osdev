@@ -66,6 +66,7 @@ void print_mmio(virtio_mmio_struct_t* device) {
 
 void virtio_mmio_ctx(system_msg_memory_t* ctx_msg) {
 
+/*
     module_ctx_t* ctx = (module_ctx_t*)ctx_msg->ptr;
     if (ctx->startsel != MOD_STARTSEL_COMPAT &&
         ctx_msg->len >= sizeof(module_ctx_t)) {
@@ -98,6 +99,8 @@ void virtio_mmio_ctx(system_msg_memory_t* ctx_msg) {
     device = system_map_device(loc, 512);
 
     print_mmio(device);
+
+    */
 }
 
 static module_handlers_t s_handlers = {

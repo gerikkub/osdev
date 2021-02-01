@@ -342,6 +342,8 @@ void create_pci_device(pci_header0_t* header, uintptr_t header_phy) {
             }
         }
     }
+
+    header->command |= 3;
     
     system_msg_memory_t ctx_msg = {
         .type = MSG_TYPE_MEMORY,

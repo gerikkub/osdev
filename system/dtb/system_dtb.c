@@ -93,8 +93,6 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
     SYS_ASSERT(dtb_ptr != NULL);
     SYS_ASSERT(node != NULL);
 
-    console_printf("get_fdt_node: %x %x\n", dtb_ptr, node);
-
     uint32_t* token_ptr = (uint32_t*)dtb_ptr;
     uint32_t token = en_swap_32(*token_ptr);
     SYS_ASSERT(token == FDT_TOKEN_BEGIN_NODE);
@@ -263,41 +261,11 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
 
     malloc_init();
 
-    void* ptr_1 = malloc(30);
-    void* ptr_2 = malloc(77);
-    void* ptr_3 = malloc(90);
-
-    console_printf("1: %x\n2: %x\n3: %x\n",
-                   (uintptr_t)ptr_1,
-                   (uintptr_t)ptr_2,
-                   (uintptr_t)ptr_3);
-    console_flush();
-    
-    free(ptr_1);
-
-    void* ptr_4 = malloc(19);
-    console_printf("\n4: %x\n", (uintptr_t)ptr_4);
-    console_flush();
-
     fdt_header_t header;
     get_fdt_header(&header);
 
-    console_printf("Got header\n");
-    console_flush();
-
     uint8_t* devicetree = system_map_device(0, header.totalsize);
     SYS_ASSERT(devicetree != NULL);
-
-    fdt_reserve_entry_t* res_entries = (fdt_reserve_entry_t*)(devicetree + header.off_mem_rsvmap);
-    console_printf("Reserved Regions:");
-    while (res_entries->address != 0 &&
-           res_entries->size != 0) {
-
-        console_printf(" %16X %X\n", en_swap_64(res_entries->address), en_swap_64(res_entries->size));
-        res_entries++;
-    }
-    console_printf("\n");
-    console_flush();
 
     uint8_t* dtb_tree = (devicetree + header.off_dt_struct);
 
@@ -308,11 +276,6 @@ void main(uint64_t my_tid, module_ctx_t* ctx) {
     s_fdt_node_idx++;
 
     get_fdt_node(dtb_tree, root_node);
-
-    // print_node(devicetree, &header, root_node, 0);
-
-    console_printf("DTB DONE\n");
-    console_flush();
 
     fdt_ctx_t fdt_ctx = {
         .fdt = devicetree,

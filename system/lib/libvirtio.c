@@ -6,9 +6,218 @@
 #include "system/lib/system_console.h"
 #include "system/lib/system_assert.h"
 #include "system/lib/system_lib.h"
+#include "system/lib/system_malloc.h"
 
 #include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
+
+pci_virtio_capability_t* virtio_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap) {
+
+    pci_virtio_capability_t* virtio_capability;
+    uint64_t idx = 0;
+
+    do {
+        virtio_capability = (pci_virtio_capability_t*)pci_get_capability(device_ctx, PCI_CAP_VENDOR, idx);
+        idx++;
+    } while (virtio_capability != NULL &&
+             virtio_capability->type != cap);
+    
+    return virtio_capability;
+}
+
+uint64_t virtio_get_features(pci_virtio_common_cfg_t* cfg) {
+
+    cfg->device_feature_sel = 1;
+    MEM_DMB();
+    uint32_t feat_high = cfg->device_feature;
+    MEM_DMB();
+    cfg->device_feature_sel = 0;
+    MEM_DMB();
+    uint32_t feat_low = cfg->device_feature;
+
+    return ((uint64_t)feat_high) << 32 | (uint64_t)feat_low;
+}
+
+void virtio_set_features(pci_virtio_common_cfg_t* cfg, uint64_t features) {
+
+    uint32_t feat_low = features & 0xFFFFFFFF;
+    uint32_t feat_high = (features >> 32) & 0xFFFFFFFF;
+
+    cfg->driver_feature_sel = 0;
+    MEM_DMB();
+    cfg->driver_feature = feat_low;
+    MEM_DMB();
+    cfg->driver_feature_sel = 1;
+    MEM_DMB();
+    cfg->driver_feature = feat_high;
+    MEM_DSB();
+}
+
+uint8_t virtio_get_status(pci_virtio_common_cfg_t* cfg) {
+    return cfg->device_status;
+}
+
+void virtio_set_status(pci_virtio_common_cfg_t* cfg, uint8_t status) {
+    cfg->device_status |= status;
+    MEM_DSB();
+}
+
+void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
+                        uint64_t queue_num, uint64_t queue_size,
+                        uint64_t pool_size,
+                        virtio_virtq_ctx_t* queue_out) {
+
+    SYS_ASSERT(cfg != NULL);
+    SYS_ASSERT(queue_out != NULL);
+
+    queue_out->queue_size = queue_size;
+
+    bool map_ok;
+    map_ok = system_map_anyphy(16 * queue_size, &queue_out->desc_phy, (uintptr_t*)&queue_out->desc_ptr);
+    SYS_ASSERT(map_ok);
+    queue_out->desc_phy &= 0xFFFFFFFFFFFF;
+    map_ok = system_map_anyphy(2 * queue_size, &queue_out->avail_phy, (uintptr_t*)&queue_out->avail_ptr);
+    SYS_ASSERT(map_ok);
+    queue_out->avail_phy &= 0xFFFFFFFFFFFF;
+    map_ok = system_map_anyphy(16 * queue_size, &queue_out->used_phy, (uintptr_t*)&queue_out->used_ptr);
+    SYS_ASSERT(map_ok);
+    queue_out->used_phy &= 0xFFFFFFFFFFFF;
+
+    queue_out->avail_ptr->idx = 0;
+    queue_out->used_ptr->idx = 0;
+    queue_out->last_used_idx = 0;
+
+    map_ok = system_map_anyphy(pool_size, &queue_out->buffer_pool_phy, (uintptr_t*)&queue_out->buffer_pool);
+    SYS_ASSERT(map_ok);
+    queue_out->buffer_pool_phy &= 0xFFFFFFFFFFFF;
+
+    malloc_init_p(&queue_out->buffer_malloc_state, NULL, queue_out->buffer_pool, pool_size);
+
+    cfg->queue_select = queue_num;
+    MEM_DSB();
+    queue_out->queue_notify_off = cfg->queue_notify_off;
+
+    cfg->queue_size = queue_size;
+    cfg->queue_desc = queue_out->desc_phy;
+    cfg->queue_driver = queue_out->avail_phy;
+    cfg->queue_device = queue_out->used_phy;
+    cfg->queue_enable = 1;
+    MEM_DSB();
+}
+
+bool virtio_get_buffer(virtio_virtq_ctx_t* queue_ctx, uint64_t buffer_len, uintptr_t* buffer_out) {
+
+    SYS_ASSERT(queue_ctx != NULL);
+    SYS_ASSERT(buffer_out != NULL);
+
+    void* buffer_ptr;
+    buffer_ptr = malloc_p(buffer_len, &queue_ctx->buffer_malloc_state);
+    if (buffer_ptr == NULL) {
+        return false;
+    }
+
+    *buffer_out = (uintptr_t)buffer_ptr;
+    return true;
+}
+
+void virtio_return_buffer(virtio_virtq_ctx_t* queue_ctx, void* buffer_ptr) {
+
+    SYS_ASSERT(queue_ctx != NULL);
+    SYS_ASSERT(buffer_ptr != NULL);
+
+    free_p(buffer_ptr, &queue_ctx->buffer_malloc_state);
+}
+
+bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
+                       virtio_virtq_buffer_t* write_buffers,
+                       uint64_t num_write_buffers,
+                       virtio_virtq_buffer_t* read_buffers,
+                       uint64_t num_read_buffers) {
+
+    SYS_ASSERT(queue_ctx != NULL);
+    SYS_ASSERT(num_write_buffers + num_read_buffers > 0);
+
+    if (num_write_buffers + num_read_buffers > queue_ctx->queue_size) {
+        return false;
+    }
+
+    // Write the descriptors
+    virtio_virtq_desc_t* virtq_desc = queue_ctx->desc_ptr;
+
+    uint64_t desc_idx = 0;
+
+    for (uint64_t write_idx = 0; write_idx < num_write_buffers; write_idx++) {
+        void* write_buffer = write_buffers[write_idx].ptr;
+
+        uintptr_t write_buffer_phy = queue_ctx->buffer_pool_phy + 
+                                        (write_buffer - queue_ctx->buffer_pool);
+        virtq_desc[desc_idx].addr = write_buffer_phy;
+        virtq_desc[desc_idx].len = write_buffers[write_idx].len;
+        virtq_desc[desc_idx].flags = VIRTQ_DESC_F_NEXT;
+        virtq_desc[desc_idx].next = desc_idx + 1;
+        desc_idx++;
+    }
+    for (uint64_t read_idx = 0; read_idx < num_read_buffers; read_idx++) {
+        void* read_buffer = read_buffers[read_idx].ptr;
+
+        uintptr_t read_buffer_phy = queue_ctx->buffer_pool_phy + 
+                                        (read_buffer - queue_ctx->buffer_pool);
+        virtq_desc[desc_idx].addr = read_buffer_phy;
+        virtq_desc[desc_idx].len = read_buffers[read_idx].len;
+        virtq_desc[desc_idx].flags = VIRTQ_DESC_F_NEXT |
+                                     VIRTQ_DESC_F_WRITE;
+        virtq_desc[desc_idx].next = desc_idx + 1;
+        desc_idx++;
+    }
+
+    virtq_desc[desc_idx-1].flags &= ~(VIRTQ_DESC_F_NEXT);
+
+    MEM_DSB();
+
+    // Write the available ring to start the transaction
+    virtio_virtq_avail_t* virtq_avail = queue_ctx->avail_ptr;
+
+    virtq_avail->flags = 0;
+    virtq_avail->ring[virtq_avail->idx] = 0;
+    MEM_DSB();
+
+    // Pass the buffers to the driver
+    virtq_avail->idx++;
+
+    MEM_DSB();
+    return true;
+}
+
+bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
+
+    MEM_DMB();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+    volatile uint16_t* used_idx_ptr = &queue_ctx->used_ptr->idx;
+#pragma GCC diagnostic pop
+
+    do {
+        if (*used_idx_ptr != queue_ctx->last_used_idx) {
+            return true;
+        }
+    } while (block);
+
+    return false;
+}
+
+void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx) {
+    void* cap_ptr = virtio_get_capability(ctx, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    SYS_ASSERT(cap_ptr != NULL);
+
+    pci_virtio_notify_capability_t* notify_cap = cap_ptr;
+
+    uint16_t* notify_addr = ctx->bar[notify_cap->cap.bar].vmem + notify_cap->cap.bar_offset +
+                                (queue_ctx->queue_notify_off * notify_cap->notify_off_multiplier);
+    
+    *notify_addr = queue_ctx->queue_num;
+    MEM_DSB();
+}
 
 void print_pci_capability_qemu(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr) {
 
@@ -21,7 +230,7 @@ void print_pci_capability_qemu(pci_device_ctx_t* device_ctx, pci_vendor_capabili
         "Virito PCI Cap PCI Cfg",
     };
 
-    pci_qemu_capability_t* qemu_cap_ptr = (pci_qemu_capability_t*) cap_ptr;
+    pci_virtio_capability_t* qemu_cap_ptr = (pci_virtio_capability_t*) cap_ptr;
 
     console_printf("  QEMU\n");
     if (qemu_cap_ptr->type < VIRTIO_PCI_CAP_MAX) {
@@ -43,15 +252,20 @@ void print_pci_capability_qemu(pci_device_ctx_t* device_ctx, pci_vendor_capabili
     console_flush();
 }
 
-void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_qemu_capability_t* cap_ptr) {
+void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_virtio_capability_t* cap_ptr) {
 
-    pci_qemu_virtio_common_cfg_t* common_cfg;
+    pci_virtio_common_cfg_t* common_cfg;
 
     common_cfg = device_ctx->bar[cap_ptr->bar].vmem + cap_ptr->bar_offset;
     common_cfg->device_feature_sel = 1;
-    console_printf("   Device Features: %8x", common_cfg->device_feature);
+    uint32_t feat_high = common_cfg->device_feature;
+    console_printf("   Device Features: %8x", feat_high);
     common_cfg->device_feature_sel = 0;
-    console_printf(" %8x\n", common_cfg->device_feature);
+    uint32_t feat_low = common_cfg->device_feature;
+    console_printf(" %8x\n", feat_low);
+
+    uint64_t device_id = ((pci_header_t*)device_ctx->header_vmem)->device_id - 0x1040;
+    print_virtio_feature_bits(feat_low, feat_high, device_id);
 
     common_cfg->driver_feature_sel = 1;
     console_printf("   Driver Features: %8x", common_cfg->driver_feature);
@@ -77,5 +291,80 @@ void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_qemu_capabil
         console_flush();
     }
 
+    console_flush();
+}
+
+struct virtio_flag_names_t {
+    int64_t num;
+    char* name;
+};
+
+static const struct virtio_flag_names_t virtio_res_flag_names[] = {
+    {VIRTIO_F_NOTIFY_ON_EMPTY, "VIRTIO_F_NOTIFY_ON_EMPTY"},
+    {VIRTIO_F_ANY_LAYOUT, "VIRTIO_F_ANY_LAYOUT"},
+    {VIRTIO_F_RING_INDIRECT_DESC, "VIRTIO_F_RING_INDIRECT_DESC"},
+    {VIRTIO_F_RING_EVENT_IDX, "VIRTIO_F_RING_EVENT_IDX"},
+    {VIRTIO_F_VERSION_1, "VIRTIO_F_VERSION_1"},
+    {VIRTIO_F_ACCESS_PLATFORM, "VIRTIO_F_ACCESS_PLATFORM"},
+    {VIRTIO_F_RING_PACKED, "VIRTIO_F_RING_PACKED"},
+    {VIRTIO_F_IN_ORDER, "VIRTIO_F_IN_ORDER"},
+    {VIRTIO_F_ORDER_PLATFORM, "VIRTIO_F_ORDER_PLATFORM"},
+    {VIRTIO_F_SR_IOV, "VIRTIO_F_SR_IOV"},
+    {VIRTIO_F_NOTIFICATION_DATA, "VIRTIO_F_NOTIFICATION_DATA"},
+    {-1, NULL}
+};
+
+static const struct virtio_flag_names_t virtio_blk_flag_names[] = {
+    {VIRTIO_BLK_F_SIZE_MAX, "VIRTIO_BLK_F_SIZE_MAX"},
+    {VIRTIO_BLK_F_SEG_MAX, "VIRTIO_BLK_F_SEG_MAX"},
+    {VIRTIO_BLK_F_GEOMETRY, "VIRTIO_BLK_F_GEOMETRY"},
+    {VIRTIO_BLK_F_RO, "VIRTIO_BLK_F_RO"},
+    {VIRTIO_BLK_F_BLK_SIZE, "VIRTIO_BLK_F_BLK_SIZE"},
+    {VIRTIO_BLK_F_FLUSH, "VIRTIO_BLK_F_FLUSH"},
+    {VIRTIO_BLK_F_TOPOLOGY, "VIRTIO_BLK_F_TOPOLOGY"},
+    {VIRTIO_BLK_F_CONFIG_WCE, "VIRTIO_BLK_F_CONFIG_WCE"},
+    {VIRTIO_BLK_F_DISCARD, "VIRTIO_BLK_F_DISCARD"},
+    {VIRTIO_BLK_F_WRITE_ZEROES, "VIRTIO_BLK_F_WRITE_ZEROES"},
+    {-1, NULL}
+};
+
+static const struct virtio_flag_names_t* virtio_device_flag_names[] = {
+    NULL,
+    NULL,
+    virtio_blk_flag_names
+};
+
+void print_virtio_feature_bits(uint32_t feat_low, uint32_t feat_high, uint64_t device_id) {
+
+    uint64_t feat = (((uint64_t)feat_high) << 32) | (uint64_t)feat_low;
+
+    for (int64_t idx = 0; idx < 64; idx++) {
+        if (feat & (1UL << idx)) {
+            bool found = false;
+            for (uint64_t name_idx = 0; name_idx < ARR_ELEMENTS(virtio_res_flag_names); name_idx++) {
+                if (virtio_res_flag_names[name_idx].num == idx) {
+                    console_printf("   %s\n", virtio_res_flag_names[name_idx].name);
+                    found = true;
+                }
+            }
+            if (!found) {
+
+                if (device_id < ARR_ELEMENTS(virtio_device_flag_names)) {
+                    const struct virtio_flag_names_t* device_flag_names = virtio_device_flag_names[device_id];
+                    if (device_flag_names != NULL) {
+                        for (uint64_t name_idx = 0; device_flag_names[name_idx].num != -1; name_idx++) {
+                            if (device_flag_names[name_idx].num == idx) {
+                                console_printf("   %s\n", device_flag_names[name_idx].name);
+                                found = true;
+                            }
+                        }
+                    }
+                }
+                if (!found) {
+                    console_printf("   Unknown Flag: %u\n", idx);
+                }
+            }
+        }
+    }
     console_flush();
 }

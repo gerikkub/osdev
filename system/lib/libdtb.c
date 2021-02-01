@@ -167,7 +167,7 @@ static int dt_build_props(dt_node_t* node, fdt_node_t* fdt_node, void* block_dat
 
             // Build each entry
             for (uint64_t idx = 0; idx < num_entries; idx++) {
-                uint8_t* reg_ptr = fdt_prop->data_ptr + (idx * entry_size);
+                uint8_t* reg_ptr = fdt_prop->data_ptr + (idx * entry_size * 4);
 
                 uint64_t addr = 0;
                 for (uint64_t cell_idx = 0; cell_idx < node->parent_cells.addr; cell_idx++) {
@@ -210,7 +210,7 @@ static int dt_build_props(dt_node_t* node, fdt_node_t* fdt_node, void* block_dat
 
             // Build each entry
             for (uint64_t idx = 0; idx < num_entries; idx++) {
-                uint8_t* reg_ptr = fdt_prop->data_ptr + (idx * entry_size);
+                uint8_t* reg_ptr = fdt_prop->data_ptr + (idx * entry_size * 4);
 
                 uint64_t child_addr_cells = node->cells.addr;
                 uint64_t pci_hi_addr = 0;
@@ -246,7 +246,7 @@ static int dt_build_props(dt_node_t* node, fdt_node_t* fdt_node, void* block_dat
                 }
 
                 uint64_t size = 0;
-                for (uint64_t cell_idx = 0; cell_idx < node->cells.addr; cell_idx++) {
+                for (uint64_t cell_idx = 0; cell_idx < node->cells.size; cell_idx++) {
                     uint32_t cell = (reg_ptr[0] << 24) |
                                     (reg_ptr[1] << 16) |
                                     (reg_ptr[2] << 8) |
@@ -278,7 +278,7 @@ static int dt_build_props(dt_node_t* node, fdt_node_t* fdt_node, void* block_dat
 
             // Build each entry
             for (uint64_t idx = 0; idx < num_entries; idx++) {
-                uint8_t* reg_ptr = fdt_prop->data_ptr + (idx * entry_size);
+                uint8_t* reg_ptr = fdt_prop->data_ptr + (idx * entry_size * 4);
 
                 uint64_t child_addr_cells = node->cells.addr;
                 uint64_t pci_hi_addr = 0;

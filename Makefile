@@ -76,7 +76,8 @@ kernel/messages.c
 C_SRC_LIBS = \
 stdlib/string.c \
 stdlib/printf.c \
-stdlib/bitutils.c
+stdlib/bitutils.c \
+stdlib/linalloc.c
 
 
 # C sources
@@ -231,11 +232,11 @@ clean:
 
 run: $(BUILD_DIR)/$(TARGET).elf
 	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $< \
-	-drive file=test_ext2.qcow2,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
+	-drive file=test_flat.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
 debug: $(BUILD_DIR)/$(TARGET).elf
 	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $< \
-	-drive file=test_ext2.qcow2,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
+	-drive file=test_flat.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
 .PHONY: run debug
 

@@ -4,6 +4,7 @@
 
 #include "system/lib/system_lib.h"
 #include "system/lib/system_assert.h"
+#include "system/lib/system_malloc.h"
 
 #include "stdlib/bitutils.h"
 
@@ -14,22 +15,6 @@
 #define MIN_MALLOC_SBRK_SIZE 32768
 
 struct _malloc_entry_t;
-
-typedef struct _malloc_entry_t {
-    uint64_t magic;                 /* Equal to MALLOC_MAGIC */
-    struct _malloc_entry_t* next;   /* Pointer to the next malloc_entry, or NULL if the last entry */
-    uint64_t size;                  /* Size of the associated chunk */
-    bool inuse;                     /* Is the chunk currently allocated? */
-    void* chunk_start;              /* Pointer to the beginnning of chunk memory */
-} malloc_entry_t;
-
-
-typedef struct {
-    uintptr_t base;                 /* Base address of malloc's memory */
-    uintptr_t limit;                /* Limit address of malloc's memory */
-    malloc_entry_t* first_entry;    /* First entry. Should be the same as the base pointer */
-    uint64_t magic;                 /* Equal to MALLOC_MAGIC */
-} malloc_state_t;
 
 malloc_state_t s_malloc_state;
 
@@ -61,19 +46,23 @@ void malloc_check_structure_p(malloc_state_t* state) {
     } while(curr_entry != NULL);
 }
 
-void malloc_init_p(malloc_state_t* state) {
+void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void* mem, uint64_t len) {
     SYS_ASSERT(state != NULL);
 
     intptr_t base;
-    SYSCALL_CALL_RET(SYSCALL_SBRK, 0, 0, 0, 0, base);
-    SYS_ASSERT(base > 0);
-
-    state->base = base;
-
     intptr_t limit;
-    SYSCALL_CALL_RET(SYSCALL_SBRK, MIN_MALLOC_SBRK_SIZE, 0, 0, 0, limit);
-    SYS_ASSERT(limit > 0);
+    if (add_mem_func != NULL) {
+        SYSCALL_CALL_RET(SYSCALL_SBRK, 0, 0, 0, 0, base);
+        SYS_ASSERT(base > 0);
+
+        SYSCALL_CALL_RET(SYSCALL_SBRK, MIN_MALLOC_SBRK_SIZE, 0, 0, 0, limit);
+        SYS_ASSERT(limit > 0);
     
+    } else {
+        base = (uint64_t)mem;
+        limit = base + len;
+    }
+    state->base = base;
     state->limit = limit;
 
     malloc_entry_t* first_entry = (malloc_entry_t*)base;
@@ -84,11 +73,13 @@ void malloc_init_p(malloc_state_t* state) {
     first_entry->chunk_start = first_entry + 1;
 
     state->first_entry = first_entry;
+    state->add_mem_func = add_mem_func;
+    state->num_malloc_ops = 0;
     state->magic = MALLOC_MAGIC;
 }
 
 
-void malloc_add_mem_p(uint64_t req_size, malloc_state_t* state) {
+bool malloc_add_mem_p(uint64_t req_size, malloc_state_t* state) {
     SYS_ASSERT(state != NULL);
     SYS_ASSERT(state->magic == MALLOC_MAGIC);
 
@@ -131,13 +122,14 @@ void malloc_add_mem_p(uint64_t req_size, malloc_state_t* state) {
     }
 
     malloc_check_structure_p(state);
+
+    return true;
 }
 
 void* malloc_p(uint64_t size, malloc_state_t* state) {
     SYS_ASSERT(state != NULL);
     SYS_ASSERT(state->magic == MALLOC_MAGIC);
-
-    //console_log(LOG_INFO, "malloc %d bytes\n", size);
+    state->num_malloc_ops++;
 
     uint64_t size_align = (size + sizeof(uint64_t) - 1) & (~(sizeof(uint64_t) - 1));
 
@@ -157,10 +149,16 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
 
     if (curr_entry == NULL) {
         // Add memory
-        malloc_add_mem_p(size_align, state);
-
-        // Re-run malloc. This should return valid memory
-        return malloc_p(size_align, state);
+        bool add_ok = false;
+        if (state->add_mem_func != NULL) {
+            add_ok = state->add_mem_func(size_align, state);
+        }
+        if (!add_ok) {
+            return NULL;
+        } else {
+            // Re-run malloc. This should return valid memory
+            return malloc_p(size_align, state);
+        }
     } else {
         uint64_t leftover = curr_entry->size - size_align;
         curr_entry->inuse = true;
@@ -194,6 +192,7 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
 void free_p(void* mem, malloc_state_t* state) {
     SYS_ASSERT(mem != NULL);
     SYS_ASSERT(state->magic == MALLOC_MAGIC);
+    state->num_malloc_ops++;
 
     malloc_entry_t* entry = ((malloc_entry_t*)mem) - 1;
 
@@ -220,7 +219,7 @@ void free_p(void* mem, malloc_state_t* state) {
 
 
 void malloc_init(void) {
-    malloc_init_p(&s_malloc_state);
+    malloc_init_p(&s_malloc_state, malloc_add_mem_p, NULL, 0);
 }
 
 void* malloc(uint64_t size) {
@@ -228,5 +227,5 @@ void* malloc(uint64_t size) {
 }
 
 void free(void* mem) {
-    return free_p(mem, &s_malloc_state);
+    free_p(mem, &s_malloc_state);
 }

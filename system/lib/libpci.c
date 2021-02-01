@@ -79,6 +79,33 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* m
     }
 }
 
+pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx) {
+
+    pci_header0_t* h = device_ctx->header_vmem;
+    uint8_t* cap_offset_ptr = &h->capabilities_ptr;
+    pci_generic_capability_t* cap_ptr;
+
+    while (*cap_offset_ptr != 0) {
+        cap_ptr = device_ctx->header_vmem + *cap_offset_ptr;
+
+        if (cap_ptr->cap == cap) {
+            if (idx == 0) {
+                break;
+            } else {
+                idx--;
+            }
+        }
+
+        cap_offset_ptr = &cap_ptr->next;
+    }
+
+    if (*cap_offset_ptr != 0) {
+        return cap_ptr;
+    } else {
+        return NULL;
+    }
+}
+
 void print_pci_header(pci_device_ctx_t* device_ctx) {
     pci_header0_t* h0 = device_ctx->header_vmem;
     console_printf("PCI Device\n");

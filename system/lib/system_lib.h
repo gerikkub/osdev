@@ -2,6 +2,7 @@
 #define __SYSTEM_LIB_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define SYSCALL_CALL(NUM, x0, x1, x2, x3) \
 { \
@@ -35,5 +36,6 @@
     }
 
 void* system_map_device(uintptr_t device, uint64_t len);
+bool system_map_anyphy(uintptr_t len, uintptr_t* phy_out, uintptr_t* virt_out);
 
 #endif
