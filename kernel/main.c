@@ -65,19 +65,6 @@ void main() {
     pagefault_init();
     exception_init();
 
-    /*
-    _vmem_table* vmem_l0_table = vmem_create_kernel_map();
-
-    _vmem_ap_flags ap_flags = VMEM_AP_P_R |
-                              VMEM_AP_P_W |
-                              VMEM_AP_P_E;
-
-    //vmem_map_address(vmem_l0_table, (addr_phy_t)VIRT_UART, (addr_virt_t)VIRT_UART, ap_flags, VMEM_ATTR_DEVICE);
-    vmem_map_address(vmem_l0_table, (addr_phy_t)VIRT_UART, (addr_virt_t)VIRT_UART_VMEM, ap_flags, VMEM_ATTR_DEVICE);
-    vmem_map_address(vmem_l0_table, (addr_phy_t)GICD_BASE_PHYS, (addr_virt_t)GICD_BASE_VIRT, ap_flags, VMEM_ATTR_DEVICE);
-    vmem_map_address(vmem_l0_table, (addr_phy_t)GICC_BASE_PHYS, (addr_virt_t)GICC_BASE_VIRT, ap_flags, VMEM_ATTR_DEVICE);
-    */
-
     memspace_init_kernelspace();
     memspace_init_systemspace();
     memory_entry_device_t virtuart_device = {
@@ -149,18 +136,9 @@ void main() {
     modules_init_list();
     modules_start();
 
-    //uint64_t tid = create_kernel_task(4096, my_task, NULL);
-    //task_f ext2_task_ptr;
-    //GET_ABS_SYM(ext2_task_ptr, ext2_task);
-    //uint64_t tid = create_system_task(4096, ext2_task_ptr, NULL);
-    //(void)tid;
-
     schedule();
 
     console_write("Should not get here\n");
-
-
-
 
     gic_set_irq_handler(timer_handler, 30);
 

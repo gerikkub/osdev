@@ -103,7 +103,7 @@ static elf_result_t elf_add_memspace_entry(memory_space_t* memspace, _elf64_phdr
 
     // Copy file data into physical memory
     if (phdr->p_offset > 0) {
-        memcpy(phy_mem, &elf_data[phdr->p_offset], phdr->p_filesz);
+        memcpy((void*)PHY_TO_KSPACE(phy_mem), &elf_data[phdr->p_offset], phdr->p_filesz);
     }
 
     // Translate memory permission flags
@@ -124,7 +124,7 @@ static elf_result_t elf_add_memspace_entry(memory_space_t* memspace, _elf64_phdr
         .end = PAGE_CEIL((phdr->p_vaddr + phdr->p_memsz)),
         .type = MEMSPACE_PHY,
         .flags = memspace_flags,
-        .phy_addr = KSPACE_TO_PHY(phy_mem),
+        .phy_addr = (uintptr_t)phy_mem,
         .kmem_addr = (uint64_t)phy_mem
     };
 
@@ -155,7 +155,7 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
 
     // Start building a memoryspace for this object
     memory_space_t elf_space;
-    elf_space.entries = kmalloc_phy(ELF_MAX_MEMSPACE_ENTRIES * sizeof(memory_entry_t));
+    elf_space.entries = (void*)PHY_TO_KSPACE(kmalloc_phy(ELF_MAX_MEMSPACE_ENTRIES * sizeof(memory_entry_t)));
     elf_space.num = 0;
     elf_space.maxnum = ELF_MAX_MEMSPACE_ENTRIES;
     elf_space.valloc_ctx.systemspace_end = USER_ADDRSPACE_SYSTEM;
@@ -214,7 +214,7 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
         .end = USER_ADDRSPACE_STACKTOP,
         .type = MEMSPACE_STACK,
         .flags = MEMSPACE_FLAG_PERM_URW,
-        .phy_addr = KSPACE_TO_PHY((uintptr_t)stack_phy_space),
+        .phy_addr = (uintptr_t)stack_phy_space,
         .base = stack_base,
         .limit = stack_limit,
         .maxlimit = stack_limit

@@ -4,6 +4,7 @@
 
 #include "kernel/assert.h"
 #include "kernel/kmalloc.h"
+#include "kernel/kernelspace.h"
 
 #include "stdlib/bitutils.h"
 
@@ -20,7 +21,7 @@
 #define PAGEMEM(X) (PAGES((X)) * PAGE_SIZE)
 
 typedef struct {
-    uint8_t* ptr;
+    uintptr_t ptr;
     uint64_t size;
     uint8_t flags;
 } memblock_t;
@@ -36,42 +37,30 @@ extern uint8_t _heap_limit;
 
 static uint64_t kmalloc_op_num = 0;
 
-//static uintptr_t s_next_ptr;
-
 void kmalloc_init(void) {
 
-    //uint64_t elfmem = (uint64_t)((&_heap_base) - (&_data_start));
-    //uint64_t elfpages = PAGES(elfmem);
+    uintptr_t heap_base_phy = KSPACE_TO_PHY(&_heap_base);
+    uintptr_t heap_limit_phy = KSPACE_TO_PHY(&_heap_limit);
 
-    //s_memblocks[0].ptr = &_data_start;
-    //s_memblocks[0].size = elfpages * PAGE_SIZE;
-    //s_memblocks[0].flags = MEMBLOCK_FLAG_ALLOCATED;
-
-    //s_memblocks[1].ptr = (uint8_t*)(((uint64_t)&_data_start) + (elfpages * PAGE_SIZE));
-    //s_memblocks[1].size = MEM_SIZE - (elfpages * PAGE_SIZE);
-    //s_memblocks[1].flags = 0;
-
-    s_memblocks[0].ptr = &_heap_base;
-    s_memblocks[0].size = ((uintptr_t)&_heap_limit) - ((uintptr_t)&_heap_base);
+    s_memblocks[0].ptr = heap_base_phy;
+    s_memblocks[0].size = heap_limit_phy - heap_base_phy;
     s_memblocks[0].flags = 0;
 
-
     s_last_memblock = 0;
-
-    //s_next_ptr = (uintptr_t)&_heap_base;
 }
 
 void kmalloc_check_structure(void) {
 
     uint64_t idx;
-    uintptr_t exp_ptr = (uintptr_t)&_heap_base;
-
+    uintptr_t exp_ptr = KSPACE_TO_PHY(&_heap_base);
+ 
     for (idx = 0; idx <= s_last_memblock; idx++) {
         memblock_t* this_block = &s_memblocks[idx];
-        ASSERT(exp_ptr == (uintptr_t)this_block->ptr);
+        ASSERT(exp_ptr == this_block->ptr);
 
         exp_ptr += this_block->size;
-        ASSERT(exp_ptr <= (uintptr_t)&_heap_limit);
+        uintptr_t heap_limit_phy = KSPACE_TO_PHY(&_heap_limit);
+        ASSERT(exp_ptr <= heap_limit_phy);
     }
 }
 
@@ -83,12 +72,6 @@ void* kmalloc_phy(uint64_t bytes) {
 
     kmalloc_op_num++;
     console_log(LOG_DEBUG, "kmalloc_phy: %u\n", kmalloc_op_num);
-
-    /*uintptr_t return_ptr = s_next_ptr;
-    s_next_ptr += pagebytes;
-    ASSERT(s_next_ptr <= (uint64_t)&_heap_limit);
-
-    return (uint8_t*)return_ptr;*/
 
     while (!found_mem) {
         if (pagebytes <= s_memblocks[idx].size &&
@@ -132,7 +115,7 @@ void* kmalloc_phy(uint64_t bytes) {
 
     kmalloc_check_structure();
 
-    return s_memblocks[idx].ptr;
+    return (void*)s_memblocks[idx].ptr;
 }
 
 void kfree_phy(void* ptr) {
@@ -143,7 +126,7 @@ void kfree_phy(void* ptr) {
 
     uint64_t idx;
     for (idx = 0; idx <= s_last_memblock; idx++) {
-        if (s_memblocks[idx].ptr == ptr) {
+        if (s_memblocks[idx].ptr == (uintptr_t)ptr) {
             break;
         }
     }
@@ -200,14 +183,6 @@ void print_kmalloc_memblock(memblock_t* memblock) {
 }
 
 void print_kmalloc_debug(uint64_t alloc_size) {
-
-
-    /*
-    for (uint64_t idx = 0; idx <= s_last_memblock; idx++) {
-        console_log(LOG_DEBUG, "Memblock %d\n", idx);
-        print_kmalloc_memblock(&s_memblocks[idx]);
-    }
-    */
 
     console_log(LOG_DEBUG, "Alloc: %d\n", alloc_size);
 }

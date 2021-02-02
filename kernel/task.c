@@ -196,8 +196,9 @@ uint64_t create_kernel_task(uint64_t stack_size,
                             task_f task_entry,
                              void* ctx) {
 
-    uint64_t* stack_ptr = (uint64_t*)kmalloc_phy(stack_size);
-    ASSERT(stack_ptr != NULL);
+    void* stack_ptr_phy = kmalloc_phy(stack_size);
+    ASSERT(stack_ptr_phy != NULL);
+    uint64_t* stack_ptr = (uint64_t*)PHY_TO_KSPACE(stack_ptr_phy);
 
     task_reg_t reg;
     reg.gp[TASK_REG(1)] = (uint64_t)ctx;
@@ -215,15 +216,16 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
                             void* ctx,
                             char* name) {
 
-    uint64_t* kernel_stack_ptr = (uint64_t*)kmalloc_phy(kernel_stack_size);
-    ASSERT(kernel_stack_ptr != NULL);
+    void* kernel_stack_ptr_phy = kmalloc_phy(kernel_stack_size);
+    ASSERT(kernel_stack_ptr_phy != NULL);
+    uint64_t* kernel_stack_ptr = (uint64_t*)PHY_TO_KSPACE(kernel_stack_ptr_phy);
 
     memory_entry_stack_t  kernel_stack_entry = {
         .start = (uintptr_t)kernel_stack_ptr,
         .end = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size),
         .type = MEMSPACE_PHY,
         .flags = MEMSPACE_FLAG_PERM_URW,
-        .phy_addr = KSPACE_TO_PHY((uintptr_t)kernel_stack_ptr & 0xFFFFFFFFFFFF),
+        .phy_addr = (uintptr_t)kernel_stack_ptr_phy,
         .base = (uintptr_t)kernel_stack_ptr,
         .limit = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size),
         .maxlimit = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size)
@@ -232,7 +234,7 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
     bool memspace_result;
     memspace_result = memspace_add_entry_to_kernel_memory((memory_entry_t*)&kernel_stack_entry);
     if (!memspace_result) {
-        kfree_phy((uint8_t*)kernel_stack_ptr);
+        kfree_phy(kernel_stack_ptr_phy);
         return 0;
     }
 

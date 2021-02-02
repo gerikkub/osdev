@@ -27,7 +27,9 @@ void memspace_init_kernelspace(void) {
 
     bool result;
 
-    memory_entry_t* kentries = (memory_entry_t*)kmalloc_phy(KERNELSPACE_ENTRIES * sizeof(memory_entry_t));
+    void* kentries_phy = kmalloc_phy(KERNELSPACE_ENTRIES * sizeof(memory_entry_t));
+    ASSERT(kentries_phy != NULL);
+    memory_entry_t* kentries = (memory_entry_t*)PHY_TO_KSPACE(kentries_phy);
 
     s_kernelspace.entries = kentries;
     s_kernelspace.num = 0;

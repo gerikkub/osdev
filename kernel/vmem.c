@@ -98,7 +98,8 @@ addr_phy_t vmem_get_page_addr(_vmem_entry_page_t page) {
 }
 
 _vmem_table* vmem_allocate_empty_table(void) {
-    _vmem_table* table_ptr = (_vmem_table*)kmalloc_phy(VMEM_4K_TABLE_ENTRIES * sizeof(_vmem_entry_t));
+    uintptr_t table_ptr_phy = PHY_TO_KSPACE(kmalloc_phy(VMEM_4K_TABLE_ENTRIES * sizeof(_vmem_entry_t)));
+    _vmem_table* table_ptr = (_vmem_table*)table_ptr_phy;
 
     ASSERT(table_ptr != NULL);
 
