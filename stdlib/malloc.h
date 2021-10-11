@@ -4,11 +4,11 @@
 
 #include <stdlib.h>
 
-void malloc_init();
+//void malloc_init();
 
-void* malloc(uint64_t size);
+//void* malloc(uint64_t size);
 
-void free(void* mem);
+//void free(void* mem);
 
 typedef struct _malloc_entry_t {
     uint64_t magic;                 /* Equal to MALLOC_MAGIC */

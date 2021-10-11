@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include "system/lib/libpci.h"
-#include "system/lib/system_malloc.h"
+#include "kernel/lib/libpci.h"
+#include "stdlib/malloc.h"
 
 typedef struct __attribute__((__packed__)) {
     uint8_t cap;

@@ -164,6 +164,13 @@ typedef struct {
     uint8_t data[];
 } dt_block_t;
 
+typedef struct {
+    dt_block_t* block;
+} discovery_dtb_ctx_t;
+
+#define MAX_DTB_COMPAT_REG_NAME 128
+
+
 char* fdt_get_string(fdt_header_t* header, uint8_t* dtbmem, uint32_t stroff);
 
 /**
@@ -173,6 +180,6 @@ char* fdt_get_string(fdt_header_t* header, uint8_t* dtbmem, uint32_t stroff);
  * for a single node and its children. This block can then be passed to
  * other modules through a message call
  */
-dt_block_t* dt_build_block(fdt_node_t* base_fdt_node, fdt_ctx_t* fdt_ctx);
+dt_block_t* dt_build_block(fdt_node_t* base_fdt_node, fdt_ctx_t* fdt_ctx, dt_prop_cells_t* parent_cells);
 
 #endif

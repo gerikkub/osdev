@@ -2,9 +2,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "system/lib/system_lib.h"
-#include "system/lib/system_assert.h"
-#include "system/lib/system_malloc.h"
+#include "kernel/assert.h"
+
+#define SYS_ASSERT(x) ASSERT(x)
+
+
+#include "stdlib/malloc.h"
 
 #include "stdlib/bitutils.h"
 
@@ -49,15 +52,15 @@ void malloc_check_structure_p(malloc_state_t* state) {
 void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void* mem, uint64_t len) {
     SYS_ASSERT(state != NULL);
 
-    intptr_t base;
-    intptr_t limit;
+    intptr_t base = 0;
+    intptr_t limit = 0;
     if (add_mem_func != NULL) {
-        SYSCALL_CALL_RET(SYSCALL_SBRK, 0, 0, 0, 0, base);
-        SYS_ASSERT(base > 0);
+        // SYSCALL_CALL_RET(SYSCALL_SBRK, 0, 0, 0, 0, base);
+        // SYS_ASSERT(base > 0);
 
-        SYSCALL_CALL_RET(SYSCALL_SBRK, MIN_MALLOC_SBRK_SIZE, 0, 0, 0, limit);
-        SYS_ASSERT(limit > 0);
-    
+        // SYSCALL_CALL_RET(SYSCALL_SBRK, MIN_MALLOC_SBRK_SIZE, 0, 0, 0, limit);
+        // SYS_ASSERT(limit > 0);
+        SYS_ASSERT(0);
     } else {
         base = (uint64_t)mem;
         limit = base + len;
@@ -78,53 +81,6 @@ void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void
     state->magic = MALLOC_MAGIC;
 }
 
-
-bool malloc_add_mem_p(uint64_t req_size, malloc_state_t* state) {
-    SYS_ASSERT(state != NULL);
-    SYS_ASSERT(state->magic == MALLOC_MAGIC);
-
-    console_log(LOG_INFO, "Sbrk %d bytes\n", req_size);
-
-    uint64_t size = req_size > MIN_MALLOC_SBRK_SIZE ? req_size : MIN_MALLOC_SBRK_SIZE;
-
-    static uint64_t add_count = 0;
-
-    int64_t new_limit;
-    SYSCALL_CALL_RET(SYSCALL_SBRK, size, 0, 0, 0, new_limit);
-    SYS_ASSERT(new_limit > 0);
-
-    add_count++;
-    console_printf("Add count: %d\n", add_count);
-    console_flush();
-
-    uintptr_t old_limit = state->limit;
-    state->limit = new_limit;
-
-    malloc_entry_t* last_entry = state->first_entry;
-    while (last_entry->next != NULL) {
-        last_entry = last_entry->next;
-    }
-
-    if (last_entry->inuse) {
-        // Create a new entry
-        malloc_entry_t* new_last_entry = (malloc_entry_t*)old_limit;
-        new_last_entry->magic = MALLOC_MAGIC;
-        new_last_entry->next = NULL;
-        new_last_entry->size = new_limit - old_limit - sizeof(malloc_entry_t);
-        new_last_entry->inuse = false;
-        new_last_entry->chunk_start = new_last_entry + 1;
-
-        last_entry->next = new_last_entry;
-    } else {
-        // Extend the last entry
-        uint64_t last_entry_size = (uintptr_t)new_limit - (uintptr_t)last_entry->chunk_start;
-        last_entry->size = last_entry_size;
-    }
-
-    malloc_check_structure_p(state);
-
-    return true;
-}
 
 void* malloc_p(uint64_t size, malloc_state_t* state) {
     SYS_ASSERT(state != NULL);
@@ -218,14 +174,14 @@ void free_p(void* mem, malloc_state_t* state) {
 }
 
 
-void malloc_init(void) {
-    malloc_init_p(&s_malloc_state, malloc_add_mem_p, NULL, 0);
-}
+// void malloc_init(void) {
+//     malloc_init_p(&s_malloc_state, malloc_add_mem_p, NULL, 0);
+// }
 
-void* malloc(uint64_t size) {
-    return malloc_p(size, &s_malloc_state);
-}
+// void* malloc(uint64_t size) {
+//     return malloc_p(size, &s_malloc_state);
+// }
 
-void free(void* mem) {
-    free_p(mem, &s_malloc_state);
-}
+// void free(void* mem) {
+//     free_p(mem, &s_malloc_state);
+// }

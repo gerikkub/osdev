@@ -21,6 +21,7 @@ typedef enum {
     MOD_GENERIC_GETINFO = 2,
     MOD_GENERIC_IOCTL = 3,
     MOD_GENERIC_CTX = 4,
+    MOD_GENERIC_RESPONSE = 5,
     MAX_MOD_GENERIC_PORT = 0x1000
 } module_generic_ports_t;
 
@@ -79,24 +80,6 @@ typedef struct {
         uint32_t pci_vendor_device;
     } data;
 } module_startmod_t;
-
-typedef struct {
-    uintptr_t header_phy;
-
-    uintptr_t io_base;
-    uint64_t io_size;
-    uintptr_t m32_base;
-    uint64_t m32_size;
-    uintptr_t m64_base;
-    uint64_t  m64_size;
-
-    struct {
-        bool allocated;
-        uint64_t space;
-        uintptr_t phy;
-        uint64_t len;
-    } bar[6];
-} module_pci_ctx_t;
 
 typedef struct {
     module_startsel_t startsel;

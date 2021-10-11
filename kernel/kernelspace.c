@@ -137,3 +137,37 @@ _vmem_table* memspace_build_kernel_vmem(void) {
 memory_space_t* memspace_get_systemspace(void) {
     return &s_systemspace;
 }
+
+void memspace_map_phy_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint32_t flags) {
+
+    memory_entry_phy_t entry = {
+        .start = (uintptr_t)virt_addr,
+        .end = ((uintptr_t)virt_addr) + len,
+        .type = MEMSPACE_PHY,
+        .flags = flags,
+        .phy_addr = (uintptr_t)phy_addr,
+        .kmem_addr = (uintptr_t)virt_addr
+    };
+
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&entry);
+}
+
+void memspace_map_device_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint32_t flags) {
+
+    memory_entry_device_t entry = {
+        .start = (uintptr_t)virt_addr,
+        .end = ((uintptr_t)virt_addr) + len,
+        .type = MEMSPACE_DEVICE,
+        .flags = flags,
+        .phy_addr = (uintptr_t)phy_addr
+    };
+
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&entry);
+}
+
+void memspace_update_kernel_vmem(void) {
+
+    _vmem_table* kernel_vmem_table = memspace_build_kernel_vmem();
+
+    vmem_set_kernel_table(kernel_vmem_table);
+}

@@ -52,6 +52,10 @@ SECTIONS
         . = ALIGN(4096);
         _data_start = .;
         *(.data*)
+        . = ALIGN(8);
+        _driver_init_start = .;
+        KEEP(*(.driver_init))
+        _driver_init_end = .;
         . = ALIGN(4096);
         _data_end = .;
     }

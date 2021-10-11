@@ -52,7 +52,10 @@ bootstrap/vmem_bootstrap.c
 C_SRC_DRIVERS = \
 drivers/cortex_a57_gic.c \
 drivers/pl011_uart.c \
-drivers/qemu_fw_cfg.c
+drivers/qemu_fw_cfg.c \
+drivers/dummy.c \
+drivers/pcie/pcie.c \
+drivers/virtio_pci_blk/virtio_pci_blk.c
 
 C_SRC_KERNEL = \
 kernel/main.c \
@@ -71,17 +74,26 @@ kernel/memoryspace.c \
 kernel/kernelspace.c \
 kernel/modules.c \
 kernel/elf.c \
-kernel/messages.c
+kernel/messages.c \
+kernel/dtb.c \
+kernel/drivers.c
+
+C_SRC_KERNEL_LIBS = \
+kernel/lib/libdtb.c \
+kernel/lib/libpci.c \
+kernel/lib/libvirtio.c \
+kernel/lib/vmalloc.c
 
 C_SRC_LIBS = \
 stdlib/string.c \
 stdlib/printf.c \
 stdlib/bitutils.c \
-stdlib/linalloc.c
+stdlib/linalloc.c \
+stdlib/malloc.c
 
 
 # C sources
-C_SOURCES = ${C_SRC_BOOTSTRAP} ${C_SRC_KERNEL} ${C_SRC_DRIVERS} ${C_SRC_LIBS}
+C_SOURCES = ${C_SRC_BOOTSTRAP} ${C_SRC_KERNEL} ${C_SRC_DRIVERS} ${C_SRC_LIBS} ${C_SRC_KERNEL_LIBS}
 
 # ASM sources
 ASM_SOURCES =  \
@@ -89,15 +101,15 @@ bootstrap/start.s \
 kernel/high_start.s \
 kernel/exception_asm.s
 
-SYS_MODS = \
-$(SYSTEMS_DIR)/ext2 \
-$(SYSTEMS_DIR)/vfs \
-$(SYSTEMS_DIR)/dtb \
-$(SYSTEMS_DIR)/virtio_mmio \
-$(SYSTEMS_DIR)/pcie \
-$(SYSTEMS_DIR)/virtio_pci_blk
+# SYS_MODS = \
+# $(SYSTEMS_DIR)/ext2 \
+# $(SYSTEMS_DIR)/vfs \
+# $(SYSTEMS_DIR)/dtb \
+# $(SYSTEMS_DIR)/virtio_mmio \
+# $(SYSTEMS_DIR)/pcie \
+# $(SYSTEMS_DIR)/virtio_pci_blk
 
-MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
+# MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 
 #######################################
 # binaries
@@ -190,13 +202,13 @@ vpath %.s $(sort $(dir $(ASM_SOURCES)))
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(MODULES:.elf=.elf.o)))
 vpath %.elf $(sort $(dir $(MODULES)))
 
-$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
+$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR) 
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
-$(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: %.s | $(BUILD_DIR)
 	$(AS) -c $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/%.elf.o: %.elf Makefile | $(BUILD_DIR)
+$(BUILD_DIR)/%.elf.o: %.elf | $(BUILD_DIR)
 	$(CP) --input-target=binary --output-target=elf64-littleaarch64 --binary-architecture aarch64 $< $@
 	#$(COMP_DIR)/bin/$(PREFIX)-ld -r -b binary $< -o $@
 
@@ -205,7 +217,7 @@ $(MODULES_BUILD)/%.elf: FORCE
 
 FORCE: ;
 
-$(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) $(MODULES) Makefile $(LD_SCRIPT)
+$(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) $(MODULES) $(LD_SCRIPT)
 	$(LD) $(OBJECTS) $(LDFLAGS) -o $@
 	$(SZ) $@
 

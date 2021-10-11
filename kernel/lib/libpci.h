@@ -183,7 +183,25 @@ typedef struct __attribute__((__packed__)) {
     uint8_t len;
 } pci_vendor_capability_t;
 
-void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* module_ctx);
+typedef struct {
+    uintptr_t header_phy;
+
+    uintptr_t io_base;
+    uint64_t io_size;
+    uintptr_t m32_base;
+    uint64_t m32_size;
+    uintptr_t m64_base;
+    uint64_t  m64_size;
+
+    struct {
+        bool allocated;
+        uint64_t space;
+        uintptr_t phy;
+        uint64_t len;
+    } bar[6];
+} discovery_pci_ctx_t;
+
+void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t* module_ctx);
 
 pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx);
 

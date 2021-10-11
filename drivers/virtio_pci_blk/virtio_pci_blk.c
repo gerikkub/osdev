@@ -1,14 +1,12 @@
 
 #include <stdint.h>
 
-#include "system/lib/system_lib.h"
-#include "system/lib/system_msg.h"
-#include "system/lib/system_assert.h"
-#include "system/lib/system_console.h"
-#include "system/lib/libpci.h"
-#include "system/lib/libvirtio.h"
+#include "kernel/assert.h"
+#include "kernel/console.h"
+#include "kernel/lib/libpci.h"
+#include "kernel/lib/libvirtio.h"
+#include "kernel/drivers.h"
 
-#include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
 
@@ -69,7 +67,7 @@ static void print_blk_config(pci_device_ctx_t* pci_ctx) {
     pci_virtio_capability_t* blk_cfg_cap;
 
     blk_cfg_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
-    SYS_ASSERT(blk_cfg_cap != NULL);
+    ASSERT(blk_cfg_cap != NULL);
 
     virtio_blk_config_t* blk_config;
 
@@ -85,7 +83,7 @@ static void init_blk_device(pci_device_ctx_t* pci_ctx) {
     
     pci_virtio_capability_t* cap_ptr;
     cap_ptr = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
-    SYS_ASSERT(cap_ptr != NULL);
+    ASSERT(cap_ptr != NULL);
 
     common_cfg = pci_ctx->bar[cap_ptr->bar].vmem + cap_ptr->bar_offset;
 
@@ -96,7 +94,7 @@ static void init_blk_device(pci_device_ctx_t* pci_ctx) {
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_FEATURES_OK);
     uint8_t device_status = virtio_get_status(common_cfg);
-    SYS_ASSERT(device_status & VIRTIO_STATUS_FEATURES_OK);
+    ASSERT(device_status & VIRTIO_STATUS_FEATURES_OK);
 
     virtio_virtq_ctx_t requestq;
     virtio_alloc_queue(common_cfg, VIRTIO_QUEUE_BLOCK_REQUESTQ, 8, 65536, &requestq);
@@ -112,7 +110,7 @@ static void read_blk_device(pci_device_ctx_t* pci_ctx, uint64_t sector, void* bu
 
     bool get_ok;
     get_ok = virtio_get_buffer(&s_virtio_requestq, sizeof(virtio_blk_req_header_t), (uintptr_t*)&write_buffers[0].ptr);
-    SYS_ASSERT(get_ok);
+    ASSERT(get_ok);
     write_buffers[0].len = sizeof(virtio_blk_req_header_t);
 
     virtio_blk_req_header_t* blk_req_header = write_buffers[0].ptr;
@@ -121,10 +119,10 @@ static void read_blk_device(pci_device_ctx_t* pci_ctx, uint64_t sector, void* bu
     blk_req_header->sector = sector;
 
     get_ok = virtio_get_buffer(&s_virtio_requestq, len, (uintptr_t*)&read_buffers[0].ptr);
-    SYS_ASSERT(get_ok);
+    ASSERT(get_ok);
     read_buffers[0].len = len;
     get_ok = virtio_get_buffer(&s_virtio_requestq, sizeof(virtio_blk_req_status_t), (uintptr_t*)&read_buffers[1].ptr);
-    SYS_ASSERT(get_ok);
+    ASSERT(get_ok);
     read_buffers[1].len = sizeof(virtio_blk_req_status_t);
 
     virtio_virtq_send(&s_virtio_requestq, write_buffers, 1,
@@ -151,44 +149,14 @@ static void print_blk_device(pci_device_ctx_t* pci_ctx) {
     print_pci_capabilities(pci_ctx);
 
     print_blk_config(pci_ctx);
-
-    /*
-    for (int idx = 0; idx < 6; idx++) {
-        if (pci_ctx->bar[idx].allocated) {
-            uint32_t* vmem = pci_ctx->bar[idx].vmem;
-            uint64_t len = pci_ctx->bar[idx].len / 4;
-            console_printf("Bar ");
-            switch (pci_ctx->bar[idx].space) {
-                case PCI_SPACE_IO:
-                    console_printf("IO ");
-                    break;
-                case PCI_SPACE_M32:
-                    console_printf("M32 ");
-                    break;
-                case PCI_SPACE_M64:
-                    console_printf("M64 ");
-                    break;
-                default:
-                    SYS_ASSERT(0);
-            }
-            console_printf("Phy %16x Virt %16x Len %x (%u)\n",
-                           pci_ctx->bar[idx].phy,
-                           pci_ctx->bar[idx].vmem,
-                           len, len);
-            console_flush();
-
-            (void)vmem;
-        }
-    }
-    */
 }
 
-static void virtio_pci_blk_ctx(system_msg_memory_t* ctx_msg) {
+static void virtio_pci_blk_ctx(void* ctx_msg) {
 
     console_write("virtio-pci-blk got ctx\n");
     console_flush();
 
-    module_pci_ctx_t* pci_ctx = (module_pci_ctx_t*)ctx_msg->ptr;
+    discovery_pci_ctx_t* pci_ctx = ctx_msg;
 
     pci_alloc_device_from_context(&s_pci_device, pci_ctx);
 
@@ -203,23 +171,17 @@ static void virtio_pci_blk_ctx(system_msg_memory_t* ctx_msg) {
     console_flush();
 }
 
-static module_handlers_t s_handlers = {
-    { //generic
-        .info = NULL,
-        .getinfo = NULL,
-        .ioctl = NULL,
-        .ctx = virtio_pci_blk_ctx
-    }
+static discovery_register_t s_virtio_pci_blk_register = {
+    .type = DRIVER_DISCOVERY_PCI,
+    .pci = {
+        .vendor_id = 0x1AF4,
+        .device_id = 0x1042,
+    },
+    .ctxfunc = virtio_pci_blk_ctx
 };
 
-void main(uint64_t my_tid, module_ctx_t* ctx) {
-
-    system_register_handler(s_handlers, MOD_CLASS_DISCOVERY);
-
-    console_write("virtio-pci-blk driver\n");
-    console_flush();
-
-    while (1) {
-        system_recv_msg();
-    }
+void virtio_pci_blk_register(void) {
+    register_driver(&s_virtio_pci_blk_register);
 }
+
+REGISTER_DRIVER(virtio_pci_blk);

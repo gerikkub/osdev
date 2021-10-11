@@ -115,6 +115,7 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
 void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
 _vmem_table* vmem_create_kernel_map(void);
 void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr);
+void vmem_set_kernel_table(_vmem_table* kernel_table);
 void vmem_set_user_table(_vmem_table* user_table, uint8_t asid);
 void vmem_initialize(void);
 void vmem_enable_translations(void);

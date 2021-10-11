@@ -1,23 +1,23 @@
 
 #include <stdint.h>
 
-#include "system/lib/libpci.h"
-#include "system/lib/libvirtio.h"
-#include "system/lib/system_console.h"
-#include "system/lib/system_assert.h"
-#include "system/lib/system_lib.h"
+#include "kernel/lib/libpci.h"
+#include "kernel/lib/libvirtio.h"
+#include "kernel/console.h"
+#include "kernel/assert.h"
+#include "kernel/kernelspace.h"
 
 #include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
 
-void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* module_ctx) {
-    SYS_ASSERT(device != NULL);
-    SYS_ASSERT(module_ctx != NULL);
+void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t* module_ctx) {
+    ASSERT(device != NULL);
+    ASSERT(module_ctx != NULL);
 
     // Allocate virtual memory space for the PCI header
     device->header_phy = module_ctx->header_phy;
-    void* header_vmem = system_map_device(device->header_phy, sizeof(pci_header0_t));
-    SYS_ASSERT(header_vmem != NULL);
+    void* header_vmem = PHY_TO_KSPACE_PTR(device->header_phy);
+    ASSERT(header_vmem != NULL);
     device->header_vmem = header_vmem;
 
     // Allocate virtual memory space for IO, M32 and M64 memories
@@ -25,9 +25,8 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* m
     device->io_size = module_ctx->io_size;
     device->io_base_vmem = NULL;
     if (module_ctx->io_size > 0) {
-        void* pci_io_mem = system_map_device(module_ctx->io_base,
-                                             module_ctx->io_size);
-        SYS_ASSERT(pci_io_mem);
+        void* pci_io_mem = PHY_TO_KSPACE_PTR(module_ctx->io_base);
+        ASSERT(pci_io_mem);
         device->io_base_vmem = pci_io_mem;
     }
 
@@ -35,9 +34,8 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* m
     device->m32_size = module_ctx->m32_size;
     device->m32_base_vmem = NULL;
     if (module_ctx->m32_size > 0) {
-        void* pci_m32_mem = system_map_device(module_ctx->m32_base,
-                                              module_ctx->m32_size);
-        SYS_ASSERT(pci_m32_mem);
+        void* pci_m32_mem = PHY_TO_KSPACE_PTR(module_ctx->m32_base);
+        ASSERT(pci_m32_mem);
         device->m32_base_vmem = pci_m32_mem;
     }
 
@@ -45,9 +43,8 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* m
     device->m64_size = module_ctx->m64_size;
     device->m64_base_vmem = NULL;
     if (module_ctx->m64_size > 0) {
-        void* pci_m64_mem = system_map_device(module_ctx->m64_base,
-                                              module_ctx->m64_size);
-        SYS_ASSERT(pci_m64_mem);
+        void* pci_m64_mem = PHY_TO_KSPACE_PTR(module_ctx->m64_base);
+        ASSERT(pci_m64_mem);
         device->m64_base_vmem = pci_m64_mem;
     }
 
@@ -72,7 +69,7 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, module_pci_ctx_t* m
                     device->bar[idx].vmem = device->m64_base_vmem + offset;
                     break;
                 default:
-                    SYS_ASSERT(0);
+                    ASSERT(0);
                     break;
             }
         }

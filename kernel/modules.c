@@ -54,12 +54,12 @@ typedef struct {
 static modules_list_t s_module_list[MAX_MODULES_NUM] = {0};
 static module_subclass_t s_module_subclass_table[MOD_SUBCLASS_MAX] = {0};
 
-DEFINE_MODULE(_binary_system_build_ext2_ext2_elf)
-DEFINE_MODULE(_binary_system_build_vfs_vfs_elf)
-DEFINE_MODULE(_binary_system_build_dtb_dtb_elf)
-DEFINE_MODULE(_binary_system_build_virtio_mmio_virtio_mmio_elf);
-DEFINE_MODULE(_binary_system_build_pcie_pcie_elf);
-DEFINE_MODULE(_binary_system_build_virtio_pci_blk_virtio_pci_blk_elf);
+// DEFINE_MODULE(_binary_system_build_ext2_ext2_elf)
+// DEFINE_MODULE(_binary_system_build_vfs_vfs_elf)
+// DEFINE_MODULE(_binary_system_build_dtb_dtb_elf)
+// DEFINE_MODULE(_binary_system_build_virtio_mmio_virtio_mmio_elf);
+// DEFINE_MODULE(_binary_system_build_pcie_pcie_elf);
+// DEFINE_MODULE(_binary_system_build_virtio_pci_blk_virtio_pci_blk_elf);
 
 void modules_init_list(void) {
 
@@ -99,12 +99,12 @@ void modules_init_list(void) {
     s_module_subclass_table[5].pci_device = 0x1042;
     s_module_subclass_table[5].valid = MOD_SUBCLASS_VALID_SUBCLASS | MOD_SUBCLASS_VALID_PCI;
 
-    ADD_MODULE(0, _binary_system_build_vfs_vfs_elf, MOD_CLASS_VFS, 0, MOD_STARTTYPE_ONE, true)
-    ADD_MODULE(1, _binary_system_build_ext2_ext2_elf, MOD_CLASS_FS, 1, MOD_STARTTYPE_ONE, false)
-    ADD_MODULE(2, _binary_system_build_dtb_dtb_elf, MOD_CLASS_DISCOVERY, 2, MOD_STARTTYPE_ONE, true)
-    //ADD_MODULE(3, _binary_system_build_virtio_mmio_virtio_mmio_elf, MOD_CLASS_DISCOVERY, 3, MOD_STARTTYPE_ONE, true);
-    ADD_MODULE(4, _binary_system_build_pcie_pcie_elf, MOD_CLASS_DISCOVERY, 4, MOD_STARTTYPE_ONE, false);
-    ADD_MODULE(5, _binary_system_build_virtio_pci_blk_virtio_pci_blk_elf, MOD_CLASS_DISCOVERY, 5, MOD_STARTTYPE_MANY, false);
+    // ADD_MODULE(0, _binary_system_build_vfs_vfs_elf, MOD_CLASS_VFS, 0, MOD_STARTTYPE_ONE, true)
+    // ADD_MODULE(1, _binary_system_build_ext2_ext2_elf, MOD_CLASS_FS, 1, MOD_STARTTYPE_ONE, false)
+    // ADD_MODULE(2, _binary_system_build_dtb_dtb_elf, MOD_CLASS_DISCOVERY, 2, MOD_STARTTYPE_ONE, true)
+    // //ADD_MODULE(3, _binary_system_build_virtio_mmio_virtio_mmio_elf, MOD_CLASS_DISCOVERY, 3, MOD_STARTTYPE_ONE, true);
+    // ADD_MODULE(4, _binary_system_build_pcie_pcie_elf, MOD_CLASS_DISCOVERY, 4, MOD_STARTTYPE_ONE, false);
+    // ADD_MODULE(5, _binary_system_build_virtio_pci_blk_virtio_pci_blk_elf, MOD_CLASS_DISCOVERY, 5, MOD_STARTTYPE_MANY, false);
 }
 
 static uint64_t start_module(modules_list_t* mod) {

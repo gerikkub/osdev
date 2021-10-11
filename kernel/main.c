@@ -22,6 +22,10 @@
 #include "kernel/kernelspace.h"
 #include "kernel/modules.h"
 #include "kernel/elf.h"
+#include "kernel/dtb.h"
+#include "kernel/drivers.h"
+
+#include "kernel/lib/vmalloc.h"
 
 
 static volatile uint8_t timer_irq_fired;
@@ -126,10 +130,18 @@ void main() {
 
     vmem_set_tables(kernel_vmem_table, dummy_user_table);
 
+    vmalloc_init(4 * 1024 * 1024);
+
     console_log(LOG_DEBUG, "UART_VMEM is Mapped\n");
 
     gtimer_init();
     syscall_init();
+
+    drivers_init();
+
+    dtb_init();
+
+    while (1);
 
     task_init((uint64_t*)exstack_entry.base);
 

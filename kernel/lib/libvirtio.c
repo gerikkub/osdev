@@ -1,14 +1,13 @@
 
 #include <stdint.h>
 
-#include "system/lib/libpci.h"
-#include "system/lib/libvirtio.h"
-#include "system/lib/system_console.h"
-#include "system/lib/system_assert.h"
-#include "system/lib/system_lib.h"
-#include "system/lib/system_malloc.h"
+#include "kernel/lib/libpci.h"
+#include "kernel/lib/libvirtio.h"
+#include "kernel/console.h"
+#include "kernel/assert.h"
+#include "kernel/lib/vmalloc.h"
+#include "kernel/kernelspace.h"
 
-#include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
 
 pci_virtio_capability_t* virtio_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap) {
@@ -67,29 +66,29 @@ void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
                         uint64_t pool_size,
                         virtio_virtq_ctx_t* queue_out) {
 
-    SYS_ASSERT(cfg != NULL);
-    SYS_ASSERT(queue_out != NULL);
+    ASSERT(cfg != NULL);
+    ASSERT(queue_out != NULL);
 
     queue_out->queue_size = queue_size;
 
-    bool map_ok;
-    map_ok = system_map_anyphy(16 * queue_size, &queue_out->desc_phy, (uintptr_t*)&queue_out->desc_ptr);
-    SYS_ASSERT(map_ok);
-    queue_out->desc_phy &= 0xFFFFFFFFFFFF;
-    map_ok = system_map_anyphy(2 * queue_size, &queue_out->avail_phy, (uintptr_t*)&queue_out->avail_ptr);
-    SYS_ASSERT(map_ok);
-    queue_out->avail_phy &= 0xFFFFFFFFFFFF;
-    map_ok = system_map_anyphy(16 * queue_size, &queue_out->used_phy, (uintptr_t*)&queue_out->used_ptr);
-    SYS_ASSERT(map_ok);
-    queue_out->used_phy &= 0xFFFFFFFFFFFF;
+    queue_out->desc_ptr = vmalloc(16 * queue_size);
+    queue_out->desc_phy = KSPACE_TO_PHY(queue_out->desc_ptr);
+    ASSERT(queue_out->desc_ptr != NULL);
+
+    queue_out->avail_ptr = vmalloc(2 * queue_size);
+    queue_out->avail_phy = KSPACE_TO_PHY(queue_out->avail_ptr);
+    ASSERT(queue_out->avail_ptr != NULL);
+
+    queue_out->used_ptr = vmalloc(16 * queue_size);
+    queue_out->used_phy = KSPACE_TO_PHY(queue_out->used_ptr);
+    ASSERT(queue_out->used_ptr != NULL);
 
     queue_out->avail_ptr->idx = 0;
     queue_out->used_ptr->idx = 0;
     queue_out->last_used_idx = 0;
 
-    map_ok = system_map_anyphy(pool_size, &queue_out->buffer_pool_phy, (uintptr_t*)&queue_out->buffer_pool);
-    SYS_ASSERT(map_ok);
-    queue_out->buffer_pool_phy &= 0xFFFFFFFFFFFF;
+    queue_out->buffer_pool = vmalloc(pool_size);
+    queue_out->buffer_pool_phy = KSPACE_TO_PHY(queue_out->buffer_pool);
 
     malloc_init_p(&queue_out->buffer_malloc_state, NULL, queue_out->buffer_pool, pool_size);
 
@@ -107,8 +106,8 @@ void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
 
 bool virtio_get_buffer(virtio_virtq_ctx_t* queue_ctx, uint64_t buffer_len, uintptr_t* buffer_out) {
 
-    SYS_ASSERT(queue_ctx != NULL);
-    SYS_ASSERT(buffer_out != NULL);
+    ASSERT(queue_ctx != NULL);
+    ASSERT(buffer_out != NULL);
 
     void* buffer_ptr;
     buffer_ptr = malloc_p(buffer_len, &queue_ctx->buffer_malloc_state);
@@ -122,8 +121,8 @@ bool virtio_get_buffer(virtio_virtq_ctx_t* queue_ctx, uint64_t buffer_len, uintp
 
 void virtio_return_buffer(virtio_virtq_ctx_t* queue_ctx, void* buffer_ptr) {
 
-    SYS_ASSERT(queue_ctx != NULL);
-    SYS_ASSERT(buffer_ptr != NULL);
+    ASSERT(queue_ctx != NULL);
+    ASSERT(buffer_ptr != NULL);
 
     free_p(buffer_ptr, &queue_ctx->buffer_malloc_state);
 }
@@ -134,8 +133,8 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
                        virtio_virtq_buffer_t* read_buffers,
                        uint64_t num_read_buffers) {
 
-    SYS_ASSERT(queue_ctx != NULL);
-    SYS_ASSERT(num_write_buffers + num_read_buffers > 0);
+    ASSERT(queue_ctx != NULL);
+    ASSERT(num_write_buffers + num_read_buffers > 0);
 
     if (num_write_buffers + num_read_buffers > queue_ctx->queue_size) {
         return false;
@@ -208,7 +207,7 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx) {
     void* cap_ptr = virtio_get_capability(ctx, VIRTIO_PCI_CAP_NOTIFY_CFG);
-    SYS_ASSERT(cap_ptr != NULL);
+    ASSERT(cap_ptr != NULL);
 
     pci_virtio_notify_capability_t* notify_cap = cap_ptr;
 
