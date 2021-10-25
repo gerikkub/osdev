@@ -255,7 +255,7 @@ static void dtb_discover(uint8_t* dtbmem, fdt_node_t* node, fdt_header_t* header
             };
 
             if (discovery_have_driver(&disc_reg)) {
-                print_node(dtbmem, header, node, 2);
+                // print_node(dtbmem, header, node, 2);
 
                 dt_block_t* disc_block = dt_build_block(node, ctx, parent_cells);
                 discovery_dtb_ctx_t disc_ctx = {

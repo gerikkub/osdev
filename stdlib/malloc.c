@@ -4,7 +4,9 @@
 
 #include "kernel/assert.h"
 
+#ifndef SYS_ASSERT
 #define SYS_ASSERT(x) ASSERT(x)
+#endif
 
 
 #include "stdlib/malloc.h"
@@ -89,6 +91,7 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
 
     uint64_t size_align = (size + sizeof(uint64_t) - 1) & (~(sizeof(uint64_t) - 1));
 
+    malloc_check_structure_p(state);
     malloc_entry_t* curr_entry = state->first_entry;
 
     do {

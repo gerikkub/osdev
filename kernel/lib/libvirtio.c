@@ -69,17 +69,18 @@ void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
     ASSERT(cfg != NULL);
     ASSERT(queue_out != NULL);
 
+    queue_out->queue_num = queue_num;
     queue_out->queue_size = queue_size;
 
     queue_out->desc_ptr = vmalloc(16 * queue_size);
     queue_out->desc_phy = KSPACE_TO_PHY(queue_out->desc_ptr);
     ASSERT(queue_out->desc_ptr != NULL);
 
-    queue_out->avail_ptr = vmalloc(2 * queue_size);
+    queue_out->avail_ptr = vmalloc(6 + 2 * queue_size);
     queue_out->avail_phy = KSPACE_TO_PHY(queue_out->avail_ptr);
     ASSERT(queue_out->avail_ptr != NULL);
 
-    queue_out->used_ptr = vmalloc(16 * queue_size);
+    queue_out->used_ptr = vmalloc(6 + 8 * queue_size);
     queue_out->used_phy = KSPACE_TO_PHY(queue_out->used_ptr);
     ASSERT(queue_out->used_ptr != NULL);
 
@@ -177,11 +178,11 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
     virtio_virtq_avail_t* virtq_avail = queue_ctx->avail_ptr;
 
     virtq_avail->flags = 0;
-    virtq_avail->ring[virtq_avail->idx] = 0;
+    virtq_avail->ring[virtq_avail->idx % queue_ctx->queue_size] = 0;
     MEM_DSB();
 
     // Pass the buffers to the driver
-    virtq_avail->idx++;
+    virtq_avail->idx += 1;
 
     MEM_DSB();
     return true;
@@ -198,6 +199,8 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
 
     do {
         if (*used_idx_ptr != queue_ctx->last_used_idx) {
+            queue_ctx->last_used_idx = *used_idx_ptr;
+            MEM_DMB();
             return true;
         }
     } while (block);

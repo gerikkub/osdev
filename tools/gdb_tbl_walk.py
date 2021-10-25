@@ -14,10 +14,11 @@ class PageTableWalkCmd(gdb.Command):
     PT_BLOCK = 2
     PT_TABLE = 3
     PT_PAGE = 4
-    
+
     ATTR_UXN = 54
     ATTR_PXN = 53
     ATTR_AP = 6
+    ATTR_MEMATTR = 7
 
     pt_type = gdb.lookup_type('_vmem_entry_t').pointer()
     pt_entry_type = gdb.lookup_type('_vmem_entry_t')
@@ -29,6 +30,7 @@ class PageTableWalkCmd(gdb.Command):
         )
     
     def parse_pt_entry(self, entry, level):
+        memattributes = 0
         attributes = 0
         kind = 0
         address = 0
@@ -68,14 +70,16 @@ class PageTableWalkCmd(gdb.Command):
                 elif ap == 3:
                     attributes |= self.PT_PRIV_READ
                     attributes |= self.PT_USER_READ
+                
+                memattributes = (entry >> 2) & self.ATTR_MEMATTR
 
-        return (kind, attributes, address)
+        return (kind, attributes, memattributes, address)
 
     def level_lookup(self, table, idx, level):
 
         entry = int((table + idx).dereference())
         #print(hex(entry))
-        kind, attr, addr = self.parse_pt_entry(entry, level)
+        kind, attr, memattr, addr = self.parse_pt_entry(entry, level)
         #print("{} : {} : {}".format(kind, attr, addr))
 
 
@@ -91,7 +95,7 @@ class PageTableWalkCmd(gdb.Command):
             return (table, attr)
         else:
             page = gdb.Value(addr).cast(self.pt_page)
-            return (page, attr)
+            return (page, attr, memattr)
             
     def print_table(self, result, table, level):
         return result + "Level {}: {}\n".format(level, table)
@@ -135,7 +139,7 @@ class PageTableWalkCmd(gdb.Command):
         l3_res = self.level_lookup(l3_table, l3_idx, 3)
         if type(l3_res) is str:
             return result + l3_res
-        l3_page, l3_attr = l3_res
+        l3_page, l3_attr, l3_memattridx = l3_res
 
         user_attr = ""
         if l3_attr & self.PT_USER_READ:
@@ -164,10 +168,94 @@ class PageTableWalkCmd(gdb.Command):
             priv_attr += 'X'
         else:
             priv_attr += '-'
+        
+        mem_attr = ""
+        reg_mair_el1 = gdb.parse_and_eval("$MAIR_EL1")
+        l3_memattr = (reg_mair_el1 >> (l3_memattridx * 8)) & 0xFF
+        if (l3_memattr & 0xF0) == 0:
+            mem_attr = "Device"
+            if (l3_memattr & 0xF) == 0:
+                mem_attr += "-nGnRnE"
+            elif (l3_memattr & 0xF) < 0x4:
+                mem_attr += "-UNPREDICTABLE"
+            elif (l3_memattr & 0xF) == 0x4:
+                mem_attr += "-nGnRE"
+            elif (l3_memattr & 0xF) < 0x8:
+                mem_attr += "-UNPREDICTABLE"
+            elif (l3_memattr & 0xF) == 0x8:
+                mem_attr += "-nGRE"
+            elif (l3_memattr & 0xF) < 0xC:
+                mem_attr += "-UNPREDICTABLE"
+            elif (l3_memattr & 0xF) == 0xC:
+                mem_attr += "-GRE"
+            else:
+                mem_attr += "-UNPREDICTABLE"
+        else:
+            mem_attr = "Normal. "
+            if (l3_memattr & 0xF0) < 0x40:
+                mem_attr += "Outer Write-through transient "
+            elif (l3_memattr & 0xF0) == 0x40:
+                mem_attr += "Outer Non-cacheable "
+            elif (l3_memattr & 0xF0) < 0x80:
+                mem_attr += "Outer Write-back transient "
+            elif (l3_memattr & 0xF0) < 0xC0:
+                mem_attr += "Outer Write-through non-transient "
+            else:
+                mem_attr += "Outer Write-back non-transient "
+            
+            if (l3_memattr & 0x20) != 0:
+                mem_attr += "Read Allocate "
+            if (l3_memattr & 0x10) != 0:
+                mem_attr += "Write Allocate "
+            
+            if (l3_memattr & 0xF) == 0:
+                mem_attr += "UNPREDICTABLE"
+            elif (l3_memattr & 0xF) < 0x4: 
+                mem_attr += "Inner Write-through transient"
+            elif (l3_memattr & 0xF) == 0x4: 
+                mem_attr += "Inner non-cacheable"
+            elif (l3_memattr & 0xF) < 0x8: 
+                mem_attr += "Inner Write-back transient"
+            elif (l3_memattr & 0xF) < 0xC: 
+                mem_attr += "Inner Write-through non-transient"
+            else:
+                mem_attr += "Inner Write-back non-transient"
+
+            if (l3_memattr & 0x2) != 0:
+                mem_attr += "Read Allocate "
+            if (l3_memattr & 0x1) != 0:
+                mem_attr += "Write Allocate "
+
+        # if (l3_memattr & 0xC) == 0:
+        #     mem_attr = "Device"
+        #     if (l3_memattr & 0x3) == 0:
+        #         mem_attr += "-nGnRnE"
+        #     elif (l3_memattr & 0x3) == 1:
+        #         mem_attr += "-nGnRE"
+        #     elif (l3_memattr & 0x3) == 2:
+        #         mem_attr += "-nGRE"
+        #     else:
+        #         mem_attr += "GRE"
+        # else:
+        #     if (l3_memattr & 0xC) == 0x4:
+        #         mem_attr = "Normal. Outer Cacheable. "
+        #     elif (l3_memattr & 0xC) == 0x8:
+        #         mem_attr = "Normal. Outer Write-Through Cacheable. "
+        #     elif (l3_memattr & 0xC) == 0xC:
+        #         mem_attr = "Normal. Outer Write-Back Cacheable. "
+            
+        #     if (l3_memattr & 0x3) == 0:
+        #         mem_attr += 'INVALID'
+        #     elif (l3_memattr & 0x3) == 1:
+        #         mem_attr += 'Inner Non-cacheable'
+        #     elif (l3_memattr & 0x3) == 2:
+        #         mem_attr += 'Inner Write-Through Cacehable'
+        #     else:
+        #         mem_attr += 'Inner Write-Back Cacehable'
 
         result += "l3 page address: {}\n".format(hex(l3_page))
         result += "Priv: {}\nUser: {}\n".format(priv_attr, user_attr)
-
+        result += "Memory Attributes: {}\n".format(mem_attr)
 
         return result
     

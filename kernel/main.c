@@ -24,6 +24,10 @@
 #include "kernel/elf.h"
 #include "kernel/dtb.h"
 #include "kernel/drivers.h"
+#include "kernel/vfs.h"
+#include "kernel/sys_device.h"
+#include "kernel/fs_manager.h"
+#include "kernel/fs/ext2.h"
 
 #include "kernel/lib/vmalloc.h"
 
@@ -137,9 +141,29 @@ void main() {
     gtimer_init();
     syscall_init();
 
+    sys_device_init();
+
     drivers_init();
 
+    ext2_register();
+
     dtb_init();
+
+    fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
+                            "home");
+
+    fd_ops_t file_ops;
+    void* file_ctx;
+
+    vfs_open_device("home", "hello.txt", 0, &file_ops, &file_ctx);
+
+    uint8_t read_arr[1024];
+    memset(read_arr, 0, sizeof(read_arr));
+
+    int64_t size = file_ops.read(file_ctx, read_arr, 1024, 0);
+    (void)size;
+
+    console_printf("%s", read_arr);
 
     while (1);
 

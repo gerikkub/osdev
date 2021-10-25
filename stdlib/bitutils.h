@@ -13,6 +13,8 @@
 
 #define ARR_ELEMENTS(arr) (sizeof(arr)/sizeof(arr[0]))
 
+#define ALIGN_DOWN(x, align) (((x) + align - 1) % align)
+
 #define WRITE_SYS_REG(reg, x) \
     do { \
     uint64_t __val = x; \

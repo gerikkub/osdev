@@ -10,6 +10,7 @@
 #include "stdlib/bitutils.h"
 #include "kernel/memoryspace.h"
 #include "kernel/messages.h"
+#include "kernel/fd.h"
 
 #define MAX_NUM_TASKS 8
 
@@ -17,6 +18,8 @@
 #define KERNEL_STD_STACK_SIZE 8192
 
 #define MAX_TASK_NAME_LEN 16
+
+#define MAX_TASK_FDS 64
 
 #define GET_CURR_TID(x) \
     READ_SYS_REG("TPIDR_EL1", x)
@@ -70,6 +73,8 @@ typedef struct task_t_ {
     wait_reason_t wait_reason;
     wait_ctx_t wait_ctx;
     task_wakeup_f wait_wakeup_fun;
+
+    fd_ctx_t fds[MAX_TASK_FDS];
 
     uint64_t* user_stack_base;
     uint64_t user_stack_size;

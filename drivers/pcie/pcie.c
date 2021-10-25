@@ -221,7 +221,7 @@ uint64_t mem_to_pci_addr(pci_range_t* ranges, uintptr_t mem_addr, pci_space_t sp
     }
 }
 
-void create_pci_device(pci_header0_t* header, uintptr_t header_phy) {
+void create_pci_device(volatile pci_header0_t* header, uintptr_t header_phy) {
 
     discovery_register_t driver_discovery = {
         .type = DRIVER_DISCOVERY_PCI,
@@ -293,9 +293,9 @@ void create_pci_device(pci_header0_t* header, uintptr_t header_phy) {
                 uint32_t bar_init = header->bar[idx];
                 header->bar[idx] = 0xFFFFFFFF;
                 uint32_t bar_set = header->bar[idx];
-                
+
                 uint32_t size = (~(uint64_t)(bar_set ^ bar_init)) + 1;
-                if (size == 0 || size == 1) {
+                if (size == 0) {
                     continue;
                 }
 

@@ -76,13 +76,21 @@ kernel/modules.c \
 kernel/elf.c \
 kernel/messages.c \
 kernel/dtb.c \
-kernel/drivers.c
+kernel/drivers.c \
+kernel/vfs.c \
+kernel/sys_device.c \
+kernel/fs_manager.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
 kernel/lib/libpci.c \
 kernel/lib/libvirtio.c \
-kernel/lib/vmalloc.c
+kernel/lib/vmalloc.c \
+kernel/lib/llist.c \
+
+C_SRC_KERNEL_FS = \
+kernel/fs/ext2.c \
+kernel/fs/ext2_helpers.c
 
 C_SRC_LIBS = \
 stdlib/string.c \
@@ -94,6 +102,7 @@ stdlib/malloc.c
 
 # C sources
 C_SOURCES = ${C_SRC_BOOTSTRAP} ${C_SRC_KERNEL} ${C_SRC_DRIVERS} ${C_SRC_LIBS} ${C_SRC_KERNEL_LIBS}
+C_SOURCES += ${C_SRC_KERNEL_FS}
 
 # ASM sources
 ASM_SOURCES =  \
@@ -244,11 +253,11 @@ clean:
 
 run: $(BUILD_DIR)/$(TARGET).elf
 	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $< \
-	-drive file=test_flat.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
+	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
 debug: $(BUILD_DIR)/$(TARGET).elf
 	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $< \
-	-drive file=test_flat.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
+	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
 .PHONY: run debug
 
