@@ -149,6 +149,9 @@ void main() {
 
     dtb_init();
 
+    volatile uint8_t dummy = *(volatile uint8_t*)0;
+    (void)dummy;
+
     fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                             "home");
 
@@ -164,6 +167,7 @@ void main() {
     (void)size;
 
     console_printf("%s", read_arr);
+
 
     while (1);
 

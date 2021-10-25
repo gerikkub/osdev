@@ -69,6 +69,10 @@ SECTIONS
         . += 4096;
         _stack_base = .;
         . = ALIGN(4096);
+        _exception_stack_limit = .;
+        . += 4096;
+        _exception_stack_base = .;
+        . = ALIGN(4096);
         _heap_base = .;
         . += heap_size;
         _heap_limit = .;
