@@ -12,8 +12,20 @@
 
 #define CONSOLE_BUFFER_SIZE 512
 
+static int64_t s_console_fd = -1;
 static char s_console_buffer[CONSOLE_BUFFER_SIZE+1];
 static uint64_t s_console_idx = 0;
+
+void console_open(void) {
+    const char* device = "sys";
+    const char* path = "con";
+    int64_t fd;
+    SYSCALL_CALL_RET(SYSCALL_OPEN, (uint64_t)device, (uint64_t)path, 0, 0, fd);
+
+    SYS_ASSERT(fd >= 0);
+
+    s_console_fd = fd;
+}
 
 void console_putc(const char c) {
     SYS_ASSERT(s_console_idx < CONSOLE_BUFFER_SIZE);
@@ -58,9 +70,10 @@ void console_write_len(const char* s, uint64_t len) {
 
 void console_flush(void) {
     SYS_ASSERT(s_console_idx <= CONSOLE_BUFFER_SIZE);
+    SYS_ASSERT(s_console_fd >= 0);
 
     s_console_buffer[s_console_idx] = '\0';
 
-    SYSCALL_CALL(SYSCALL_PRINT, (uintptr_t)s_console_buffer, 0, 0, 0);
+    SYSCALL_CALL(SYSCALL_WRITE, s_console_fd, (uintptr_t)s_console_buffer, s_console_idx, 0);
     s_console_idx = 0;
 }

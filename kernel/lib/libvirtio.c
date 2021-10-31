@@ -61,6 +61,18 @@ void virtio_set_status(pci_virtio_common_cfg_t* cfg, uint8_t status) {
     MEM_DSB();
 }
 
+int64_t virtio_malloc_add_mem(bool initialize, uint64_t req_size, void* ctx, malloc_state_t* state) {
+
+    ASSERT(initialize == true);
+
+    virtio_virtq_ctx_t* queue_ctx = ctx;
+
+    state->base = (uintptr_t)queue_ctx->buffer_pool;
+    state->limit = state->base + queue_ctx->buffer_pool_size;
+
+    return queue_ctx->buffer_pool_size;
+}
+
 void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
                         uint64_t queue_num, uint64_t queue_size,
                         uint64_t pool_size,
@@ -90,8 +102,9 @@ void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
 
     queue_out->buffer_pool = vmalloc(pool_size);
     queue_out->buffer_pool_phy = KSPACE_TO_PHY(queue_out->buffer_pool);
+    queue_out->buffer_pool_size = pool_size;
 
-    malloc_init_p(&queue_out->buffer_malloc_state, NULL, queue_out->buffer_pool, pool_size);
+    malloc_init_p(&queue_out->buffer_malloc_state, virtio_malloc_add_mem, queue_out);
 
     cfg->queue_select = queue_num;
     MEM_DSB();

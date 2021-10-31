@@ -14,6 +14,8 @@ typedef llist_t* llist_head_t;
 
 llist_head_t llist_create();
 
+void llist_free(llist_head_t);
+
 #define LLIST_FIND(head, x) llist_find_heaper(head, x, sizeof(x))
 
 llist_t* llist_find_helper(llist_head_t head, void* x, uint64_t len);
@@ -21,5 +23,7 @@ llist_t* llist_find_helper(llist_head_t head, void* x, uint64_t len);
 void llist_append_ptr(llist_head_t head, void* newitem);
 
 void llist_delete_ptr(llist_head_t head, void* delitem);
+
+bool llist_empty(llist_head_t head);
 
 #endif

@@ -55,7 +55,8 @@ drivers/pl011_uart.c \
 drivers/qemu_fw_cfg.c \
 drivers/dummy.c \
 drivers/pcie/pcie.c \
-drivers/virtio_pci_blk/virtio_pci_blk.c
+drivers/virtio_pci_blk/virtio_pci_blk.c \
+drivers/console/console_dev.c
 
 C_SRC_KERNEL = \
 kernel/main.c \
@@ -79,7 +80,8 @@ kernel/dtb.c \
 kernel/drivers.c \
 kernel/vfs.c \
 kernel/sys_device.c \
-kernel/fs_manager.c
+kernel/fs_manager.c \
+kernel/fd.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
@@ -87,6 +89,8 @@ kernel/lib/libpci.c \
 kernel/lib/libvirtio.c \
 kernel/lib/vmalloc.c \
 kernel/lib/llist.c \
+kernel/lock/lock.c \
+kernel/lock/mutex.c \
 
 C_SRC_KERNEL_FS = \
 kernel/fs/ext2.c \
@@ -178,7 +182,7 @@ endif
 
 
 # Generate dependency information
-CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
+CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)" -DKERNEL_BUILD
 
 
 SYSTEMS_CFLAGS = $(CFLAGS) 

@@ -156,6 +156,7 @@ typedef struct {
 
     void* buffer_pool;
     uintptr_t buffer_pool_phy;
+    uint64_t buffer_pool_size;
     malloc_state_t buffer_malloc_state;
 } virtio_virtq_ctx_t;
 

@@ -2,10 +2,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "kernel/assert.h"
 
-#ifndef SYS_ASSERT
+#ifdef KERNEL_BUILD
+#include "kernel/assert.h"
 #define SYS_ASSERT(x) ASSERT(x)
+#else
+#include "system/lib/system_assert.h"
 #endif
 
 
@@ -17,7 +19,6 @@
 
 #define MIN_LEFTOVER_SIZE 64
 #define MALLOC_MAGIC (0xA5A51F1FBCBC9393ULL)
-#define MIN_MALLOC_SBRK_SIZE 32768
 
 struct _malloc_entry_t;
 
@@ -51,29 +52,29 @@ void malloc_check_structure_p(malloc_state_t* state) {
     } while(curr_entry != NULL);
 }
 
-void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void* mem, uint64_t len) {
+void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void* ctx) {
     SYS_ASSERT(state != NULL);
 
-    intptr_t base = 0;
-    intptr_t limit = 0;
-    if (add_mem_func != NULL) {
-        // SYSCALL_CALL_RET(SYSCALL_SBRK, 0, 0, 0, 0, base);
-        // SYS_ASSERT(base > 0);
+    int64_t ret = add_mem_func(true, 0, ctx, state);
+    SYS_ASSERT(ret > 0);
+    // if (add_mem_func != NULL) {
+    //     // SYSCALL_CALL_RET(SYSCALL_SBRK, 0, 0, 0, 0, base);
+    //     // SYS_ASSERT(base > 0);
 
-        // SYSCALL_CALL_RET(SYSCALL_SBRK, MIN_MALLOC_SBRK_SIZE, 0, 0, 0, limit);
-        // SYS_ASSERT(limit > 0);
-        SYS_ASSERT(0);
-    } else {
-        base = (uint64_t)mem;
-        limit = base + len;
-    }
-    state->base = base;
-    state->limit = limit;
+    //     // SYSCALL_CALL_RET(SYSCALL_SBRK, MIN_MALLOC_SBRK_SIZE, 0, 0, 0, limit);
+    //     // SYS_ASSERT(limit > 0);
+    //     SYS_ASSERT(0);
+    // } else {
+    //     base = (uint64_t)mem;
+    //     limit = base + len;
+    // }
+    // state->base = base;
+    // state->limit = limit;
 
-    malloc_entry_t* first_entry = (malloc_entry_t*)base;
+    malloc_entry_t* first_entry = (malloc_entry_t*)state->base;
     first_entry->magic = MALLOC_MAGIC;
     first_entry->next = NULL;
-    first_entry->size = (limit - base) - sizeof(malloc_entry_t);
+    first_entry->size = (state->limit - state->base) - sizeof(malloc_entry_t);
     first_entry->inuse = false;
     first_entry->chunk_start = first_entry + 1;
 
@@ -108,16 +109,12 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
 
     if (curr_entry == NULL) {
         // Add memory
-        bool add_ok = false;
-        if (state->add_mem_func != NULL) {
-            add_ok = state->add_mem_func(size_align, state);
-        }
-        if (!add_ok) {
-            return NULL;
-        } else {
-            // Re-run malloc. This should return valid memory
-            return malloc_p(size_align, state);
-        }
+        int64_t increase;
+        increase = state->add_mem_func(false, size_align, state->add_mem_ctx, state);
+        SYS_ASSERT(increase > 0);
+
+        // Re-run malloc. This should return valid memory
+        return malloc_p(size_align, state);
     } else {
         uint64_t leftover = curr_entry->size - size_align;
         curr_entry->inuse = true;

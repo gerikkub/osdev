@@ -30,7 +30,7 @@ static int64_t syscall_yield(uint64_t x0,
                               uint64_t x2,
                               uint64_t x3) {
 
-    console_write("yield\n");
+    // console_write("yield\n");
     return 0;
 }
 
@@ -247,6 +247,12 @@ void syscall_init(void) {
     s_syscall_table[SYSCALL_STARTMOD] = syscall_startmod;
     s_syscall_table[SYSCALL_MAPDEV] = syscall_mapdev;
     s_syscall_table[SYSCALL_SBRK] = syscall_sbrk;
+    s_syscall_table[SYSCALL_OPEN] = syscall_open;
+    s_syscall_table[SYSCALL_READ] = syscall_read;
+    s_syscall_table[SYSCALL_WRITE] = syscall_write;
+    s_syscall_table[SYSCALL_SEEK] = syscall_seek;
+    s_syscall_table[SYSCALL_IOCTL] = syscall_ioctl;
+    s_syscall_table[SYSCALL_CLOSE] = syscall_close;
 
     set_sync_handler(EC_SVC, syscall_sync_handler);
 }

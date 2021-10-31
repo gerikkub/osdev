@@ -240,14 +240,13 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
                                  NULL,
                                  name);
     } else {
-        ASSERT(0);
-        tid = 0;
-        /*tid = create_user_task(TASK_STD_STACK_SIZE,
-                               KERNEL_STD_STACK_SIZE,
-                               memspace,
-                               header->e_entry,
-                               NULL);
-                               */
+        tid = create_user_task(KERNEL_STD_STACK_SIZE,
+                               stack_base,
+                               USER_STACK_SIZE,
+                               &elf_space,
+                               (task_f)header->e_entry,
+                               NULL,
+                               name);
     }
 
     if (tid == 0) {

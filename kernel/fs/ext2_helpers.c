@@ -35,11 +35,13 @@ void ext2_disk_read(ext2_fs_ctx_t* fs, uint64_t offset, void* buffer, uint64_t s
 
 void ext2_read_block(ext2_fs_ctx_t* fs, const uint64_t block, void* buffer) {
 
-    ASSERT(block != 0);
+    if (block != 0) {
+        uint64_t block_offset = block * BLOCK_SIZE(fs->sb);
 
-    uint64_t block_offset = block * BLOCK_SIZE(fs->sb);
-
-    ext2_disk_read(fs, block_offset, buffer, BLOCK_SIZE(fs->sb));
+        ext2_disk_read(fs, block_offset, buffer, BLOCK_SIZE(fs->sb));
+    } else {
+        memset(buffer, 0, BLOCK_SIZE(fs->sb));
+    }
 }
 
 void ext2_read_blocks(ext2_fs_ctx_t* fs,

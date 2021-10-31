@@ -31,36 +31,9 @@
 
 #include "kernel/lib/vmalloc.h"
 
+#include "include/k_fs_ioctl_common.h"
 
-static volatile uint8_t timer_irq_fired;
-
-void timer_handler(uint32_t intid) {
-
-    // Turn off the timer
-    WRITE_SYS_REG(CNTP_CTL_EL0, 0);
-
-    timer_irq_fired = 1;
-}
-
-void my_task(void* ctx) {
-
-    pl011_puts(VIRT_UART_VMEM, "In Thread!\n");
-
-    char* hello_str = "Hello from syscall\n";
-    uint64_t hello_str_int = (uint64_t)hello_str;
-    uint64_t hello_size = strlen(hello_str);
-
-    asm("mov x0, %[arg1]\n \
-         mov x1, %[arg2]\n \
-         svc #1"
-         : : [arg1] "r" (hello_str_int), [arg2] "r" (hello_size));
-
-    pl011_puts(VIRT_UART_VMEM, "Back In Thread!!!\n");
-
-    volatile uint8_t* bad_ptr = 0;
-
-    *bad_ptr;
-}
+void kernel_init_lower_thread(void* ctx);
 
 void main() {
 
@@ -134,12 +107,50 @@ void main() {
 
     vmem_set_tables(kernel_vmem_table, dummy_user_table);
 
-    vmalloc_init(4 * 1024 * 1024);
+    vmalloc_init(16 * 1024 * 1024);
 
     console_log(LOG_DEBUG, "UART_VMEM is Mapped\n");
 
     gtimer_init();
     syscall_init();
+
+    task_init((uint64_t*)exstack_entry.base);
+    create_kernel_task(8192, kernel_init_lower_thread, NULL);
+
+    schedule();
+
+    PANIC("Schedule Returned");
+    while (1);
+
+
+    // modules_init_list();
+    // modules_start();
+
+    // schedule();
+
+    // console_write("Should not get here\n");
+
+    // gic_set_irq_handler(timer_handler, 30);
+
+    // gic_init();
+    // gic_enable_intid(30);
+    // gic_enable();
+
+
+    // while (1) {
+
+    //     timer_irq_fired = 0;
+
+    //     gtimer_start_downtimer(62500000, true);
+
+    //     while (timer_irq_fired == 0) {
+    //     }
+
+    //     console_write("Tiggered\n");
+    // }
+}
+
+void kernel_init_lower_thread(void* ctx) {
 
     sys_device_init();
 
@@ -149,53 +160,31 @@ void main() {
 
     dtb_init();
 
-    volatile uint8_t dummy = *(volatile uint8_t*)0;
-    (void)dummy;
-
     fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                             "home");
 
     fd_ops_t file_ops;
     void* file_ctx;
 
-    vfs_open_device("home", "hello.txt", 0, &file_ops, &file_ctx);
+    vfs_open_device("home", "bin/cat.elf", 0, &file_ops, &file_ctx);
 
-    uint8_t read_arr[1024];
-    memset(read_arr, 0, sizeof(read_arr));
+    int64_t cat_size = file_ops.ioctl(file_ctx, FS_IOCTL_FSIZE, NULL, 0);
+    ASSERT(cat_size > 0);
 
-    int64_t size = file_ops.read(file_ctx, read_arr, 1024, 0);
-    (void)size;
+    uint8_t* read_buffer = vmalloc(cat_size);
+    memset(read_buffer, 0, cat_size);
 
-    console_printf("%s", read_arr);
+    int64_t size = file_ops.read(file_ctx, read_buffer, cat_size, 0);
+    ASSERT(size == cat_size);
 
+    uint64_t cat_tid;
+    elf_result_t res;
+    cat_tid = create_elf_task(read_buffer, size, &res, false, "cat");
+    (void)cat_tid;
 
-    while (1);
-
-    task_init((uint64_t*)exstack_entry.base);
-
-    modules_init_list();
-    modules_start();
-
-    schedule();
-
-    console_write("Should not get here\n");
-
-    gic_set_irq_handler(timer_handler, 30);
-
-    gic_init();
-    gic_enable_intid(30);
-    gic_enable();
-
+    ASSERT(res == ELF_VALID);
 
     while (1) {
-
-        timer_irq_fired = 0;
-
-        gtimer_start_downtimer(62500000, true);
-
-        while (timer_irq_fired == 0) {
-        }
-
-        console_write("Tiggered\n");
+        asm volatile ("svc #0");
     }
 }

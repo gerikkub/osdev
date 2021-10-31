@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "kernel/lock/lock.h"
+
 #include "kernel/fs/ext2_structures.h"
 
 #define BLOCK_SIZE(sb) (1024 << (sb.log_block_size))
@@ -26,6 +28,8 @@ typedef struct {
 
     void* disk_ctx;
     fd_ops_t disk_ops;
+
+    lock_t fs_lock;
 } ext2_fs_ctx_t;
 
 void ext2_find_inode(ext2_superblock_t* sb, const uint32_t inode,

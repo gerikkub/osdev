@@ -9,6 +9,7 @@
 
 #include "stdlib/printf.h"
 
+void console_open(void);
 void console_putc(const char c);
 void console_endl(void);
 void console_write(const char* s);

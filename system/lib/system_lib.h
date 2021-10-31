@@ -40,4 +40,6 @@ void system_init(void);
 void* system_map_device(uintptr_t device, uint64_t len);
 bool system_map_anyphy(uintptr_t len, uintptr_t* phy_out, uintptr_t* virt_out);
 
+void system_yield(void);
+
 #endif

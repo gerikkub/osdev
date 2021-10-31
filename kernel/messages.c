@@ -131,7 +131,7 @@ static int64_t wakeup_getmsgs(task_t* task) {
                            task->reg.gp[TASK_REG(3)]);
 }
 
-static bool canwakeup_getmsgs(wait_ctx_t* wait_ctx) {
+static bool canwakeup_getmsgs(wait_ctx_t* wait_ctx, void* ctx) {
     ASSERT(wait_ctx);
 
     msg_queue* wait_queue = wait_ctx->getmsgs.wait_queue;
@@ -227,7 +227,7 @@ int64_t syscall_sendmsg(uint64_t msg_0,
         return SYSCALL_ERROR_NOSPACE;
     }
 
-    task_wakeup(dst_task, WAIT_GETMSGS, canwakeup_getmsgs);
+    task_wakeup(dst_task, WAIT_GETMSGS, canwakeup_getmsgs, NULL);
 
     return SYSCALL_ERROR_OK;
 }

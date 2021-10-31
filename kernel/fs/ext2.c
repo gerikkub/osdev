@@ -6,6 +6,11 @@
 #include "kernel/fs_manager.h"
 #include "kernel/fd.h"
 #include "kernel/lib/vmalloc.h"
+#include "kernel/lock/lock.h"
+#include "kernel/lock/lock.h"
+#include "kernel/lock/mutex.h"
+
+#include "include/k_fs_ioctl_common.h"
 
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
@@ -17,6 +22,7 @@ typedef struct {
     uint64_t inode_num;
     ext2_inode_t* inode;
     uint64_t pos;
+    lock_t inode_lock;
     ext2_fs_ctx_t* fs_ctx;
 } ext2_fid_ctx_t;
 
@@ -85,6 +91,8 @@ static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_ou
         fs_ctx->inodes[idx].valid = false;
     }
 
+    mutex_init(&fs_ctx->fs_lock, 32);
+
     *ctx_out = fs_ctx;
 
     return 0;
@@ -97,6 +105,8 @@ ext2_mount_failure:
 static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void** ctx_out) {
 
     ext2_fs_ctx_t* fs_ctx = ctx;
+
+    lock_acquire(&fs_ctx->fs_lock, true);
 
     uint32_t inode_num = ext2_get_inode_for_path(fs_ctx, file);
 
@@ -111,15 +121,22 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
     file_ctx->inode = inode;
     file_ctx->fs_ctx = fs_ctx;
     file_ctx->pos = 0;
+    mutex_init(&file_ctx->inode_lock, 32);
     ext2_get_inode(fs_ctx, inode_num, inode);
 
     *ctx_out = file_ctx;
+
+    lock_release(&fs_ctx->fs_lock);
     return 0;
 }
 
 static int64_t ext2_read(void* ctx, uint8_t* buffer, const int64_t size_ro, const uint64_t flags) {
 
     ext2_fid_ctx_t* file_ctx = ctx;
+
+    lock_acquire(&file_ctx->inode_lock, true);
+    lock_acquire(&file_ctx->fs_ctx->fs_lock, true);
+
     const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
     uint32_t size = size_ro;
     int32_t read_size = 0;
@@ -173,6 +190,9 @@ static int64_t ext2_read(void* ctx, uint8_t* buffer, const int64_t size_ro, cons
         file_ctx->pos += size;
     }
 
+    lock_release(&file_ctx->fs_ctx->fs_lock);
+    lock_release(&file_ctx->inode_lock);
+
     return read_size;
 }
 
@@ -182,8 +202,35 @@ static int64_t ext2_write(void* ctx, const uint8_t* buffer, const int64_t size, 
 
 static int64_t ext2_seek(void* ctx, const int64_t pos, const uint64_t flags) {
     ext2_fid_ctx_t* file_ctx = ctx;
+
+    lock_acquire(&file_ctx->inode_lock, true);
     file_ctx->pos = pos;
-    return file_ctx->pos;
+    lock_release(&file_ctx->inode_lock);
+    return pos;
+}
+
+static int64_t ext2_ioctl(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
+
+    ext2_fid_ctx_t* file_ctx = ctx;
+
+    int64_t ret;
+
+    lock_acquire(&file_ctx->inode_lock, true);
+    lock_acquire(&file_ctx->fs_ctx->fs_lock, true);
+
+    switch (ioctl) {
+        case FS_IOCTL_FSIZE:
+            ret = file_ctx->inode->size;
+            break;
+        default:
+            ret = -1;
+            break;
+    }
+
+    lock_release(&file_ctx->fs_ctx->fs_lock);
+    lock_release(&file_ctx->inode_lock);
+
+    return ret;
 }
 
 static int64_t ext2_close(void* ctx) {
@@ -197,7 +244,7 @@ static fs_ops_t ext2_opts = {
         .read = ext2_read,
         .write = ext2_write,
         .seek = ext2_seek,
-        .ioctl = NULL,
+        .ioctl = ext2_ioctl,
         .close = ext2_close
     }
 };

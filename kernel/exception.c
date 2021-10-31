@@ -6,9 +6,28 @@
 #include "kernel/exception.h"
 #include "kernel/panic.h"
 #include "kernel/gic.h"
+#include "kernel/task.h"
+#include "stdlib/printf.h"
 
 void unhandled_exception(uint64_t exception_num) {
-    panic("Exception", exception_num, "Unhandled exception");
+    uint32_t esr;
+    uint32_t far;
+
+    READ_SYS_REG(ESR_EL1, esr);
+    READ_SYS_REG(FAR_EL1, far);
+
+    console_printf("Unhandled exception: %d\n", exception_num);
+    console_printf("ESR: %8x\n", esr);
+    console_printf("FAR: %x\n", far);
+
+    uint64_t elr;
+    READ_SYS_REG(ELR_EL1, elr);
+    console_printf("Fault Addr %x\n", elr);
+
+    task_t* active_task = get_active_task();
+
+    console_printf("tid %u\n", active_task->tid);
+    console_printf("name %s\n", active_task->name);
 }
 
 void exception_handler_sync(uint64_t vector) {
@@ -22,7 +41,8 @@ void exception_handler_sync(uint64_t vector) {
     sync_handler handler = get_sync_handler(ec);
 
     if (handler == 0) {
-        panic("Exception", vector, "Sync");
+        unhandled_exception(ec);
+        PANIC("Unhandled Exception");
     } else {
         handler(vector, esr);
     }

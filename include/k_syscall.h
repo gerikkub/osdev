@@ -11,6 +11,13 @@
 #define SYSCALL_STARTMOD 4
 #define SYSCALL_MAPDEV 5
 #define SYSCALL_SBRK 6
+#define SYSCALL_OPEN 7
+#define SYSCALL_READ 8
+#define SYSCALL_WRITE 9
+#define SYSCALL_SEEK 10
+#define SYSCALL_IOCTL 11
+#define SYSCALL_CLOSE 12
+
 
 
 enum {

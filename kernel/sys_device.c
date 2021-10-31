@@ -65,9 +65,9 @@ int64_t sys_device_seek(void* ctx, const int64_t pos, const uint64_t flags) {
     return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.seek(dev_ctx->open_ctx, pos, flags);
 }
 
-int64_t sys_device_ioctl(void* ctx, const uint64_t ioctl, const uint64_t arg1, const uint64_t arg2, const void* additional, const uint64_t size) {
+int64_t sys_device_ioctl(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
     sys_device_open_ctx_t* dev_ctx = ctx;
-    return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.ioctl(dev_ctx->open_ctx, ioctl, arg1, arg2, additional, size);
+    return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.ioctl(dev_ctx->open_ctx, ioctl, args, arg_count);
 }
 
 int64_t sys_device_close(void* ctx) {

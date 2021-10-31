@@ -186,6 +186,10 @@ uint64_t create_task(uint64_t* user_stack_base,
 
     strncpy(task->name, name, MAX_TASK_NAME_LEN);
 
+    for (int idx = 0; idx < MAX_TASK_FDS; idx++) {
+        task->fds[idx].valid = false;
+    }
+
     // Populate x0 with the task's tid
     task->reg.gp[TASK_REG(0)] = task->tid;
 
@@ -251,12 +255,20 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
                        &reg, memspace, false, name);
 }
 
-uint64_t create_user_task(uint64_t user_stack_size,
-                            uint64_t kernel_stack_size,
-                            memory_space_t memspace,
-                            task_f task_entry,
-                            void* ctx){
-    return 0;
+uint64_t create_user_task(uint64_t kernel_stack_size,
+                          uintptr_t user_stack_base,
+                          uint64_t user_stack_size,
+                          memory_space_t* memspace,
+                          task_f task_entry,
+                          void* ctx,
+                          char* name) {
+
+    return create_system_task(kernel_stack_size,
+                              user_stack_base, 
+                              user_stack_size,
+                              memspace,
+                              task_entry,
+                              ctx, name);
 }
 
 void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun) {
@@ -270,7 +282,7 @@ void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f
     schedule();
 }
 
-void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_fun) {
+void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_fun, void* ctx) {
     ASSERT(task != NULL);
 
     if ((task->run_state == TASK_RUNABLE) ||
@@ -278,7 +290,7 @@ void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_f
         return;
     }
 
-    if (can_wake_fun(&task->wait_ctx)) {
+    if (can_wake_fun(&task->wait_ctx, ctx)) {
         task->run_state = TASK_AWAKE;
     }
 }

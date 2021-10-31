@@ -11,6 +11,7 @@
 #include "kernel/memoryspace.h"
 #include "kernel/messages.h"
 #include "kernel/fd.h"
+#include "kernel/lock/lock.h"
 
 #define MAX_NUM_TASKS 8
 
@@ -22,7 +23,13 @@
 #define MAX_TASK_FDS 64
 
 #define GET_CURR_TID(x) \
-    READ_SYS_REG("TPIDR_EL1", x)
+    READ_SYS_REG(TPIDR_EL1, x)
+
+#define TASK_TID_KERNEL BIT(31)
+
+#define IS_KERNEL_TASK(tid) ((tid) & TASK_TID_KERNEL)
+#define IS_USER_TASK(tid) (!((tid) & TASK_TID_KERNEL))
+
 
 struct task_t_;
 
@@ -47,8 +54,7 @@ typedef enum {
 } wait_reason_t;
 
 typedef struct {
-    //lock_t* lock_ptr;
-    void* dummy;
+    lock_t* lock_ptr;
 } wait_lock_t;
 
 typedef struct {
@@ -60,7 +66,7 @@ typedef union {
     wait_getmsgs_t getmsgs;
 } wait_ctx_t;
 
-typedef bool (*task_canwakeup_f)(wait_ctx_t*);
+typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx,void* ctx);
 typedef int64_t (*task_wakeup_f)(struct task_t_*);
 
 typedef struct task_t_ {
@@ -88,7 +94,6 @@ typedef struct task_t_ {
     _vmem_table* low_vm_table;
 
     msg_queue msgs;
-
 } task_t;
 
 void task_init(uint64_t* exstack);
@@ -111,15 +116,20 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
                             task_f task_entry,
                             void* ctx,
                             char* name);
-//uint64_t create_user_task(uint64_t user_stack_size, uint64_t kernel_stack_size, memory_space_t memspace, task_f task_entry, void* ctx);
+uint64_t create_user_task(uint64_t kernel_stack_size,
+                          uintptr_t user_stack_base,
+                          uint64_t user_stack_size,
+                          memory_space_t* memspace,
+                          task_f task_entry,
+                          void* ctx,
+                          char* name);
 void restore_context_asm(task_reg_t* reg, uint64_t* exstack);
 
 void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun);
-void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_fun);
+void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_fun, void* ctx);
 
 void schedule(void);
 
-#define TASK_TID_KERNEL BIT(31)
 
 #define TASK_SPSR_N BIT(31)
 #define TASK_SPSR_Z BIT(30)
