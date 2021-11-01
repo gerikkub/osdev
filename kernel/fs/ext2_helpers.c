@@ -10,6 +10,8 @@
 #include "kernel/fs/ext2_helpers.h"
 #include "kernel/fs/ext2_structures.h"
 
+#include "include/k_ioctl_common.h"
+
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
 
@@ -26,7 +28,8 @@ void ext2_get_inode_idx(ext2_superblock_t* sb, const uint32_t inode,
 void ext2_disk_read(ext2_fs_ctx_t* fs, uint64_t offset, void* buffer, uint64_t size) {
 
     int64_t res;
-    res = fs->disk_ops.seek(fs->disk_ctx, offset, 0);
+    uint64_t seek_args[2] = {offset, 0};
+    res = fs->disk_ops.ioctl(fs->disk_ctx, IOCTL_SEEK, seek_args, 2);
     ASSERT(res >= 0);
 
     res = fs->disk_ops.read(fs->disk_ctx, buffer, size, 0);

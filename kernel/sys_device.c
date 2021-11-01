@@ -52,27 +52,36 @@ int64_t sys_device_open(void* ctx, const char* path, const uint64_t flags, void*
 
 int64_t sys_device_read(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
     sys_device_open_ctx_t* dev_ctx = ctx;
-    return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.read(dev_ctx->open_ctx, buffer, size, flags);
+    if (s_sys_devices[dev_ctx->sys_device_idx].fd_ops.read != NULL) {
+        return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.read(dev_ctx->open_ctx, buffer, size, flags);
+    } else {
+        return -1;
+    }
 }
 
 int64_t sys_device_write(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
     sys_device_open_ctx_t* dev_ctx = ctx;
-    return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.write(dev_ctx->open_ctx, buffer, size, flags);
-}
-
-int64_t sys_device_seek(void* ctx, const int64_t pos, const uint64_t flags) {
-    sys_device_open_ctx_t* dev_ctx = ctx;
-    return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.seek(dev_ctx->open_ctx, pos, flags);
+    if (s_sys_devices[dev_ctx->sys_device_idx].fd_ops.write != NULL) {
+        return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.write(dev_ctx->open_ctx, buffer, size, flags);
+    } else {
+        return -1;
+    }
 }
 
 int64_t sys_device_ioctl(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
     sys_device_open_ctx_t* dev_ctx = ctx;
-    return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.ioctl(dev_ctx->open_ctx, ioctl, args, arg_count);
+    if (s_sys_devices[dev_ctx->sys_device_idx].fd_ops.ioctl != NULL) {
+        return s_sys_devices[dev_ctx->sys_device_idx].fd_ops.ioctl(dev_ctx->open_ctx, ioctl, args, arg_count);
+    } else {
+        return -1;
+    }
 }
 
 int64_t sys_device_close(void* ctx) {
     sys_device_open_ctx_t* dev_ctx = ctx;
-    s_sys_devices[dev_ctx->sys_device_idx].fd_ops.close(dev_ctx->open_ctx);
+    if (s_sys_devices[dev_ctx->sys_device_idx].fd_ops.close != NULL) {
+        s_sys_devices[dev_ctx->sys_device_idx].fd_ops.close(dev_ctx->open_ctx);
+    }
 
     vfree(dev_ctx);
     return 0;
@@ -85,7 +94,6 @@ static vfs_device_ops_t s_sys_device_ops = {
     .fd_ops = {
         .read = sys_device_read,
         .write = sys_device_write,
-        .seek = sys_device_seek,
         .ioctl = sys_device_ioctl,
         .close = sys_device_close
     },

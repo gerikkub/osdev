@@ -11,6 +11,8 @@
 #include "kernel/fd.h"
 #include "kernel/sys_device.h"
 
+#include "include/k_ioctl_common.h"
+
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
 
@@ -247,11 +249,34 @@ static int64_t virtio_pci_blk_seek_op(void* ctx, const int64_t pos, const uint64
     return -1;
 }
 
+static int64_t virtio_pci_blk_ioctl_op(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
+
+    blk_disk_ctx_t* blk_ctx = ctx;
+    int64_t ret;
+    
+    switch (ioctl) {
+        case IOCTL_SEEK:
+            if (arg_count != 2) {
+                ret = -1;
+            } else {
+                ret = virtio_pci_blk_seek_op(ctx, args[0], args[1]);
+            }
+            break;
+        case BLK_IOCTL_SIZE:
+            ret = blk_ctx->device_config.capacity;
+            break;
+        default:
+            ret = -1;
+    }
+
+    return ret;
+
+}
+
 static fd_ops_t s_bulk_file_ops = {
     .read = virtio_pci_blk_read_op,
     .write = virtio_pci_blk_write_op,
-    .seek = virtio_pci_blk_seek_op,
-    .ioctl = NULL,
+    .ioctl = virtio_pci_blk_ioctl_op,
     .close = NULL
 };
 

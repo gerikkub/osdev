@@ -1,4 +1,5 @@
 
+
 #include <stdint.h>
 #include <string.h>
 
@@ -16,25 +17,10 @@
 
 #include "stdlib/printf.h"
 
-void main(uint64_t tid, char** ctx) {
+void main(uint64_t tid, char** argv) {
 
-    int64_t fd;
-    fd = system_open(ctx[0], ctx[1], 0);
-    SYS_ASSERT(fd >= 0);
-
-    int64_t len;
-    len = system_ioctl(fd, BLK_IOCTL_SIZE, NULL, 0);
-    SYS_ASSERT(len > 0);
-
-    char* buffer = malloc(len);
-    int64_t read_len;
-    read_len = system_read(fd, buffer, len, 0);
-    SYS_ASSERT(read_len > 0);
-
-    console_write_len(buffer, read_len);
+    console_write(argv[0]);
     console_flush();
-
-    free(buffer);
 
     while (1) {
         system_yield();

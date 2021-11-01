@@ -81,7 +81,8 @@ kernel/drivers.c \
 kernel/vfs.c \
 kernel/sys_device.c \
 kernel/fs_manager.c \
-kernel/fd.c
+kernel/fd.c \
+kernel/exec.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
@@ -114,15 +115,13 @@ bootstrap/start.s \
 kernel/high_start.s \
 kernel/exception_asm.s
 
-# SYS_MODS = \
-# $(SYSTEMS_DIR)/ext2 \
-# $(SYSTEMS_DIR)/vfs \
-# $(SYSTEMS_DIR)/dtb \
-# $(SYSTEMS_DIR)/virtio_mmio \
-# $(SYSTEMS_DIR)/pcie \
-# $(SYSTEMS_DIR)/virtio_pci_blk
+SYS_MODS = \
+$(SYSTEMS_DIR)/cat \
+$(SYSTEMS_DIR)/echo
 
-# MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
+MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
+
+DISKIMG = drive_ext2.img
 
 #######################################
 # binaries
@@ -240,6 +239,15 @@ $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir $@		
 
+$(DISKIMG): $(MODULES)
+	mkdir -p mnt
+	sudo mount $(DISKIMG) mnt/
+	mkdir -p mnt/bin
+	cp $(MODULES) mnt/bin/
+	sudo umount $(DISKIMG)
+	rm -r mnt
+
+
 print-% : ; @echo $* = $($*)
 
 
@@ -255,11 +263,11 @@ clean:
 -include $(wildcard $(BUILD_DIR)/*.d)
 
 
-run: $(BUILD_DIR)/$(TARGET).elf
+run: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
 	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $< \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
-debug: $(BUILD_DIR)/$(TARGET).elf
+debug: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
 	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $< \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 

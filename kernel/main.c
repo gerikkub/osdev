@@ -28,10 +28,11 @@
 #include "kernel/sys_device.h"
 #include "kernel/fs_manager.h"
 #include "kernel/fs/ext2.h"
+#include "kernel/exec.h"
 
 #include "kernel/lib/vmalloc.h"
 
-#include "include/k_fs_ioctl_common.h"
+#include "include/k_ioctl_common.h"
 
 void kernel_init_lower_thread(void* ctx);
 
@@ -160,29 +161,27 @@ void kernel_init_lower_thread(void* ctx) {
 
     dtb_init();
 
-    fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
-                            "home");
+    int64_t open_res;
+    open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
+                                       "home");
+    ASSERT(open_res >= 0);
 
-    fd_ops_t file_ops;
-    void* file_ctx;
-
-    vfs_open_device("home", "bin/cat.elf", 0, &file_ops, &file_ctx);
-
-    int64_t cat_size = file_ops.ioctl(file_ctx, FS_IOCTL_FSIZE, NULL, 0);
-    ASSERT(cat_size > 0);
-
-    uint8_t* read_buffer = vmalloc(cat_size);
-    memset(read_buffer, 0, cat_size);
-
-    int64_t size = file_ops.read(file_ctx, read_buffer, cat_size, 0);
-    ASSERT(size == cat_size);
+    uint64_t echo_tid;
+    char* echo_argv[] = {
+        "This is in echo!\n",
+        NULL
+    };
+    echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
+    (void)echo_tid;
 
     uint64_t cat_tid;
-    elf_result_t res;
-    cat_tid = create_elf_task(read_buffer, size, &res, false, "cat");
+    char* cat_argv[] = {
+        "home",
+        "hello.txt",
+        NULL
+    };
+    cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
     (void)cat_tid;
-
-    ASSERT(res == ELF_VALID);
 
     while (1) {
         asm volatile ("svc #0");

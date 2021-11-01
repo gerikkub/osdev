@@ -43,7 +43,8 @@ typedef enum {
 #define USER_ADDRSPACE_STACKTOP (0x00E000000000UL)
 #define USER_ADDRSPACE_STACKLIMIT (0x00C000000000UL)
 #define USER_ADDRSPACE_HEAP (0x000100000000UL)
-#define USER_ADDRSPACE_DATA (0x000060000000UL)
+#define USER_ADDRSPACE_DATA (0x000060800000UL)
+#define USER_ADDRSPACE_ARGV (0x000060000000UL)
 #define USER_ADDRSPACE_TEXT (0x000040000000UL)
 #define USER_ADDRSPACE_BASE (0UL)
 
@@ -52,7 +53,12 @@ typedef enum {
 
 #define USER_GUARD_PAGES (4096UL)
 
-uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* result, bool system_task, char* name);
+uint64_t create_elf_task(uint8_t* elf_data,
+                         uint64_t elf_size,
+                         elf_result_t* result,
+                         bool system_task,
+                         const char* name,
+                         char** argv);
 
 #define ELF_MAX_MEMSPACE_ENTRIES 128
 

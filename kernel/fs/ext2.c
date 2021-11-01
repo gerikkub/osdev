@@ -10,7 +10,7 @@
 #include "kernel/lock/lock.h"
 #include "kernel/lock/mutex.h"
 
-#include "include/k_fs_ioctl_common.h"
+#include "include/k_ioctl_common.h"
 
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
@@ -36,18 +36,8 @@ static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_ou
     uint8_t sb[1024];
     int64_t sb_idx = 0;
     int64_t res;
-    res = disk_ops.seek(disk_ctx, 1024, 0);
-    if (res < 0) {
-        goto ext2_mount_failure;
-    }
-
-    res = disk_ops.read(disk_ctx, sb, 1024, 0);
-    if (res < 0) {
-        goto ext2_mount_failure;
-    }
-
-    memset(sb, 0, 1024);
-    res = disk_ops.seek(disk_ctx, 1024, 0);
+    uint64_t seek_args[2] = {1024, 0};
+    res = disk_ops.ioctl(disk_ctx, IOCTL_SEEK, seek_args, 2);
     if (res < 0) {
         goto ext2_mount_failure;
     }
@@ -203,9 +193,7 @@ static int64_t ext2_write(void* ctx, const uint8_t* buffer, const int64_t size, 
 static int64_t ext2_seek(void* ctx, const int64_t pos, const uint64_t flags) {
     ext2_fid_ctx_t* file_ctx = ctx;
 
-    lock_acquire(&file_ctx->inode_lock, true);
     file_ctx->pos = pos;
-    lock_release(&file_ctx->inode_lock);
     return pos;
 }
 
@@ -219,7 +207,13 @@ static int64_t ext2_ioctl(void* ctx, const uint64_t ioctl, const uint64_t* args,
     lock_acquire(&file_ctx->fs_ctx->fs_lock, true);
 
     switch (ioctl) {
-        case FS_IOCTL_FSIZE:
+        case IOCTL_SEEK:
+            if (arg_count != 2) {
+                return -1;
+            }
+            ret = ext2_seek(ctx, args[0], args[1]);
+            break;
+        case BLK_IOCTL_SIZE:
             ret = file_ctx->inode->size;
             break;
         default:
@@ -243,7 +237,6 @@ static fs_ops_t ext2_opts = {
     .ops = {
         .read = ext2_read,
         .write = ext2_write,
-        .seek = ext2_seek,
         .ioctl = ext2_ioctl,
         .close = ext2_close
     }

@@ -136,7 +136,7 @@ static uint64_t start_module(modules_list_t* mod) {
 
     strncpy(&mod_name[name_idx], subclass->subclass_name, MAX_TASK_NAME_LEN - name_idx);
 
-    tid = create_elf_task(mod->module_start, mod->module_size, &res, true, mod_name);
+    tid = create_elf_task(mod->module_start, mod->module_size, &res, true, mod_name, NULL);
     ASSERT(res == ELF_VALID);
 
     if (mod->starttype == MOD_STARTTYPE_ONE) {

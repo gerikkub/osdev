@@ -29,7 +29,6 @@ static int64_t console_dev_write(void* ctx, const uint8_t* buffer, const int64_t
 static fd_ops_t s_console_ops = {
     .read = NULL,
     .write = console_dev_write,
-    .seek = NULL,
     .ioctl = NULL,
     .close = NULL
 };

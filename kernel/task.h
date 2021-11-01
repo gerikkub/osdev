@@ -107,7 +107,7 @@ uint64_t create_task(uint64_t* user_stack_base,
                      task_reg_t* reg,
                      memory_space_t* vm_table,
                      bool kernel_task,
-                     char* name);
+                     const char* name);
 uint64_t create_kernel_task(uint64_t stack_size, task_f task_entry, void* ctx);
 uint64_t create_system_task(uint64_t kernel_stack_size,
                             uintptr_t user_stack_base,
@@ -115,14 +115,14 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
                             memory_space_t* memspace,
                             task_f task_entry,
                             void* ctx,
-                            char* name);
+                            const char* name);
 uint64_t create_user_task(uint64_t kernel_stack_size,
                           uintptr_t user_stack_base,
                           uint64_t user_stack_size,
                           memory_space_t* memspace,
                           task_f task_entry,
                           void* ctx,
-                          char* name);
+                          const char* name);
 void restore_context_asm(task_reg_t* reg, uint64_t* exstack);
 
 void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun);

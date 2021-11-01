@@ -112,7 +112,7 @@ uint64_t create_task(uint64_t* user_stack_base,
                      task_reg_t* reg,
                      memory_space_t* memspace,
                      bool kernel_task,
-                     char* name) {
+                     const char* name) {
 
     ASSERT(kernel_stack_base != NULL);
     ASSERT(kernel_stack_size > 0);
@@ -218,7 +218,7 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
                             memory_space_t* memspace,
                             task_f task_entry,
                             void* ctx,
-                            char* name) {
+                            const char* name) {
 
     void* kernel_stack_ptr_phy = kmalloc_phy(kernel_stack_size);
     ASSERT(kernel_stack_ptr_phy != NULL);
@@ -261,7 +261,7 @@ uint64_t create_user_task(uint64_t kernel_stack_size,
                           memory_space_t* memspace,
                           task_f task_entry,
                           void* ctx,
-                          char* name) {
+                          const char* name) {
 
     return create_system_task(kernel_stack_size,
                               user_stack_base, 

@@ -20,9 +20,10 @@ typedef int64_t (*syscall_handler)(uint64_t arg0, uint64_t arg1, uint64_t arg2, 
 static syscall_handler s_syscall_table[MAX_SYSCALL_NUM] = {0};
 
 const char* syscall_print_table[] = {
-    "Yield", "Print", "SendMsg",
+    "Yield", "SendMsg",
     "GetMsgs", "StartMod", "MapDev",
-    "Sbrk"
+    "Sbrk", "Open", "Read", "Write",
+    "Ioctl", "Close"
 };
 
 static int64_t syscall_yield(uint64_t x0,
@@ -31,28 +32,6 @@ static int64_t syscall_yield(uint64_t x0,
                               uint64_t x3) {
 
     // console_write("yield\n");
-    return 0;
-}
-
-static int64_t syscall_console_print(uint64_t msg_intptr,
-                                      uint64_t x1,
-                                      uint64_t x2,
-                                      uint64_t x3) {
-
-    task_t* task = get_active_task();
-
-    bool walk_ok;
-    uint64_t phy_msg_addr;
-    walk_ok = vmem_walk_table(task->low_vm_table, msg_intptr, &phy_msg_addr);
-    if (walk_ok) {
-
-        uint8_t* msg_kmem = (uint8_t*)PHY_TO_KSPACE(phy_msg_addr);
-
-        // THIS IS BAD FOR SOOOO MANY REASONS
-        // DELETE THIS AFTER PROOF OF CONCEPT!!!
-        console_write((char*)msg_kmem);
-    }
-
     return 0;
 }
 
@@ -241,7 +220,6 @@ void syscall_sync_handler(uint64_t vector, uint32_t esr) {
 void syscall_init(void) {
 
     s_syscall_table[SYSCALL_YIELD] = syscall_yield;
-    s_syscall_table[SYSCALL_PRINT] = syscall_console_print;
     s_syscall_table[SYSCALL_GETMSGS] = syscall_getmsgs;
     s_syscall_table[SYSCALL_SENDMSG] = syscall_sendmsg;
     s_syscall_table[SYSCALL_STARTMOD] = syscall_startmod;
@@ -250,7 +228,6 @@ void syscall_init(void) {
     s_syscall_table[SYSCALL_OPEN] = syscall_open;
     s_syscall_table[SYSCALL_READ] = syscall_read;
     s_syscall_table[SYSCALL_WRITE] = syscall_write;
-    s_syscall_table[SYSCALL_SEEK] = syscall_seek;
     s_syscall_table[SYSCALL_IOCTL] = syscall_ioctl;
     s_syscall_table[SYSCALL_CLOSE] = syscall_close;
 

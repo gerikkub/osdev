@@ -11,6 +11,7 @@
 #include "kernel/assert.h"
 #include "kernel/kmalloc.h"
 
+#define MAX_ARG_LEN 256
 
 static elf_result_t elf_valid(uint8_t* elf_data, uint64_t elf_size) {
 
@@ -137,7 +138,12 @@ static elf_result_t elf_add_memspace_entry(memory_space_t* memspace, _elf64_phdr
     return ELF_VALID;
 }
 
-uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* result, bool system_task, char* name) {
+uint64_t create_elf_task(uint8_t* elf_data,
+                         uint64_t elf_size,
+                         elf_result_t* result,
+                         bool system_task,
+                         const char* name,
+                         char** argv) {
 
     ASSERT(elf_data != NULL);
     ASSERT(elf_size > 0);
@@ -230,6 +236,38 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
         return 0;
     }
 
+
+    uint64_t argv_len = 0;
+    uint64_t argc = 0;
+
+    for (argc = 0; argv != NULL && argv[argc] != NULL; argc++) {
+        argv_len += strnlen(argv[argc], MAX_ARG_LEN) + 1;
+    }
+
+    uint64_t argv_size = argv_len + (argc + 1) * sizeof(char*);
+    uint64_t argv_size_page = PAGE_CEIL(argv_size);
+    uintptr_t argv_base_phy = (uintptr_t)kmalloc_phy(argv_size_page);
+
+    memory_entry_phy_t argv_entry = {
+        .start = USER_ADDRSPACE_ARGV,
+        .end = USER_ADDRSPACE_ARGV + argv_size_page,
+        .type = MEMSPACE_PHY,
+        .flags = MEMSPACE_FLAG_PERM_URW,
+        .phy_addr = argv_base_phy,
+        .kmem_addr = PHY_TO_KSPACE(argv_base_phy)
+    };
+    memspace_result = memspace_add_entry_to_memory(&elf_space, (memory_entry_t*)&argv_entry);
+    ASSERT(memspace_result == true);
+
+    uint64_t str_offset = (argc + 1) * sizeof(char*);
+    char* argv_base_kptr = PHY_TO_KSPACE_PTR(argv_base_phy);
+    for (uint64_t idx = 0; idx < argc; idx++) {
+        strncpy(&argv_base_kptr[str_offset], argv[idx], MAX_ARG_LEN);
+        ((char**)argv_base_kptr)[idx] = (char*)(USER_ADDRSPACE_ARGV + str_offset);
+        str_offset += strnlen(argv[idx], MAX_ARG_LEN) + 1;
+    }
+    ((char**)argv_base_kptr)[argc] = 0;
+
     uint64_t tid;
     if (system_task) {
         tid = create_system_task(KERNEL_STD_STACK_SIZE,
@@ -237,7 +275,7 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
                                  USER_STACK_SIZE,
                                  &elf_space,
                                  (task_f)header->e_entry,
-                                 NULL,
+                                 (void*)USER_ADDRSPACE_ARGV,
                                  name);
     } else {
         tid = create_user_task(KERNEL_STD_STACK_SIZE,
@@ -245,7 +283,7 @@ uint64_t create_elf_task(uint8_t* elf_data, uint64_t elf_size, elf_result_t* res
                                USER_STACK_SIZE,
                                &elf_space,
                                (task_f)header->e_entry,
-                               NULL,
+                               (void*)USER_ADDRSPACE_ARGV,
                                name);
     }
 

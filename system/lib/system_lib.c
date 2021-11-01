@@ -4,11 +4,13 @@
 #include <stdbool.h>
 
 #include "system/lib/system_lib.h"
+#include "system/lib/system_console.h"
 #include "system/lib/system_malloc.h"
 #include "include/k_syscall.h"
 
 void system_init(void) {
     malloc_init();
+    console_open();
 }
 
 void* system_map_device(uintptr_t device, uint64_t len) {

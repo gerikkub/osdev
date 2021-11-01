@@ -107,22 +107,6 @@ int64_t syscall_write(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags
 
 }
 
-int64_t syscall_seek(uint64_t fd, uint64_t pos, uint64_t flags, uint64_t dummy) {
-
-    task_t* task = get_active_task();
-
-    if (fd >= MAX_TASK_FDS) {
-        return -1;
-    }
-
-    if (!task->fds[fd].valid &&
-        task->fds[fd].ops.seek != NULL) {
-        return -1;
-    }
-
-    return task->fds[fd].ops.seek(task->fds[fd].ctx, pos, flags);
-}
-
 int64_t syscall_ioctl(uint64_t fd, uint64_t ioctl, uint64_t args, uint64_t arg_count) {
     task_t* task = get_active_task();
 
