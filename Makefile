@@ -41,6 +41,9 @@ SYSTEMS_DIR = system
 
 MODULES_BUILD = $(SYSTEMS_DIR)/build
 
+#QEMU_BIN = /usr/local/bin/qemu-system-aarch64
+QEMU_BIN = /usr/bin/qemu-system-aarch64
+
 ######################################
 # source
 ######################################
@@ -50,13 +53,13 @@ bootstrap/main_bootstrap.c \
 bootstrap/vmem_bootstrap.c
 
 C_SRC_DRIVERS = \
-drivers/cortex_a57_gic.c \
 drivers/pl011_uart.c \
 drivers/qemu_fw_cfg.c \
-drivers/dummy.c \
 drivers/pcie/pcie.c \
 drivers/virtio_pci_blk/virtio_pci_blk.c \
-drivers/console/console_dev.c
+drivers/console/console_dev.c \
+drivers/gicv3/gicv3.c \
+drivers/aarch64/aarch64.c
 
 C_SRC_KERNEL = \
 kernel/main.c \
@@ -68,7 +71,6 @@ kernel/panic.c \
 kernel/vmem.c \
 kernel/pagefault.c \
 kernel/gtimer.c \
-kernel/gic.c \
 kernel/task.c \
 kernel/syscall.c \
 kernel/memoryspace.c \
@@ -82,7 +84,8 @@ kernel/vfs.c \
 kernel/sys_device.c \
 kernel/fs_manager.c \
 kernel/fd.c \
-kernel/exec.c
+kernel/exec.c \
+kernel/interrupt/interrupt.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
@@ -102,7 +105,8 @@ stdlib/string.c \
 stdlib/printf.c \
 stdlib/bitutils.c \
 stdlib/linalloc.c \
-stdlib/malloc.c
+stdlib/malloc.c \
+stdlib/bitalloc.c
 
 
 # C sources
@@ -117,7 +121,8 @@ kernel/exception_asm.s
 
 SYS_MODS = \
 $(SYSTEMS_DIR)/cat \
-$(SYSTEMS_DIR)/echo
+$(SYSTEMS_DIR)/echo \
+$(SYSTEMS_DIR)/gsh
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 
@@ -264,13 +269,19 @@ clean:
 
 
 run: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
-	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -s -kernel $< \
+	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -s -kernel $< \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
 debug: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
-	qemu-system-aarch64 -M virt -cpu cortex-a57 -nographic -S -s -kernel $< \
+	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -S -s -kernel $< \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
 
-.PHONY: run debug
+dts:
+	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -S -s \
+	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on \
+	-machine dumpdtb=dtb.dtb
+	dtc -I dtb -O dts -o tools/dts.txt dtb.dtb
+
+.PHONY: run debug dts
 
 # *** EOF ***

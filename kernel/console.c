@@ -26,3 +26,7 @@ void console_write_len(const char* s, uint64_t len) {
 void console_flush(void) {
     // No-op
 }
+
+char console_getchar(void) {
+    return pl011_getc(VIRT_UART_VMEM);
+}

@@ -15,6 +15,7 @@
 #define SYSCALL_WRITE 8
 #define SYSCALL_IOCTL 9
 #define SYSCALL_CLOSE 10
+#define SYSCALL_EXIT 11
 
 
 

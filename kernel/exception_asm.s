@@ -5,7 +5,8 @@
 .text
 
 .global exception_init
-.global switch_to_kernel_stack_asm
+.global switch_to_kernel_task_stack_asm
+.global task_wait_kernel_c
 
 .macro dummy_exception name num
 \name :
@@ -33,7 +34,7 @@
 .endr
 .endm
 
-.macro save_context_asm name spreg num func
+.macro save_context_asm_user name spreg num func
 \name:
     # Save all registers to this stack frame
     stp x30, xzr, [sp, #-16]!
@@ -61,14 +62,13 @@
     # x0: saved state frame pointer
     # x1: This exception number
     # x2: Exception handler to call after saving context
-    # x3: Original kernel stack pointer
     bl save_context
-.rept 20
+.rept 19
 .word 0
 .endr
 .endm
 
-.macro save_context_asm_irq name spreg num func
+.macro save_context_asm_user_irq name spreg num func
 # Similar to save_context, but don't automatically
 # call save_context. Higher up function may decide
 # to call this directly
@@ -93,15 +93,18 @@
     # Context about this exception
     mov x1, #\num
     ldr x2, =\func
-    add x3, sp, #266
 
     # Arguments to save_context are as follows
     # x0: contact frame pointer
     # x1: This exception number
     # x2: Exception handler to call after saving context
-    # x3: Original kernel stack pointer
     bl \func
 
+    # Use the return value to determine the next step
+    # 0: Return to the caller
+    # 1 (or nonzero): Save state and call schedule
+
+    cbnz x0, \name\()_reschedule
     # We have returned with sp the same as it
     # was above. Pop context off the stack and return
 
@@ -122,24 +125,116 @@
     # Return to previous context
     eret
 
-.rept 12
+\name\()_reschedule:
+
+    # x0 will act as the frame pointer to
+    # this return frame. 
+    add x0, sp, #8
+
+    # Store context information about this exception
+    mov x1, #\num
+    ldr x2, =schedule
+
+    # Arguments to save_context are as follows
+    # x0: contact frame pointer
+    # x1: This exception number
+    # x2: Exception handler to call after saving context
+    bl save_context
+
+.rept 8
 .word 0
 .endr
 .endm
+
+.macro save_context_asm_task_kern_irq name spreg num func
+\name:
+    # Save all registers to this stack frame
+    # The zero write will be overriden with pc for a fake stack frame
+    stp xzr, fp, [sp, #-16]!
+    mov fp, sp
+
+    # Save all registers but x30
+    stp lr, xzr, [sp, #-16]!
+    bl save_most_reg
+
+    # Store the return address in the zero write above
+    mrs x0, ELR_EL1
+    str x0, [fp]
+
+    # Store context information about this exception
+    mov x0, #\num
+
+    # Arguments to save_context are as follows
+    # x0: This exception number
+    bl \func
+
+    # Restore all registers but x30
+    bl restore_most_reg
+    # Restore x30
+    ldp lr, xzr, [sp], #16
+
+    # Restore lr and fp
+    ldp xzr, fp, [sp], #16
+    
+    # Return from the IRQ
+    eret
+
+
+.rept 20
+.word 0
+.endr
+.endm
+
+.macro panic_exception_asm name num func
+# Setup just enough to panic
+\name:
+
+    # Setup a valid stack
+    ldr x0, =_stack_base
+    mov sp, x0
+
+    mov x0, #\num
+
+    # Arguments to save_context are as follows
+    # x0: This exception number
+    bl \func
+
+\name\()_loop:
+    b \name\()_loop
+
+.rept 27
+.word 0
+.endr
+.endm
+
 
 .global restore_context_asm
 
 # Restore a task from the state_fp structure
 # x0: Pointer to the state_fp structure
-# x1: Stack pointer for SP_EL1. This will be the stack pointer on the
-#     next exception
+# x1: Stack pointer for the task. This will be the stack pointer on the
+# x2: Stack pointer for the handler
+# x3: Current Stack point
 restore_context_asm:
+
+    cbz x3, restore_context_asm_el1t
+    b restore_context_asm_el1h
+
+restore_context_asm_el1h:
+    mov sp, x2
+    msr SP_EL0, x1
+    b restore_context_asm_finish
+
+restore_context_asm_el1t:
+    # Assume someone else has setup the handler SP
     mov sp, x1
+    b restore_context_asm_finish
+
+restore_context_asm_finish:
     mov x30, x0
     ldp x3, x1, [x30], #16
     ldr x2, [x30], #8
 
-    msr SP_EL0, x1
     msr ELR_EL1, x2
     msr SPSR_EL1, x3
 
@@ -223,21 +318,21 @@ restore_most_reg:
     ret
 
 
-# Switch to the kernel stack and call the given function
+# Switch to the task kernel stack and EL1t
+# Call the given function
 # x0: vector argument to Function
-# x1: Original cpu kernel stack point to revert
+# x1: Per CPU Stack pointer to reset SP1h
 # x2: Task kernel stack pointer
-# x3: Function to call at the end
-switch_to_kernel_stack_asm:
+# x3: Function to call from the new stack
+switch_to_kernel_task_stack_asm:
 
-    mov x2, sp
+    # Set the CPU Stack pointer back to the correct value
+    mov sp, x1
 
-    # # Save this stack pointer value
-    # mov sp, x1
-    # # Setup the stack point value for SP_EL0
-    # msr SP_EL0, x2
-    # # Switch the stack pointer
-    # msr SPSel, xzr
+    # Setup the stack point value for SP_EL0
+    msr SP_EL0, x2
+    # Switch the stack pointer
+    msr SPSel, xzr
 
     # Call the function
     blr x3
@@ -245,23 +340,82 @@ switch_to_kernel_stack_asm:
     # Should not get here
     ret
 
+.global task_wait_kernel
+
+# Wait a task inside a kernel context.
+# x0: Task pointer
+# x1: Wait Type
+# x2: Wait Context Ptr
+# x3: Wakeup Function
+# x4: Canwakeup Function
+task_wait_kernel:
+
+    // Setup the frame pointer
+    stp lr, fp, [sp, #-16]!
+    mov fp, sp
+
+    # Don't need to save registers x0-x7
+    stp x8, x9, [sp, #-16]!
+    stp x10, x11, [sp, #-16]!
+    stp x12, x13, [sp, #-16]!
+    stp x14, x15, [sp, #-16]!
+    stp x16, x17, [sp, #-16]!
+    stp x18, x19, [sp, #-16]!
+    stp x20, x21, [sp, #-16]!
+    stp x22, x23, [sp, #-16]!
+    stp x24, x25, [sp, #-16]!
+    stp x26, x27, [sp, #-16]!
+    stp x28, x29, [sp, #-16]!
+    stp x30, xzr, [sp, #-16]!
+
+    mov x5, sp
+    bl task_wait_kernel_c
+
+.global restore_context_kernel_asm
+
+# Restore kernel context after a wait call
+# x0: The return value to return from task_wait_kernel
+# x1: Kernel stack pointer 
+restore_context_kernel_asm:
+
+    mov sp, x1
+
+    # Restore state from task_wait_kernel
+    ldp x30, xzr, [sp], #16
+    ldp x28, x29, [sp], #16
+    ldp x26, x27, [sp], #16
+    ldp x24, x25, [sp], #16
+    ldp x22, x23, [sp], #16
+    ldp x20, x21, [sp], #16
+    ldp x18, x19, [sp], #16
+    ldp x16, x17, [sp], #16
+    ldp x14, x15, [sp], #16
+    ldp x12, x13, [sp], #16
+    ldp x10, x11, [sp], #16
+    ldp x8, x9, [sp], #16
+
+    // Cleanup the frame pointer
+    ldp lr, fp, [sp], #16
+
+    ret
+
 .section .exception_vector
 
-# Exception while processing a kernel task
-save_context_asm curr_el_sp_0_sync SP_EL0 0 exception_handler_sync
-save_context_asm_irq curr_el_sp_0_irq SP_EL0 1 exception_handler_irq
+# Exception while processing in SP0
+panic_exception_asm curr_el_sp_0_sync 0 panic_exception_handler
+save_context_asm_task_kern_irq curr_el_sp_0_irq SP_EL0 1 exception_handler_irq
 dummy_exception curr_el_sp_0_fiq 2
 dummy_exception curr_el_sp_0_serror 3
 
-# Exception while processing an IRQ
-save_context_asm curr_el_sp_X_sync SP_EL1 4 exception_handler_sync
-save_context_asm_irq curr_el_sp_X_irq SP_EL1 5 exception_handler_irq
+# Exception while processing in SP1 (in kernel or irq)
+panic_exception_asm curr_el_sp_X_sync 4 panic_exception_handler
+save_context_asm_task_kern_irq curr_el_sp_X_irq SP_EL1 5 exception_handler_irq
 dummy_exception curr_el_sp_X_fiq 6
 dummy_exception curr_el_sp_X_serror 7
 
 # Exception while in user space
-save_context_asm lower_el_sp_64_sync SP_EL0 8 exception_handler_sync
-save_context_asm_irq lower_el_sp_64_irq SP_EL0 9 exception_handler_irq
+save_context_asm_user lower_el_sp_64_sync SP_EL0 8 exception_handler_sync
+save_context_asm_user_irq lower_el_sp_64_irq SP_EL0 9 exception_handler_irq
 dummy_exception lower_el_64_fiq 10
 dummy_exception lower_el_64_serror 11
 

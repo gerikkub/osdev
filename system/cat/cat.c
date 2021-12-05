@@ -16,7 +16,7 @@
 
 #include "stdlib/printf.h"
 
-void main(uint64_t tid, char** ctx) {
+int64_t main(uint64_t tid, char** ctx) {
 
     int64_t fd;
     fd = system_open(ctx[0], ctx[1], 0);
@@ -36,7 +36,5 @@ void main(uint64_t tid, char** ctx) {
 
     free(buffer);
 
-    while (1) {
-        system_yield();
-    }
+    return 0;
 }

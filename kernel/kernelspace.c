@@ -170,4 +170,5 @@ void memspace_update_kernel_vmem(void) {
     _vmem_table* kernel_vmem_table = memspace_build_kernel_vmem();
 
     vmem_set_kernel_table(kernel_vmem_table);
+    vmem_flush_tlb();
 }

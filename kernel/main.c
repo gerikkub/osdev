@@ -15,7 +15,7 @@
 #include "kernel/vmem.h"
 #include "kernel/pagefault.h"
 #include "kernel/gtimer.h"
-#include "kernel/gic.h"
+#include "kernel/interrupt/interrupt.h"
 #include "kernel/task.h"
 #include "kernel/syscall.h"
 #include "kernel/memoryspace.h"
@@ -34,6 +34,8 @@
 
 #include "include/k_ioctl_common.h"
 
+#include "drivers/aarch64/aarch64.h"
+
 void kernel_init_lower_thread(void* ctx);
 
 void main() {
@@ -43,6 +45,8 @@ void main() {
     pl011_init(VIRT_UART);
 
     pl011_puts(VIRT_UART, "Hello World!\n");
+
+    assert_aarch64_support();
 
     pagefault_init();
     exception_init();
@@ -57,34 +61,7 @@ void main() {
        .phy_addr = (uint64_t)VIRT_UART
     };
 
-    memory_entry_device_t gicd_device = {
-       .start = (uint64_t)GICD_BASE_VIRT,
-       .end = (uint64_t)GICD_BASE_VIRT + VMEM_PAGE_SIZE,
-       .type = MEMSPACE_DEVICE,
-       .flags = MEMSPACE_FLAG_PERM_KRW,
-       .phy_addr = (uint64_t)GICD_BASE_PHYS
-    };
-
-    memory_entry_device_t gicc_device = {
-       .start = (uint64_t)GICC_BASE_VIRT,
-       .end = (uint64_t)GICC_BASE_VIRT + VMEM_PAGE_SIZE,
-       .type = MEMSPACE_DEVICE,
-       .flags = MEMSPACE_FLAG_PERM_KRW,
-       .phy_addr = (uint64_t)GICC_BASE_PHYS
-    };
-
-    memory_entry_device_t qemu_fw_cfg_device = {
-        .start = (uint64_t)QEMU_FW_CFG_VIRT,
-        .end = (uint64_t)QEMU_FW_CFG_VIRT + VMEM_PAGE_SIZE,
-        .type = MEMSPACE_DEVICE,
-        .flags = MEMSPACE_FLAG_PERM_KRW,
-        .phy_addr = (uint64_t)QEMU_FW_CFG_PHY
-    };
-
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&virtuart_device);
-    memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicd_device);
-    memspace_add_entry_to_kernel_memory((memory_entry_t*)&gicc_device);
-    memspace_add_entry_to_kernel_memory((memory_entry_t*)&qemu_fw_cfg_device);
 
     uint64_t* exstack_mem = kmalloc_phy(KSPACE_EXSTACK_SIZE);
     ASSERT(exstack_mem != NULL);
@@ -112,8 +89,12 @@ void main() {
 
     console_log(LOG_DEBUG, "UART_VMEM is Mapped\n");
 
-    gtimer_init();
     syscall_init();
+    interrupt_init();
+
+    sys_device_init();
+
+    drivers_init();
 
     task_init((uint64_t*)exstack_entry.base);
     create_kernel_task(8192, kernel_init_lower_thread, NULL);
@@ -153,18 +134,24 @@ void main() {
 
 void kernel_init_lower_thread(void* ctx) {
 
-    sys_device_init();
-
-    drivers_init();
-
     ext2_register();
 
     dtb_init();
+
+    gtimer_init();
+    interrupt_enable();
 
     int64_t open_res;
     open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                                        "home");
     ASSERT(open_res >= 0);
+
+    uint64_t gsh_tid;
+    char* gsh_argv[] = {
+        NULL
+    };
+    gsh_tid = exec_user_task("home", "bin/gsh.elf", "gsh", gsh_argv);
+    (void)gsh_tid;
 
     uint64_t echo_tid;
     char* echo_argv[] = {
@@ -182,6 +169,18 @@ void kernel_init_lower_thread(void* ctx) {
     };
     cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
     (void)cat_tid;
+
+    console_printf("Starting Timer\n");
+
+    uint64_t freq = gtimer_get_frequency();
+    uint64_t ticknum = 0;
+    while (1) {
+        gtimer_start_downtimer(freq, true);
+        gtimer_wait_for_trigger();
+        // while (!gtimer_downtimer_triggered()) {}
+        console_printf("Tick %d\n", ticknum);
+        ticknum++;
+    }
 
     while (1) {
         asm volatile ("svc #0");

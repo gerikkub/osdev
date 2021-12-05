@@ -67,4 +67,6 @@ void pl011_putc(PL011_Struct* dev, const char c);
 
 void pl011_puts(PL011_Struct* dev, const char* str);
 
+char pl011_getc(PL011_Struct* dev);
+
 #endif

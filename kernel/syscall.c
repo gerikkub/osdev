@@ -217,6 +217,13 @@ void syscall_sync_handler(uint64_t vector, uint32_t esr) {
     schedule();
 }
 
+int64_t syscall_exit(uint64_t ret_val, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
+    task_t* task_ptr = get_active_task();
+
+    task_cleanup(task_ptr, ret_val);
+    return (int64_t)ret_val;
+}
+
 void syscall_init(void) {
 
     s_syscall_table[SYSCALL_YIELD] = syscall_yield;
@@ -230,6 +237,7 @@ void syscall_init(void) {
     s_syscall_table[SYSCALL_WRITE] = syscall_write;
     s_syscall_table[SYSCALL_IOCTL] = syscall_ioctl;
     s_syscall_table[SYSCALL_CLOSE] = syscall_close;
+    s_syscall_table[SYSCALL_EXIT] = syscall_exit;
 
     set_sync_handler(EC_SVC, syscall_sync_handler);
 }

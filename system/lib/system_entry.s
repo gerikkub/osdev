@@ -13,14 +13,14 @@ _start:
     // We can also assume data and bss section are setup correctly
 
     // Initialize system libraries
-    mov x16, x0
-    mov x17, x1
+    stp x0, x1, [sp, #-16]!
     bl system_init
-    mov x0, x16
-    mov x1, x17
+    ldp x0, x1, [sp], #16
 
     // Main should not return
     bl main
 
     // If main returns the kernel has setup a trap for us
+    // Call syscall exit with the main return value
+    svc #11
     ret

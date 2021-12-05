@@ -124,20 +124,22 @@ static int64_t msg_translate_pointers(system_msg_memory_t* msg, task_t* src_task
     return SYSCALL_ERROR_OK;
 }
 
-static int64_t wakeup_getmsgs(task_t* task) {
-    return syscall_getmsgs(task->reg.gp[TASK_REG(0)],
-                           task->reg.gp[TASK_REG(1)],
-                           task->reg.gp[TASK_REG(2)],
-                           task->reg.gp[TASK_REG(3)]);
-}
+// static int64_t wakeup_getmsgs(task_t* task) {
+//     // Need to re-work the message handling before this will work again
+//     ASSERT(false);
+//     return syscall_getmsgs(task->reg.gp[TASK_REG(0)],
+//                            task->reg.gp[TASK_REG(1)],
+//                            task->reg.gp[TASK_REG(2)],
+//                            task->reg.gp[TASK_REG(3)]);
+// }
 
-static bool canwakeup_getmsgs(wait_ctx_t* wait_ctx, void* ctx) {
-    ASSERT(wait_ctx);
+// static bool canwakeup_getmsgs(wait_ctx_t* wait_ctx, void* ctx) {
+//     ASSERT(wait_ctx);
 
-    msg_queue* wait_queue = wait_ctx->getmsgs.wait_queue;
+//     msg_queue* wait_queue = wait_ctx->getmsgs.wait_queue;
 
-    return msg_queue_size(wait_queue) > 0;
-}
+//     return msg_queue_size(wait_queue) > 0;
+// }
 
 int64_t syscall_getmsgs(uint64_t msg_buffer,
                         uint64_t msg_buffer_size,
@@ -159,11 +161,12 @@ int64_t syscall_getmsgs(uint64_t msg_buffer,
     msg_queue* msgs = &active_task->msgs;
 
     if (msg_queue_size(msgs) == 0) {
-        wait_ctx_t wait_ctx;
-        wait_getmsgs_t wait_msg;
-        wait_msg.wait_queue = msgs;
-        wait_ctx.getmsgs = wait_msg;
-        task_wait(active_task, WAIT_GETMSGS, wait_ctx, wakeup_getmsgs);
+        ASSERT(false); //TODO: Rework this
+        // wait_ctx_t wait_ctx;
+        // wait_getmsgs_t wait_msg;
+        // wait_msg.wait_queue = msgs;
+        // wait_ctx.getmsgs = wait_msg;
+        // task_wait(active_task, WAIT_GETMSGS, wait_ctx, wakeup_getmsgs);
     }
 
     msg_placeholder_t msg;
@@ -227,7 +230,8 @@ int64_t syscall_sendmsg(uint64_t msg_0,
         return SYSCALL_ERROR_NOSPACE;
     }
 
-    task_wakeup(dst_task, WAIT_GETMSGS, canwakeup_getmsgs, NULL);
+    ASSERT(false); //TODO: Rework this
+    // task_wakeup(dst_task, WAIT_GETMSGS, canwakeup_getmsgs, NULL);
 
     return SYSCALL_ERROR_OK;
 }

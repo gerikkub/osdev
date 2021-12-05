@@ -12,6 +12,8 @@
 #include "kernel/memoryspace.h"
 #include "kernel/kernelspace.h"
 
+#include "kernel/interrupt/interrupt.h"
+
 static task_t s_task_list[MAX_NUM_TASKS] = {0};
 
 static volatile uint64_t s_active_task_idx;
@@ -22,10 +24,13 @@ static _vmem_table* s_dummy_user_table;
 
 static uint64_t* s_exstack;
 
-void switch_to_kernel_stack_asm(uint64_t vector,
-                                uint64_t cpu_sp,
-                                uint64_t task_sp,
-                                exception_handler func);
+extern uint8_t _stack_base;
+
+void switch_to_kernel_task_stack_asm(uint64_t vector,
+                                     uint64_t cpu_sp,
+                                     uint64_t task_sp,
+                                     exception_handler func);
+
 
 void task_init(uint64_t* exstack) {
     ASSERT(exstack != NULL);
@@ -61,8 +66,7 @@ task_t* get_task_for_tid(uint64_t tid) {
 
 void save_context(task_reg_t* state_fp,
                   uint64_t vector,
-                  exception_handler func,
-                  uint64_t* cpu_kernel_stack) {
+                  exception_handler func) {
 
     ASSERT(state_fp != NULL);
     ASSERT(func != NULL);
@@ -77,17 +81,39 @@ void save_context(task_reg_t* state_fp,
 
     task->run_state = TASK_RUNABLE;
 
-    if (VECTOR_FROM_LOW_64(vector) &&
-        (VECTOR_IS_SYNC(vector) ||
-         VECTOR_IS_SERROR(vector))) {
-        
-        switch_to_kernel_stack_asm(vector, (uint64_t)cpu_kernel_stack, (uint64_t)task->kernel_stack_base, func);
-    } else {
-        func(vector);
-    }
+    void* cpu_stack_base = &_stack_base;
+
+    switch_to_kernel_task_stack_asm(vector,
+                                    (uint64_t)cpu_stack_base,
+                                    (uint64_t)task->kernel_stack_base,
+                                    func);
 
     ASSERT(1); // Should not reach
 }
+
+/*
+void save_context_kernel(task_reg_t* state_fp,
+                         uint64_t vector,
+                         exception_handler func,
+                         uint64_t* cpu_kernel_stack) {
+
+    ASSERT(state_fp != NULL);
+    ASSERT(func != NULL);
+
+    uint64_t task_tid;
+    read_sys_reg(tpidr_el0, task_tid);
+
+    task_t* task = &s_task_list[s_active_task_idx];
+    assert(task_tid == task->tid);
+
+    task->run_state = TASK_RUNABLE_KERNEL;
+    task->kernel_wait_sp = kernel_sp;
+
+    switch_to_kernel_stack_asm()
+
+    schedule();
+}
+*/
 
 void restore_context(uint64_t tid) {
 
@@ -95,14 +121,36 @@ void restore_context(uint64_t tid) {
 
     WRITE_SYS_REG(TPIDR_EL0, tid);
 
-    uint64_t sp = task->reg.sp;
-    WRITE_SYS_REG(SP_EL0, sp);
+    uint64_t sp0t = task->reg.sp;
+    uint64_t cpu_stack_base = (uint64_t)&_stack_base;
+    uint64_t currSP = 0;
+    READ_SYS_REG(SPSel, currSP);
 
     vmem_set_user_table((_vmem_table*)KSPACE_TO_PHY(task->low_vm_table), tid);
 
-    restore_context_asm(&task->reg, s_exstack);
+    restore_context_asm(&task->reg, sp0t, cpu_stack_base, currSP);
 
     ASSERT(1); // Should not reach
+}
+
+void restore_context_kernel(uint64_t tid, uint64_t x0, void* sp) {
+
+    task_t* task = get_task_for_tid(tid);
+
+    WRITE_SYS_REG(TPIDR_EL0, tid);
+
+    if (task->low_vm_table != NULL) {
+        vmem_set_user_table((_vmem_table*)KSPACE_TO_PHY(task->low_vm_table), tid);
+    }
+
+    restore_context_kernel_asm(x0, task->kernel_wait_sp);
+
+    ASSERT(1); // Should not reach
+}
+
+bool create_task_canwakeup_f(wait_ctx_t* wait_ctx) {
+    // Dummy wait for new tasks
+    return true;
 }
 
 uint64_t create_task(uint64_t* user_stack_base,
@@ -177,9 +225,24 @@ uint64_t create_task(uint64_t* user_stack_base,
 
         task->reg.sp = (uint64_t)&user_stack_base[-2];
         task->reg.gp[TASK_REG_FP] = (uint64_t)&user_stack_base[-2];
+
+        task->run_state = TASK_RUNABLE;
     } else {
-        task->reg.sp = (uint64_t)&kernel_stack_base[-2];
-        task->reg.gp[TASK_REG_FP] = (uint64_t)&kernel_stack_base[-2];
+        // task->reg.sp = (uint64_t)&kernel_stack_base[-2];
+        // task->reg.gp[TASK_REG_FP] = (uint64_t)&kernel_stack_base[-2];
+
+        task->wait_canwakeup_fn = create_task_canwakeup_f;
+        task->wait_wakeup_fn = NULL;
+        task->run_state = TASK_WAIT;
+
+        // Set kernel registers to 0
+        task->kernel_wait_sp = (void*)&kernel_stack_base[-28];
+        memset(task->kernel_wait_sp, 0, 26 * sizeof(uint64_t));
+
+        // Set link register to point at the start address
+        ((uint64_t*)task->kernel_wait_sp)[24] = task->reg.elr;
+        // Set frame pointer to bad kernel frame
+        ((uint64_t*)task->kernel_wait_sp)[25] = (uint64_t)&kernel_stack_base[-2];
     }
     kernel_stack_base[-1] = (uint64_t)bad_task_return;
     kernel_stack_base[-2] = (uint64_t)&kernel_stack_base[-2];
@@ -271,6 +334,7 @@ uint64_t create_user_task(uint64_t kernel_stack_size,
                               ctx, name);
 }
 
+/*
 void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun) {
     ASSERT(task != NULL);
 
@@ -281,8 +345,30 @@ void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f
 
     schedule();
 }
+*/
 
-void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_fun, void* ctx) {
+void task_wait_kernel_c(task_t* task,
+                        wait_reason_t reason,
+                        wait_ctx_t* ctx,
+                        task_wakeup_f wakeup_fn,
+                        task_canwakeup_f canwakeup_fn,
+                        void* kernel_sp) {
+    ASSERT(task != NULL);
+
+    task->run_state = TASK_WAIT;
+    task->wait_reason = reason;
+    task->wait_ctx = *ctx;
+    task->wait_wakeup_fn = wakeup_fn;
+    task->wait_canwakeup_fn = canwakeup_fn;
+    task->kernel_wait_sp = kernel_sp;
+
+    schedule();
+}
+
+/*
+ * This may be called from an interrupt context
+ */
+void task_wakeup(task_t* task, wait_reason_t reason) {
     ASSERT(task != NULL);
 
     if ((task->run_state == TASK_RUNABLE) ||
@@ -290,9 +376,13 @@ void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_f
         return;
     }
 
-    if (can_wake_fun(&task->wait_ctx, ctx)) {
+    if (task->wait_canwakeup_fn(&task->wait_ctx) || task->wait_canwakeup_fn == NULL) {
         task->run_state = TASK_AWAKE;
     }
+}
+
+void task_cleanup(task_t* task, uint64_t ret_val) {
+    task->tid = 0;
 }
 
 void schedule(void) {
@@ -301,30 +391,48 @@ void schedule(void) {
     uint64_t task_count;
     uint64_t task_idx;
 
-    // Round Robin
-    for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
-        task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
-        if (s_task_list[task_idx].tid != 0 &&
-            ((s_task_list[task_idx].run_state == TASK_RUNABLE) ||
-             (s_task_list[task_idx].run_state == TASK_AWAKE)))  {
-                break;
+    // Enable interrupts
+    ENABLE_IRQ();
+
+    do { // TODO: Poor man's idle task
+        // Round Robin
+        for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
+            task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
+            if (s_task_list[task_idx].tid != 0) {
+
+                if (s_task_list[task_idx].run_state == TASK_RUNABLE ||
+                    s_task_list[task_idx].run_state == TASK_AWAKE) {
+                        break;
+                } else if (s_task_list[task_idx].run_state == TASK_WAIT &&
+                        s_task_list[task_idx].wait_canwakeup_fn != NULL) {
+                            
+                    if (s_task_list[task_idx].wait_canwakeup_fn(&s_task_list[task_idx].wait_ctx)) {
+                        s_task_list[task_idx].run_state = TASK_AWAKE;
+                        break;
+                    }
+                }
+            }
         }
-    }
+
+    } while (task_count == MAX_NUM_TASKS);
+    // Disable interrupts
+    DISABLE_IRQ();
 
     ASSERT(task_count < MAX_NUM_TASKS);
 
     s_active_task_idx = task_idx;
 
-    int64_t reg_x0;
+    int64_t reg_x0 = 0;
     switch (s_task_list[task_idx].run_state) {
         case TASK_RUNABLE:
             restore_context(s_task_list[task_idx].tid);
             break;
         case TASK_AWAKE:
-            reg_x0 = s_task_list[task_idx].wait_wakeup_fun(&s_task_list[task_idx]);
-            s_task_list[task_idx].reg.gp[TASK_REG(0)] = reg_x0;
+            if (s_task_list[task_idx].wait_wakeup_fn != NULL) {
+                reg_x0 = s_task_list[task_idx].wait_wakeup_fn(&s_task_list[task_idx]);
+            }
             s_task_list[task_idx].run_state = TASK_RUNABLE;
-            restore_context(s_task_list[task_idx].tid);
+            restore_context_kernel(s_task_list[task_idx].tid, reg_x0, s_task_list[task_idx].kernel_wait_sp);
             break;
         default:
             ASSERT(0);

@@ -84,6 +84,7 @@ void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
     queue_out->queue_num = queue_num;
     queue_out->queue_size = queue_size;
 
+    // TODO: This should probably be device memory
     queue_out->desc_ptr = vmalloc(16 * queue_size);
     queue_out->desc_phy = KSPACE_TO_PHY(queue_out->desc_ptr);
     ASSERT(queue_out->desc_ptr != NULL);
@@ -188,7 +189,7 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
     MEM_DSB();
 
     // Write the available ring to start the transaction
-    virtio_virtq_avail_t* virtq_avail = queue_ctx->avail_ptr;
+    volatile virtio_virtq_avail_t* virtq_avail = queue_ctx->avail_ptr;
 
     virtq_avail->flags = 0;
     virtq_avail->ring[virtq_avail->idx % queue_ctx->queue_size] = 0;
@@ -216,6 +217,8 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
             MEM_DMB();
             return true;
         }
+        MEM_DSB();
+        // TODO: Flush cache if not device memory
     } while (block);
 
     return false;

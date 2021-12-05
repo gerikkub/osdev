@@ -1,5 +1,4 @@
 
-
 #include <stdint.h>
 #include <string.h>
 
@@ -15,12 +14,13 @@
 #include "include/k_modules.h"
 #include "include/k_ioctl_common.h"
 
-#include "stdlib/printf.h"
-
 int32_t main(uint64_t tid, char** argv) {
 
-    console_write(argv[0]);
-    console_flush();
 
-    return 0;
+    while (1) {
+        char c;
+        console_read(&c, 1);
+        console_putc(c);
+        console_flush();
+    }
 }

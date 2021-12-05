@@ -29,6 +29,17 @@ void pl011_puts(PL011_Struct* dev, const char* str) {
     }
 }
 
+char pl011_getc(PL011_Struct* dev) {
+
+    while ((dev->fr & PL011_FR_RXFE) != 0) {}
+
+    return (char)(dev->dr & 0xFF);
+}
+
 void _putchar(char character) {
     pl011_putc(VIRT_UART, character);
+}
+
+char _getchar(void) {
+    return pl011_getc(VIRT_UART);
 }

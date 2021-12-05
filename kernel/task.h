@@ -23,7 +23,11 @@
 #define MAX_TASK_FDS 64
 
 #define GET_CURR_TID(x) \
-    READ_SYS_REG(TPIDR_EL1, x)
+    do { \
+        uint64_t _x = 0; \
+        READ_SYS_REG(TPIDR_EL0, _x); \
+        x = _x & 0x7FFFFFFF; \
+    } while(0)
 
 #define TASK_TID_KERNEL BIT(31)
 
@@ -44,13 +48,15 @@ typedef struct __attribute__((packed)) {
 
 typedef enum {
     TASK_RUNABLE,
+    TASK_RUNABLE_KERNEL,
     TASK_WAIT,
-    TASK_AWAKE
+    TASK_AWAKE,
 } run_state_t;
 
 typedef enum {
     WAIT_LOCK = 1,
     WAIT_GETMSGS = 2,
+    WAIT_IRQNOTIFY = 3,
 } wait_reason_t;
 
 typedef struct {
@@ -61,12 +67,17 @@ typedef struct {
     msg_queue* wait_queue;
 } wait_getmsgs_t;
 
+typedef struct {
+    uint64_t irq;
+} wait_irqnotify_t;
+
 typedef union {
     wait_lock_t lock;
     wait_getmsgs_t getmsgs;
+    wait_irqnotify_t irqnotify;
 } wait_ctx_t;
 
-typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx,void* ctx);
+typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);
 typedef int64_t (*task_wakeup_f)(struct task_t_*);
 
 typedef struct task_t_ {
@@ -78,7 +89,8 @@ typedef struct task_t_ {
     run_state_t run_state;
     wait_reason_t wait_reason;
     wait_ctx_t wait_ctx;
-    task_wakeup_f wait_wakeup_fun;
+    task_wakeup_f wait_wakeup_fn;
+    task_canwakeup_f wait_canwakeup_fn;
 
     fd_ctx_t fds[MAX_TASK_FDS];
 
@@ -89,6 +101,7 @@ typedef struct task_t_ {
     uint64_t kernel_stack_size;
 
     task_reg_t reg;
+    void* kernel_wait_sp;
 
     memory_space_t memory;
     _vmem_table* low_vm_table;
@@ -100,6 +113,9 @@ void task_init(uint64_t* exstack);
 task_t* get_active_task(void);
 task_t* get_task_for_tid(uint64_t tid);
 void restore_context(uint64_t tid);
+void restore_context_kernel(uint64_t tid, uint64_t x0, void* sp);
+void restore_context_kernel_asm(uint64_t x0, void* sp);
+
 uint64_t create_task(uint64_t* user_stack_base,
                      uint64_t user_stack_size,
                      uint64_t* kernel_stack_base,
@@ -123,12 +139,24 @@ uint64_t create_user_task(uint64_t kernel_stack_size,
                           task_f task_entry,
                           void* ctx,
                           const char* name);
-void restore_context_asm(task_reg_t* reg, uint64_t* exstack);
+void restore_context_asm(task_reg_t* reg,
+                         uint64_t task_sp,
+                         uint64_t handler_sp,
+                         uint64_t currentSP);
 
-void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun);
-void task_wakeup(task_t* task, wait_reason_t reason, task_canwakeup_f can_wake_fun, void* ctx);
+// void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun);
+void task_wakeup(task_t* task, wait_reason_t reason);
+
+void task_cleanup(task_t* task, uint64_t ret_val);
 
 void schedule(void);
+
+// Implemented in exception_asm.s
+int64_t task_wait_kernel(task_t* task,
+                         wait_reason_t reason,
+                         wait_ctx_t* ctx,
+                         task_wakeup_f wakeup_fun,
+                         task_canwakeup_f canwakeup_f);
 
 
 #define TASK_SPSR_N BIT(31)

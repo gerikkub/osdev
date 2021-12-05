@@ -30,6 +30,8 @@ static int64_t s_fdt_property_idx = 0;
 static fdt_node_t s_fdt_node_list[MAX_DTB_NODES] = {0};
 static int64_t s_fdt_node_idx = 0;
 
+static dt_block_t* s_full_dtb;
+
 typedef struct __attribute__((packed)) {
     uint64_t address;
     uint64_t size;
@@ -321,9 +323,16 @@ void dtb_init(void) {
         .num_nodes = s_fdt_node_idx
     };
 
+    s_full_dtb = dt_build_block(root_node, &fdt_ctx, NULL);
+    ASSERT(s_full_dtb != NULL);
+
     // dt_block_t* block = dt_build_block(root_node, &fdt_ctx);
 
     // print_node(devicetree, &header, root_node, 2);
 
     dtb_discover(devicetree, root_node, &header, &fdt_ctx, NULL);
+}
+
+const dt_block_t* dtb_get_devicetree(void) {
+    return s_full_dtb;
 }

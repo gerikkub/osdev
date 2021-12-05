@@ -7,21 +7,6 @@
 
 #include "stdlib/bitutils.h"
 
-#define BEGIN_CRITICAL(x) \
-    do { \
-    READ_SYS_REG(DAIF, x);  \
-    uint64_t __val = BIT(8) | /* Serror Mask */ \
-                     BIT(7) | /* IRQ Mask */ \
-                     BIT(6);  /* FIQ Mask */ \
-    WRITE_SYS_REG(DAIF, __val); \
-    (void)__val; \
-    } while(0)
-
-#define END_CRITICAL(x) \
-    do { \
-    WRITE_SYS_REG(DAIF, x); \
-    } while(0)
-
 struct lock_t_;
 
 typedef bool (*lock_try_acquire_func)(struct lock_t_* lock, bool should_wait);

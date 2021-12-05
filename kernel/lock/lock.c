@@ -7,6 +7,7 @@
 #include "kernel/task.h"
 #include "kernel/assert.h"
 
+#include "kernel/interrupt/interrupt.h"
 
 void lock_init(lock_t* lock, lock_try_acquire_func try_acquire, lock_release_func release, void* lock_ctx) {
     ASSERT(lock != NULL);
@@ -19,19 +20,9 @@ void lock_init(lock_t* lock, lock_try_acquire_func try_acquire, lock_release_fun
     lock->lock_ctx = lock_ctx;
 }
 
-bool lock_canwakeup(wait_ctx_t* wait_ctx, void* ctx) {
-
-    ASSERT(wait_ctx->lock.lock_ptr != ctx);
-
-    return true;
-}
-
-int64_t lock_wakeup(task_t* task) {
-    return 0;
-}
-
 bool lock_acquire(lock_t* lock, bool should_wait) {
 
+    return true;
     bool got_lock = false;
 
     do {
@@ -45,7 +36,7 @@ bool lock_acquire(lock_t* lock, bool should_wait) {
             wait_ctx_t ctx;
             ctx.lock.lock_ptr = lock;
             // TODO: Lock could be release here, before waiting the task
-            task_wait(get_active_task(), WAIT_LOCK, ctx, lock_wakeup);
+            task_wait_kernel(get_active_task(), WAIT_LOCK, &ctx, NULL, NULL);
             return true;
         }
     } while (!got_lock);
@@ -54,12 +45,13 @@ bool lock_acquire(lock_t* lock, bool should_wait) {
 }
 
 void lock_release(lock_t* lock) {
+    return;
     uint64_t next_tid;
     next_tid = lock->release(lock);
 
     if (next_tid != 0) {
         task_t* next_task = get_task_for_tid(next_tid);
 
-        task_wakeup(next_task, WAIT_LOCK, lock_canwakeup, lock);
+        task_wakeup(next_task, WAIT_LOCK);
     }
 }

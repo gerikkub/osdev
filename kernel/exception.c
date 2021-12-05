@@ -5,7 +5,7 @@
 #include "stdlib/bitutils.h"
 #include "kernel/exception.h"
 #include "kernel/panic.h"
-#include "kernel/gic.h"
+#include "kernel/interrupt/interrupt.h"
 #include "kernel/task.h"
 #include "stdlib/printf.h"
 
@@ -52,10 +52,18 @@ void exception_handler_sync_lower(uint64_t vector) {
     panic("Exception", vector, "Sync Lower");
 }
 
-void exception_handler_irq(uint64_t vector) {
+void gic_irq_handler(uint32_t vector);
+
+uint64_t exception_handler_irq(uint64_t vector) {
     gic_irq_handler(vector);
+
+    return 0;
 }
 
 void exception_handler_irq_lower(uint64_t vector) {
     panic("Exception", vector, "IRQ Lower");
+}
+
+void panic_exception_handler(uint64_t vector) {
+    panic("Exception", vector, "Exception in SP1");
 }

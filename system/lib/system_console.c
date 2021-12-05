@@ -77,3 +77,12 @@ void console_flush(void) {
     SYSCALL_CALL(SYSCALL_WRITE, s_console_fd, (uintptr_t)s_console_buffer, s_console_idx, 0);
     s_console_idx = 0;
 }
+
+int64_t console_read(char* buffer, uint64_t len) {
+    SYS_ASSERT(s_console_fd >= 0);
+
+    int64_t ret;
+    SYSCALL_CALL_RET(SYSCALL_READ, s_console_fd, (uintptr_t)buffer, len, 0, ret);
+
+    return ret;
+}

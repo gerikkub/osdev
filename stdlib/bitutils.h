@@ -15,13 +15,16 @@
 
 #define ALIGN_DOWN(x, align) (((x) + align - 1) % align)
 
-#define WRITE_SYS_REG(reg, x) \
+#define WRITE_SYS_REG(reg, x) WRITE_SYS_REG_HELPER(reg, x)
+#define READ_SYS_REG(reg, x) READ_SYS_REG_HELPER(reg, x)
+
+#define WRITE_SYS_REG_HELPER(reg, x) \
     do { \
     uint64_t __val = x; \
     asm ("msr " # reg ", %[value]" : : [value] "r" (__val)); \
     } while(0)
 
-#define READ_SYS_REG(reg, x) \
+#define READ_SYS_REG_HELPER(reg, x) \
     asm ("mrs %[value], " # reg : [value] "=r" (x))
 
 

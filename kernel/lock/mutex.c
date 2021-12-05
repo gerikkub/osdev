@@ -5,6 +5,7 @@
 #include "kernel/lock/lock.h"
 #include "kernel/task.h"
 #include "kernel/assert.h"
+#include "kernel/interrupt/interrupt.h"
 
 #include "kernel/lib/vmalloc.h"
 

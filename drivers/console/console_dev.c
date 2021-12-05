@@ -17,17 +17,25 @@ static int64_t console_dev_open(void* ctx, const char* path, const uint64_t flag
     return 0;
 }
 
+static int64_t console_dev_read(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
+    char c = console_getchar();
+
+    buffer[0] = c;
+    return 1;
+}
+
 static int64_t console_dev_write(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
 
-    task_t* task = get_active_task();
+    // task_t* task = get_active_task();
 
-    console_printf("[%s] %s", task->name, buffer);
+    // console_printf("[%s] %s", task->name, buffer);
+    console_printf("%s", buffer);
 
     return size;
 }
 
 static fd_ops_t s_console_ops = {
-    .read = NULL,
+    .read = console_dev_read,
     .write = console_dev_write,
     .ioctl = NULL,
     .close = NULL
