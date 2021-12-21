@@ -172,3 +172,13 @@ void memspace_update_kernel_vmem(void) {
     vmem_set_kernel_table(kernel_vmem_table);
     vmem_flush_tlb();
 }
+
+void* get_userspace_ptr(_vmem_table* table_ptr, uintptr_t userptr) {
+    bool walk_ok;
+    uint64_t phy_addr;
+    walk_ok = vmem_walk_table(table_ptr, userptr, &phy_addr);
+    if (!walk_ok) {
+        return NULL;
+    }
+    return PHY_TO_KSPACE_PTR(phy_addr);
+}

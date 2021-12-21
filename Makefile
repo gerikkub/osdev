@@ -41,8 +41,8 @@ SYSTEMS_DIR = system
 
 MODULES_BUILD = $(SYSTEMS_DIR)/build
 
-#QEMU_BIN = /usr/local/bin/qemu-system-aarch64
-QEMU_BIN = /usr/bin/qemu-system-aarch64
+QEMU_BIN = /usr/local/share/qemu/bin/qemu-system-aarch64
+#QEMU_BIN = /usr/bin/qemu-system-aarch64
 
 ######################################
 # source

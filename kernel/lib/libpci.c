@@ -19,6 +19,7 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t
     void* header_vmem = PHY_TO_KSPACE_PTR(device->header_phy);
     ASSERT(header_vmem != NULL);
     device->header_vmem = header_vmem;
+    device->header_offset = module_ctx->header_offset;
 
     // Allocate virtual memory space for IO, M32 and M64 memories
     device->io_base_phy = module_ctx->io_base;
@@ -103,9 +104,14 @@ pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint6
     }
 }
 
+void pci_register_interrupt_handler(pcie_irq_handler fn, void* ctx) {
+    
+}
+
 void print_pci_header(pci_device_ctx_t* device_ctx) {
     pci_header0_t* h0 = device_ctx->header_vmem;
     console_printf("PCI Device\n");
+    console_printf(" Offset %8x\n", device_ctx->header_offset);
     console_printf(" Vendor %4x Device %4x Revision %u\n", h0->vendor_id, h0->device_id, h0->revision_id);
     console_printf(" Class %4x Subclass %4x\n", h0->class, h0->subclass);
     console_printf(" Subsystem %4x Subsystem Vendor %4x\n", h0->subsystem_id, h0->subsystem_vendor_id);
@@ -113,6 +119,7 @@ void print_pci_header(pci_device_ctx_t* device_ctx) {
     for (int i = 0; i < 6; i++) {
         console_printf(" BAR[%u] %x\n", i, h0->bar[i]);
     }
+    console_printf(" Int Line/Pin %u/%u\n", h0->int_line, h0->int_pin);
 
     console_flush();
 }
@@ -174,12 +181,14 @@ void print_pci_capabilities(pci_device_ctx_t* device_ctx) {
 void print_pci_capability_msix(pci_device_ctx_t* device_ctx, pci_msix_capability_t* cap_ptr) {
 
     console_printf(" MSI-X\n");
+    console_printf("  Message Control %4x\n",
+                   cap_ptr->msg_ctrl);
     console_printf("  Table Offset [%u] %8x\n",
                    cap_ptr->table_offset & 0x7,
                    cap_ptr->table_offset & 0xFFFFFFF8);
     console_printf("  PBA Offset [%u] %8x\n",
-                   cap_ptr->table_offset & 0x7,
-                   cap_ptr->table_offset & 0xFFFFFFF8);
+                   cap_ptr->pba_offset & 0x7,
+                   cap_ptr->pba_offset & 0xFFFFFFF8);
     console_flush();
 }
 

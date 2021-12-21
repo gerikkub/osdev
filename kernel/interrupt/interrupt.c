@@ -6,6 +6,7 @@
 #include "kernel/exception.h"
 #include "kernel/assert.h"
 #include "kernel/task.h"
+#include "kernel/console.h"
 #include "kernel/lib/vmalloc.h"
 
 #include "kernel/interrupt/interrupt.h"
@@ -137,6 +138,8 @@ bool interrupt_await(uint64_t irq) {
     }
 
     if (s_interrupt_ctx.handlers[irq].awaited) {
+        s_interrupt_ctx.handlers[irq].awaited = false;
+        s_interrupt_ctx.handlers[irq].awaiter_tid = 0;
         return true;
     }
 
@@ -162,6 +165,7 @@ void interrupt_notify_awaiters(uint64_t irq) {
  * IRQ Context
  */
 void interrupt_handle_irq(uint64_t irq) {
+
     if (s_interrupt_ctx.handlers[irq].fn != NULL) {
         s_interrupt_ctx.handlers[irq].fn(irq, s_interrupt_ctx.handlers[irq].ctx);
     }

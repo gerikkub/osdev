@@ -61,7 +61,23 @@ typedef struct __attribute__((__packed__)) {
 #define PL011_CR_SIREN (1 << 1)
 #define PL011_CR_UARTEN (1 << 0)
 
+#define PL011_MIS_OE (1 << 10)
+#define PL011_MIS_BE (1 << 9)
+#define PL011_MIS_PE (1 << 8)
+#define PL011_MIS_FE (1 << 7)
+#define PL011_MIS_RT (1 << 6)
+#define PL011_MIS_TX (1 << 5)
+#define PL011_MIS_RX (1 << 4)
+#define PL011_MIS_DSRM (1 << 3)
+#define PL011_MIS_DCDM (1 << 2)
+#define PL011_MIS_CTSM (1 << 1)
+#define PL011_MIS_RIM (1 << 0)
+
+#define PL011_IRQn (33)
+
 void pl011_init(PL011_Struct* dev);
+
+void pl011_init_rx(PL011_Struct* dev);
 
 void pl011_putc(PL011_Struct* dev, const char c);
 

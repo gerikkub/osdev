@@ -14,6 +14,8 @@
 #include "kernel/messages.h"
 #include "kernel/modules.h"
 #include "kernel/kmalloc.h"
+#include "kernel/exec.h"
+#include "kernel/lib/vmalloc.h"
 
 typedef int64_t (*syscall_handler)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
 
@@ -224,6 +226,63 @@ int64_t syscall_exit(uint64_t ret_val, uint64_t arg1, uint64_t arg2, uint64_t ar
     return (int64_t)ret_val;
 }
 
+int64_t syscall_exec(uint64_t device_arg, uint64_t path_arg, uint64_t task_name_arg, uint64_t argv_arg) {
+
+    task_t* task = get_active_task();
+
+    void* device_kptr = get_userspace_ptr(task->low_vm_table, device_arg);
+    void* path_kptr = get_userspace_ptr(task->low_vm_table, path_arg);
+    void* task_name_kptr = get_userspace_ptr(task->low_vm_table, task_name_arg);
+    void* argv_kptr = get_userspace_ptr(task->low_vm_table, argv_arg);
+
+    if (device_kptr == NULL ||
+        path_kptr == NULL ||
+        task_name_kptr == NULL) {
+            
+        return -1;
+    }
+
+    char** exec_argv = NULL;
+
+    if (argv_kptr != NULL) {
+        char** argv = argv_kptr;
+        uint64_t exec_argc = 0;
+
+        while (*argv != NULL) {
+            exec_argc++;
+            argv++;
+        }
+
+        exec_argv = vmalloc((exec_argc + 1) * sizeof(char*));
+
+        argv = argv_kptr;
+        uint64_t idx;
+        for (idx = 0; idx < exec_argc; idx++) {
+            argv_kptr = get_userspace_ptr(task->low_vm_table, (uintptr_t)argv[idx]);
+            uint64_t arglen = strnlen(argv_kptr, EXEC_ARGV_ARG_MAXLEN);
+            char* exec_arg = vmalloc(arglen);
+            strncpy(exec_arg, argv[idx], EXEC_ARGV_ARG_MAXLEN);
+            exec_argv[idx] = exec_arg;
+        }
+
+        exec_argv[idx] = NULL;
+    }
+
+    uint64_t exec_res = exec_user_task(device_kptr, path_kptr, task_name_kptr, exec_argv);
+
+    if (exec_argv != NULL) {
+        uint64_t idx = 0;
+        while (exec_argv[idx] != NULL) {
+            vfree(exec_argv[idx]);
+            idx++;
+        }
+
+        vfree(exec_argv);
+    }
+
+    return exec_res != 0 ? (int64_t)exec_res : -1;
+}
+
 void syscall_init(void) {
 
     s_syscall_table[SYSCALL_YIELD] = syscall_yield;
@@ -238,6 +297,7 @@ void syscall_init(void) {
     s_syscall_table[SYSCALL_IOCTL] = syscall_ioctl;
     s_syscall_table[SYSCALL_CLOSE] = syscall_close;
     s_syscall_table[SYSCALL_EXIT] = syscall_exit;
+    s_syscall_table[SYSCALL_EXEC] = syscall_exec;
 
     set_sync_handler(EC_SVC, syscall_sync_handler);
 }

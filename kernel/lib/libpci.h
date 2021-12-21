@@ -28,7 +28,11 @@
 
 #define MAX_PCI_BAR 6
 
+typedef void (*pci_irq_handler_fn)(void* ctx);
+
 typedef struct {
+    uint64_t header_offset;
+
     uintptr_t header_phy;
     void* header_vmem;
 
@@ -49,6 +53,9 @@ typedef struct {
         void* vmem;
         uintptr_t len;
     } bar[MAX_PCI_BAR];
+
+    pci_irq_handler_fn int_fn;
+    uint8_t int_num;
 } pci_device_ctx_t;
 
 typedef struct __attribute__((__packed__)) {
@@ -185,6 +192,7 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct {
     uintptr_t header_phy;
+    uint64_t header_offset;
 
     uintptr_t io_base;
     uint64_t io_size;
@@ -201,6 +209,13 @@ typedef struct {
     } bar[6];
 } discovery_pci_ctx_t;
 
+typedef void (*pcie_irq_handler)(void* ctx);
+
+typedef struct {
+    pcie_irq_handler fn;
+    void* ctx;
+} pcie_int_handler_ctx_t;
+
 void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t* module_ctx);
 
 pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx);
@@ -210,5 +225,9 @@ void print_pci_capabilities(pci_device_ctx_t* device_ctx);
 void print_pci_capability_msix(pci_device_ctx_t* device_ctx, pci_msix_capability_t* cap_ptr);
 void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr);
 
+
+
+void pci_register_int_handler(pci_device_ctx_t* device_ctx, pci_irq_handler_fn fn, void* fn_ctx);
+void pci_wait_irq(pci_device_ctx_t* device_ctx);
 
 #endif

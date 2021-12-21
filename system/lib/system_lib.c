@@ -46,3 +46,9 @@ bool system_map_anyphy(uintptr_t len, uintptr_t* phy_out, uintptr_t* virt_out) {
 void system_yield(void) {
     SYSCALL_CALL(SYSCALL_YIELD, 0, 0, 0, 0);
 }
+
+int64_t system_exec(const char* device, const char* path, const char* name, char** const argv) {
+    int64_t ret;
+    SYSCALL_CALL_RET(SYSCALL_EXEC, (uintptr_t)device, (uintptr_t)path, (uintptr_t)name, (uintptr_t)argv, ret);
+    return ret;
+}

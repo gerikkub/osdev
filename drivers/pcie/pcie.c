@@ -9,6 +9,8 @@
 #include "kernel/kernelspace.h"
 #include "kernel/lib/libpci.h"
 #include "kernel/lib/libdtb.h"
+#include "kernel/lib/vmalloc.h"
+#include "kernel/lib/llist.h"
 
 #include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
@@ -50,8 +52,43 @@ typedef struct {
     uint64_t m64_top;
 } pci_alloc_t;
 
+typedef struct {
+    uint64_t device[3];
+    uint64_t int_num;
+    uint64_t int_ctx[3];
+} pci_interrupt_map_entry_t;
+
+typedef struct {
+    uint32_t intid;
+    llist_t* handler_list;
+} pci_interrupt_ctx_t;
+
+typedef struct {
+    uint32_t device_mask[3];
+    uint32_t int_mask;
+    pci_interrupt_map_entry_t* entries;
+    uint64_t num_entries;
+    pci_interrupt_ctx_t int_ctx[4];
+} pci_interrupt_map_t;
+
 static pci_range_t s_pci_ranges;
 static pci_alloc_t s_dtb_alloc;
+static pci_interrupt_map_t s_pcie_int_map;
+
+/*
+void pcie_irq_handler(uint32_t intid, void* ctx) {
+    pci_interrupt_ctx_t* int_ctx = ctx;
+    llist_t* pci_handlers = int_ctx->handler_list;
+    pcie_int_handler_ctx_t* handler;
+
+    FOR_LLIST(pci_handlers, handler) {
+        ASSERT(handler != NULL);
+        ASSERT(handler.fn != NULL);
+        handler.fn(handler.ctx);
+    }
+    END_FOR_LLIST()
+}
+*/
 
 void align_pci_memory(pci_alloc_t* allocator, uint64_t alignment, pci_space_t space) {
 
@@ -221,7 +258,7 @@ uint64_t mem_to_pci_addr(pci_range_t* ranges, uintptr_t mem_addr, pci_space_t sp
     }
 }
 
-void create_pci_device(volatile pci_header0_t* header, uintptr_t header_phy) {
+void create_pci_device(volatile pci_header0_t* header, uintptr_t header_phy, uint64_t offset) {
 
     discovery_register_t driver_discovery = {
         .type = DRIVER_DISCOVERY_PCI,
@@ -233,13 +270,17 @@ void create_pci_device(volatile pci_header0_t* header, uintptr_t header_phy) {
 
     bool have_driver = discovery_have_driver(&driver_discovery);
     if (!have_driver) {
-        console_printf("No Driver for PCI %4x %4x\n", header->vendor_id, header->device_id);
+        console_printf("No Driver for PCI %4x %4x at offset %x\n",
+                       header->vendor_id, header->device_id,
+                       offset);
         console_flush();
         return;
     }
 
     discovery_pci_ctx_t device_ctx = {0};
     device_ctx.header_phy = header_phy;
+    device_ctx.header_offset = offset;
+    //device_ctx.int_map = pcie_int_map;
 
     device_ctx.io_size = 0;
     device_ctx.m32_size = 0;
@@ -385,7 +426,7 @@ void discover_pcie(void* pcie_mem, uint64_t len) {
             (header->header_type & 0x7F) == 0) {
             
             uint64_t header_phy = 0x4010000000 + offset;
-            create_pci_device((pci_header0_t*)header, header_phy);
+            create_pci_device((pci_header0_t*)header, header_phy, offset);
             //print_pci_header(header, (void*)0x4010000000);
         }
     }
@@ -460,6 +501,126 @@ void* pcie_parse_allocate_reg(dt_block_t* dt_block) {
     return PHY_TO_KSPACE_PTR(dt_reg->addr);
 }
 
+pci_interrupt_map_t* pcie_parse_interrupt_map(dt_block_t* dt_block) {
+
+    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+
+    pci_interrupt_map_t* map = vmalloc(sizeof(pci_interrupt_map_t));
+
+    // Find interrupt-map-mask entry
+    uint64_t prop_idx = 0;
+    uint64_t* property_list = (uint64_t*)&dt_block->data[dt_node->property_list_off];
+    dt_prop_generic_t* prop = NULL;
+    while (prop_idx < dt_node->num_properties) {
+       prop = (dt_prop_generic_t*)&dt_block->data[property_list[prop_idx]];
+
+       char* name = (char*)&dt_block->data[prop->name_off];
+       if (strncmp(name, "interrupt-map-mask", 19) == 0) {
+           break;
+       }
+
+       prop_idx++;
+    }
+
+    ASSERT(prop_idx < dt_node->num_properties);
+    ASSERT(prop->data_len == 16);
+
+    uint32_t* prop_data = (uint32_t*)&dt_block->data[prop->data_off];
+
+    map->device_mask[0] = __builtin_bswap32(prop_data[0]);
+    map->device_mask[1] = __builtin_bswap32(prop_data[1]);
+    map->device_mask[2] = __builtin_bswap32(prop_data[2]);
+    map->int_mask = __builtin_bswap32(prop_data[3]);
+
+    // Find interrupt-map
+    while (prop_idx < dt_node->num_properties) {
+       prop = (dt_prop_generic_t*)&dt_block->data[property_list[prop_idx]];
+
+       char* name = (char*)&dt_block->data[prop->name_off];
+       if (strncmp(name, "interrupt-map", 14) == 0) {
+           break;
+       }
+
+       prop_idx++;
+    }
+
+    ASSERT(prop_idx < dt_node->num_properties);
+    ASSERT(prop->data_len % 40 == 0);
+
+    uint64_t map_count = prop->data_len / 40;
+
+    map->entries = vmalloc(map_count * sizeof(pci_interrupt_map_entry_t));
+    map->num_entries = map_count;
+
+    prop_data = (uint32_t*)&dt_block->data[prop->data_off];
+
+    for (uint64_t idx = 0; idx < map_count; idx++) {
+        map->entries[idx].device[0] = __builtin_bswap32(prop_data[0]);
+        map->entries[idx].device[1] = __builtin_bswap32(prop_data[1]);
+        map->entries[idx].device[2] = __builtin_bswap32(prop_data[2]);
+        map->entries[idx].int_num = __builtin_bswap32(prop_data[3]);
+        map->entries[idx].int_ctx[0] = __builtin_bswap32(prop_data[7]);
+        map->entries[idx].int_ctx[1] = __builtin_bswap32(prop_data[8]);
+        map->entries[idx].int_ctx[2] = __builtin_bswap32(prop_data[9]);
+
+        prop_data += 10;
+    }
+
+    return map;
+}
+
+void pcie_alloc_irq(uint32_t intid) {
+
+/*
+    for (uint64_t idx = 0; idx < 4; idx++) {
+        if (s_pcie_int_map.int_ctx[idx].handler_lists == NULL) {
+            break;
+        }
+    }
+
+    ASSERT(idx < 4);
+    s_pcie_int_map.int_ctx[idx].handler_list = llist_create();
+    s_pcie_int_map.int_ctx[idx].intid = intid;
+
+    interrupt_register_irq_handler(intid, pcie_irq_handler, &s_pcie_int_map.int_ctx[idx]);
+    */
+}
+
+void pcie_init_interrupts() {
+
+/*
+    pci_interrupt_map_t* pcie_int_map = &s_pcie_int_map;
+
+    int64_t irq_nums[4];
+    irq_nums[0] = -1;
+    irq_nums[1] = -1;
+    irq_nums[2] = -1;
+    irq_nums[3] = -1;
+    uint64_t max_irq_num = 0;
+
+    for (uint64_t idx = 0; idx < pcie_int_map->num_entries; idx++) {
+        uint64_t entry_irq_num = pcie_int_map->entries[idx].int_ctx[1];
+
+        uint64_t int_idx  = 0;
+        for (; int_idx < max_irq_num; int_idx++) {
+            if (irq_nums[int_idx] == entry_irq_num) {
+                break;
+            }
+        }
+
+        if (int_idx != max_irq_num) {
+            continue;
+        } else {
+            ASSERT(max_irq_num < 4);
+            // New irq number
+            pcie_alloc_irq(entry_irq_num);
+            irq_nums[int_idx] = entry_irq_num;
+            max_irq_num++;
+        }
+    }
+    */
+}
+
 void pcie_discovered(void* ctx) {
     dt_block_t* dt_block = ((discovery_dtb_ctx_t*)ctx)->block;
 
@@ -476,11 +637,38 @@ void pcie_discovered(void* ctx) {
     pci_range_t dtb_ranges = pcie_parse_ranges(dt_block);
     void* pcie_ptr = pcie_parse_allocate_reg(dt_block);
 
+    pci_interrupt_map_t* pcie_int_map = pcie_parse_interrupt_map(dt_block);
+
+    console_printf("PCIE Interrupt Map:\n");
+    for (uint64_t idx = 0; idx < pcie_int_map->num_entries; idx++) {
+        pci_interrupt_map_entry_t* entry = &pcie_int_map->entries[idx];
+
+        console_printf(" Device %x %x %x (%x %x %x)\n",
+                       entry->device[0], entry->device[1], entry->device[2],
+                       entry->device[0] & pcie_int_map->device_mask[0],
+                       entry->device[1] & pcie_int_map->device_mask[1],
+                       entry->device[2] & pcie_int_map->device_mask[2]);
+        console_printf(" Int %2x (%2x)\n",
+                       entry->int_num,
+                       entry->int_num & pcie_int_map->int_mask);
+        console_printf(" Int Ctx %2x %2x %2x\n",
+                       entry->int_ctx[0],
+                       entry->int_ctx[1],
+                       entry->int_ctx[2]);
+        console_printf("\n");
+    }
+
     s_pci_ranges = dtb_ranges;
     s_dtb_alloc.range_ctx = &s_pci_ranges;
     s_dtb_alloc.io_top = s_pci_ranges.io_pci_addr.addr;
     s_dtb_alloc.m32_top = s_pci_ranges.m32_pci_addr.addr;
     s_dtb_alloc.m64_top = s_pci_ranges.m64_pci_addr.addr;
 
+    s_pcie_int_map = *pcie_int_map;
+    vfree(pcie_int_map);
+
+    pcie_init_interrupts();
+
+    //discover_pcie(pcie_ptr, 0x10000000, pcie_int_map);
     discover_pcie(pcie_ptr, 0x10000000);
 }

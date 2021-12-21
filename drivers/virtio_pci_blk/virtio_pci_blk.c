@@ -166,9 +166,9 @@ static void print_blk_device(pci_device_ctx_t* pci_ctx) {
     pci_header0_t* pci_header = pci_ctx->header_vmem;
     pci_header->command |= 3;
 
-    // print_pci_header(pci_ctx);
+    print_pci_header(pci_ctx);
 
-    // print_pci_capabilities(pci_ctx);
+    print_pci_capabilities(pci_ctx);
 
     print_blk_config(pci_ctx);
 }

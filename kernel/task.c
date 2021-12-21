@@ -165,7 +165,7 @@ uint64_t create_task(uint64_t* user_stack_base,
     ASSERT(kernel_stack_base != NULL);
     ASSERT(kernel_stack_size > 0);
     ASSERT(user_stack_base != NULL || kernel_task);
-    ASSERT(reg->elr != NULL);
+    ASSERT((void*)reg->elr != NULL);
 
     // Allocate an id
     uint64_t tid = s_max_tid + 1;

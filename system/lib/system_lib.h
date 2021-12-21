@@ -42,4 +42,6 @@ bool system_map_anyphy(uintptr_t len, uintptr_t* phy_out, uintptr_t* virt_out);
 
 void system_yield(void);
 
+int64_t system_exec(const char* device, const char* path, const char* name, char** const argv);
+
 #endif

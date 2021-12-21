@@ -16,8 +16,10 @@
 #define SYSCALL_IOCTL 9
 #define SYSCALL_CLOSE 10
 #define SYSCALL_EXIT 11
+#define SYSCALL_EXEC 12
 
 
+#define EXEC_ARGV_ARG_MAXLEN 256
 
 enum {
     SYSCALL_ERROR_OK = 0,
