@@ -138,6 +138,8 @@ void kernel_init_lower_thread(void* ctx) {
 
     dtb_init();
 
+    driver_run_late_init();
+
     gtimer_init();
     pl011_init_rx(VIRT_UART_VMEM);
     interrupt_enable();
@@ -179,7 +181,7 @@ void kernel_init_lower_thread(void* ctx) {
         gtimer_start_downtimer(freq, true);
         gtimer_wait_for_trigger();
         // while (!gtimer_downtimer_triggered()) {}
-        // console_printf("Tick %d\n", ticknum);
+        //console_printf("Tick %d\n", ticknum);
         ticknum++;
     }
 

@@ -2,7 +2,7 @@
 #ifndef __LIBVIRTIO__H__
 #define __LIBVIRTIO__H__
 
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 #include "kernel/lib/libpci.h"
@@ -158,6 +158,8 @@ typedef struct {
     uintptr_t buffer_pool_phy;
     uint64_t buffer_pool_size;
     malloc_state_t buffer_malloc_state;
+
+    int32_t intid;
 } virtio_virtq_ctx_t;
 
 typedef struct {
@@ -174,7 +176,8 @@ void virtio_set_status(pci_virtio_common_cfg_t* cfg, uint8_t status);
 void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
                         uint64_t queue_num, uint64_t queue_size,
                         uint64_t pool_size,
-                        virtio_virtq_ctx_t* queue_out);
+                        virtio_virtq_ctx_t* queue_out,
+                        uint64_t msix_idx);
 
 bool virtio_get_buffer(virtio_virtq_ctx_t* queue_ctx, uint64_t buffer_len, uintptr_t* buffer_out);
 void virtio_return_buffer(virtio_virtq_ctx_t* queue_ctx, void* buffer_ptr);
@@ -186,6 +189,7 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
                        uint64_t num_read_buffers);
                     
 bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block);
+bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx);
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx);
 

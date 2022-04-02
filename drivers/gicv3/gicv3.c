@@ -24,6 +24,8 @@ typedef struct {
 
 static gicv3_ctx_t s_gicv3_ctx;
 
+static uint32_t s_gicv3_msi_words[8];
+
 void gicv3_enable(void* ctx) {
 
     uint64_t icc_ctlr = 0;
@@ -85,9 +87,15 @@ void gicv3_get_spi_msi_intid(void* ctx, uint64_t* intid_out, uint64_t* data_out,
     ok = bitalloc_alloc_any(&s_gicv3_ctx.intid_alloc, &intid);
     ASSERT(ok);
 
+    /*
     *intid_out = intid;
     *data_out = intid;
-    *addr_out = (uintptr_t)&s_gicv3_ctx.gicd->setspi_nsr;
+    *addr_out = KSPACE_TO_PHY(&s_gicv3_ctx.gicd->setspi_nsr);
+    */
+
+    *intid_out = intid;
+    *data_out = intid;
+    *addr_out = KSPACE_TO_PHY(&s_gicv3_msi_words[intid - (GIC_INTID_SPI_BASE + 500)]);
 }
 
 void gicv3_set_spi_trigger(void* ctx, uint64_t intid, interrupt_trigger_type_t type) {
@@ -150,9 +158,20 @@ void gicv3_discover(void* ctx) {
                                MEMSPACE_FLAG_PERM_KRW);
     memspace_update_kernel_vmem();
 
-    bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE, GIC_INTID_SPI_LIMIT, vmalloc);
+    //bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE, GIC_INTID_SPI_LIMIT, vmalloc);
+    bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE + 500, GIC_INTID_SPI_LIMIT, vmalloc);
 
     interrupt_register_controller(&intc_funcs, NULL, GIC_INTID_SPI_LIMIT);
+}
+
+void gicv3_poll_msi(void) {
+    for (uint64_t idx = 0; idx < 8; idx++) {
+        volatile uint32_t* msi_word = &s_gicv3_msi_words[idx];
+        if (*msi_word != 0) {
+            interrupt_handle_irq(idx + GIC_INTID_SPI_BASE + 500);
+            *msi_word = 0;
+        }
+    }
 }
 
 void gicv3_register(void) {

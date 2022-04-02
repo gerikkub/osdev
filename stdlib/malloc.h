@@ -2,7 +2,7 @@
 #ifndef __SYSTEM_MALLOC_H__
 #define __SYSTEM_MALLOC_H__
 
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 typedef struct _malloc_entry_t {

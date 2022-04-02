@@ -3,9 +3,10 @@
 
 #include "kernel/lib/libpci.h"
 #include "kernel/lib/libvirtio.h"
+#include "kernel/lib/vmalloc.h"
+#include "kernel/interrupt/interrupt.h"
 #include "kernel/console.h"
 #include "kernel/assert.h"
-#include "kernel/lib/vmalloc.h"
 #include "kernel/kernelspace.h"
 
 #include "stdlib/bitutils.h"
@@ -76,7 +77,8 @@ int64_t virtio_malloc_add_mem(bool initialize, uint64_t req_size, void* ctx, mal
 void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
                         uint64_t queue_num, uint64_t queue_size,
                         uint64_t pool_size,
-                        virtio_virtq_ctx_t* queue_out) {
+                        virtio_virtq_ctx_t* queue_out,
+                        uint64_t msix_idx) {
 
     ASSERT(cfg != NULL);
     ASSERT(queue_out != NULL);
@@ -115,6 +117,7 @@ void virtio_alloc_queue(pci_virtio_common_cfg_t* cfg,
     cfg->queue_desc = queue_out->desc_phy;
     cfg->queue_driver = queue_out->avail_phy;
     cfg->queue_device = queue_out->used_phy;
+    cfg->queue_msix_vector = msix_idx;
     cfg->queue_enable = 1;
     MEM_DSB();
 }
@@ -207,7 +210,7 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
     MEM_DMB();
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+//#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     volatile uint16_t* used_idx_ptr = &queue_ctx->used_ptr->idx;
 #pragma GCC diagnostic pop
 
@@ -220,6 +223,30 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
         MEM_DSB();
         // TODO: Flush cache if not device memory
     } while (block);
+
+    return false;
+}
+
+bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx) {
+
+    MEM_DMB();
+
+#pragma GCC diagnostic push
+//#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+    volatile uint16_t* used_idx_ptr = &queue_ctx->used_ptr->idx;
+#pragma GCC diagnostic pop
+
+    do {
+        interrupt_await_reset(queue_ctx->intid);
+        if (*used_idx_ptr != queue_ctx->last_used_idx) {
+            queue_ctx->last_used_idx = *used_idx_ptr;
+            MEM_DMB();
+            return true;
+        }
+        interrupt_await(queue_ctx->intid);
+        MEM_DSB();
+        // TODO: Flush cache if not device memory
+    } while (true);
 
     return false;
 }

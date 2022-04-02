@@ -2,7 +2,7 @@
 #ifndef __INTERRUPT_H__
 #define __INTERRUPT_H__
 
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 #include "stdlib/bitutils.h"

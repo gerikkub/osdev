@@ -411,7 +411,7 @@ void create_pci_device(volatile pci_header0_t* header, uintptr_t header_phy, uin
     }
     memspace_update_kernel_vmem();
 
-    header->command |= 3;
+    header->command |= 7;
     
     discover_driver(&driver_discovery, (void*)&device_ctx);
 }

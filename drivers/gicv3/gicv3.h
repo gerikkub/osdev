@@ -17,6 +17,8 @@ void gic_disable_intid(uint32_t intid);
 
 void gic_irq_handler(uint32_t vector);
 
+void gicv3_poll_msi(void);
+
 #define GIC_MAX_IRQS (1024)
 
 #define GIC_MAX_IRQ_WORDS (0x80/4)

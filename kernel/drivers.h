@@ -40,6 +40,9 @@ typedef struct {
 } discovery_register_t;
 
 void register_driver(discovery_register_t* discovery);
+void driver_register_late_init(initctxfunc fn, void* ctx);
+void driver_run_late_init(void);
+
 
 bool discovery_have_driver(discovery_register_t* discovery);
 void discover_driver(discovery_register_t* discovery, void* ctx);

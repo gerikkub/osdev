@@ -19,8 +19,8 @@ typedef struct {
     fd_ops_t disk_ops;
 } fs_mount_ctx_t;
 
-fs_ops_t s_fs_ops[MAX_NUM_FS_TYPE];
-llist_head_t s_fs_mounts;
+static fs_ops_t s_fs_ops[MAX_NUM_FS_TYPE];
+static llist_head_t s_fs_mounts;
 
 void fs_manager_init(void) {
     s_fs_mounts = llist_create();

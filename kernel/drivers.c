@@ -8,6 +8,7 @@
 #include "kernel/assert.h"
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lib/libdtb.h"
+#include "kernel/lib/llist.h"
 
 #include "kernel/drivers.h"
 
@@ -18,6 +19,13 @@ static discovery_register_t* s_driver_registers;
 static uint64_t s_driver_registers_end;
 static uint64_t s_driver_registers_size;
 
+typedef struct {
+    initctxfunc fn;
+    void* ctx;
+} driver_late_init_ctx_t;
+
+static llist_head_t s_driver_late_init_list;
+
 void drivers_init(void) {
 
     initfunc* driver_driver_init = (initfunc*)&_driver_init_start;
@@ -27,12 +35,14 @@ void drivers_init(void) {
     s_driver_registers_size = num_drivers * 4;
     s_driver_registers_end = 0;
 
+    s_driver_late_init_list = llist_create();
+
     for (uint64_t idx = 0; idx < num_drivers; idx++) {
         ASSERT((uintptr_t)driver_driver_init[idx] != 0);
         driver_driver_init[idx]();
     }
-
 }
+
 
 void register_driver(discovery_register_t* discovery) {
 
@@ -88,4 +98,23 @@ void discover_driver(discovery_register_t* discovery, void* ctx) {
     if (driver_idx >= 0) {
         s_driver_registers[driver_idx].ctxfunc(ctx);
     }
+}
+
+void driver_register_late_init(initctxfunc fn, void* ctx) {
+    driver_late_init_ctx_t* item = vmalloc(sizeof(driver_late_init_ctx_t));
+    item->fn = fn;
+    item->ctx = ctx;
+
+    llist_append_ptr(s_driver_late_init_list, item);
+} 
+
+void driver_run_late_init(void) {
+    driver_late_init_ctx_t* item = NULL;
+
+    FOR_LLIST(s_driver_late_init_list, item)
+        item->fn(item->ctx);
+        vfree(item);
+    END_FOR_LLIST()
+
+    llist_free(s_driver_late_init_list);
 }

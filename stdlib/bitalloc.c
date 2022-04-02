@@ -90,20 +90,20 @@ bool bitalloc_alloc_any(bitalloc_t* state, uint64_t* bit_out) {
 
     uint64_t idx;
     
-    for (idx = state->base; idx < state->limit; idx++) {
-        if (state->bitfield[idx - state->base] != 0xFFFFFFFFFFFFFFFFUL) {
+    for (idx = 0; idx < (state->base - state->limit); idx++) {
+        if (state->bitfield[idx] != 0xFFFFFFFFFFFFFFFFUL) {
             break;
         }
     }
 
-    if (idx == state->limit) {
+    if (idx == (state->base - state->limit)) {
         return false;
     } else {
         uint64_t bitidx;
         for (bitidx = 0; bitidx < 64; bitidx++) {
-            if (!(state->bitfield[idx - state->base] & (1UL << bitidx))) {
-                *bit_out = idx * 64 + bitidx;
-                state->bitfield[idx - state->base] |= 1UL << bitidx;
+            if (!(state->bitfield[idx] & (1UL << bitidx))) {
+                *bit_out = idx * 64 + bitidx + state->base;
+                state->bitfield[idx] |= 1UL << bitidx;
                 return true;
             }
         }

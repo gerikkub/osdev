@@ -14,6 +14,8 @@
 
 #include "kernel/interrupt/interrupt.h"
 
+void gicv3_poll_msi(void);
+
 static task_t s_task_list[MAX_NUM_TASKS] = {0};
 
 static volatile uint64_t s_active_task_idx;
@@ -395,6 +397,8 @@ void schedule(void) {
     ENABLE_IRQ();
 
     do { // TODO: Poor man's idle task
+        // Check for MSI manually. "Poor man's interrupts"
+        gicv3_poll_msi();
         // Round Robin
         for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
             task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;

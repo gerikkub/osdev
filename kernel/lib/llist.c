@@ -20,6 +20,10 @@ llist_head_t llist_create() {
     return l;
 }
 
+void llist_free(llist_head_t head) {
+    vfree(head);
+}
+
 llist_t* llist_find_helper(llist_head_t head, void* x, uint64_t len) {
 
     llist_t* item = head;

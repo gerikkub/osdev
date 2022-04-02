@@ -19,13 +19,14 @@ void llist_free(llist_head_t);
 #define FOR_LLIST(head, x) \
 { \
 llist_t* __for_llist_item = head; \
-while (*__for_llist_item->p) {\
+while (__for_llist_item->n != NULL) {\
 x = __for_llist_item->dataptr; \
-do 
+__for_llist_item = __for_llist_item->n; \
+do {
 
-#define END_FOR_LLIST() while(0); } \
+#define END_FOR_LLIST() } while(0); } } \
 
-#define LLIST_FIND(head, x) llist_find_heaper(head, x, sizeof(x))
+#define LLIST_FIND(head, x) llist_find_helper(head, x, sizeof(x))
 
 llist_t* llist_find_helper(llist_head_t head, void* x, uint64_t len);
 

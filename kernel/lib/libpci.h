@@ -2,10 +2,14 @@
 #ifndef __LIBPCI_H__
 #define __LIBPCI_H__
 
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 #include "include/k_modules.h"
+
+#include "kernel/lib/llist.h"
+
+#include "stdlib/bitalloc.h"
 
 #define PCI_ADDR_HI_RELOCATABLE (1 << 31)
 #define PCI_ADDR_HI_PREFETCHABLE (1 << 30)
@@ -28,7 +32,9 @@
 
 #define MAX_PCI_BAR 6
 
-typedef void (*pci_irq_handler_fn)(void* ctx);
+typedef void (*pci_irq_handler_fn)(uint32_t intid, void* ctx);
+
+struct pci_msix_capability_t;
 
 typedef struct {
     uint64_t header_offset;
@@ -54,8 +60,10 @@ typedef struct {
         uintptr_t len;
     } bar[MAX_PCI_BAR];
 
-    pci_irq_handler_fn int_fn;
-    uint8_t int_num;
+    struct pci_msix_capability_t* msix_cap;
+    llist_head_t msix_vector_list;
+    bitalloc_t msix_vector_alloc;
+
 } pci_device_ctx_t;
 
 typedef struct __attribute__((__packed__)) {
@@ -169,7 +177,7 @@ typedef struct __attribute__((__packed__)) {
     uint8_t payload[];
 } pci_generic_capability_t;
 
-typedef struct __attribute__((__packed__)) {
+typedef struct __attribute__((__packed__)) pci_msix_capability_t {
     uint8_t cap;
     uint8_t next;
     uint16_t msg_ctrl;
@@ -177,12 +185,19 @@ typedef struct __attribute__((__packed__)) {
     uint32_t pba_offset;
 } pci_msix_capability_t;
 
+#define PCI_MSIX_CTRL_SIZE_MASK (BIT(11) - 1)
+#define PCI_MSIX_CTRL_FUNCTION_MASK BIT(14)
+#define PCI_MSIX_CTRL_ENABLE BIT(15)
+
 typedef struct __attribute__((__packed__)) {
-    uint32_t msg_addr;
-    uint32_t msg_uppr_addr;
+    uint32_t msg_addr_lower;
+    uint32_t msg_addr_upper;
     uint32_t msg_data;
     uint32_t vector_ctrl;
 } pci_msix_table_entry_t;
+
+
+#define PCI_MSIX_VECTOR_MASKED BIT(0)
 
 typedef struct __attribute__((__packed__)) {
     uint8_t cap;
@@ -209,7 +224,15 @@ typedef struct {
     } bar[6];
 } discovery_pci_ctx_t;
 
-typedef void (*pcie_irq_handler)(void* ctx);
+typedef struct {
+    pci_msix_table_entry_t* entry;
+    uint32_t entry_idx;
+    uint32_t intid;
+    pci_irq_handler_fn handler;
+    void* ctx;
+} pci_msix_vector_ctx_t;
+
+typedef void (*pcie_irq_handler)(uint32_t intid, void* ctx);
 
 typedef struct {
     pcie_irq_handler fn;
@@ -226,8 +249,14 @@ void print_pci_capability_msix(pci_device_ctx_t* device_ctx, pci_msix_capability
 void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr);
 
 
+uint32_t pci_register_interrupt_handler(pci_device_ctx_t* device_ctx, pci_irq_handler_fn fn, void* fn_ctx);
+void pci_enable_interrupts(pci_device_ctx_t* device_ctx);
+void pci_disable_interrupts(pci_device_ctx_t* device_ctx);
+void pci_enable_vector(pci_device_ctx_t* device_ctx, uint32_t intid);
+void pci_disable_vector(pci_device_ctx_t* device_ctx, uint32_t intid);
+void pci_interrupt_clear_pending(pci_device_ctx_t* device_ctx, uint32_t intid);
 
-void pci_register_int_handler(pci_device_ctx_t* device_ctx, pci_irq_handler_fn fn, void* fn_ctx);
 void pci_wait_irq(pci_device_ctx_t* device_ctx);
+
 
 #endif

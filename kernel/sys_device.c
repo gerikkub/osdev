@@ -13,18 +13,21 @@
 
 #define MAX_NUM_SYS_DEVICES 64
 
-struct {
+typedef struct {
     bool valid;
     device_open_op open;
     void* ctx;
     fd_ops_t fd_ops;
     char name[MAX_SYS_DEVICE_NAME_LEN];
-} s_sys_devices[MAX_NUM_SYS_DEVICES];
+} sys_device_ctx_t;
+
 
 typedef struct {
     int64_t sys_device_idx;
     void* open_ctx;
 }  sys_device_open_ctx_t;
+
+static sys_device_ctx_t s_sys_devices[MAX_NUM_SYS_DEVICES];
 
 int64_t sys_device_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
 

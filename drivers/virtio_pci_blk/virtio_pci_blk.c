@@ -91,6 +91,11 @@ static void print_blk_config(pci_device_ctx_t* pci_ctx) {
     console_flush();
 }
 
+static void virtio_pci_blk_device_irq_fn(uint32_t intid, void* ctx) {
+    blk_disk_ctx_t* disk_ctx = ctx;
+    pci_interrupt_clear_pending(&disk_ctx->pci_device, intid);
+}
+
 static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
 
     pci_device_ctx_t* pci_ctx = &disk_ctx->pci_device;
@@ -111,9 +116,32 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
     uint8_t device_status = virtio_get_status(common_cfg);
     ASSERT(device_status & VIRTIO_STATUS_FEATURES_OK);
 
+    uint32_t queue_intid;
+    queue_intid = pci_register_interrupt_handler(
+                                        &disk_ctx->pci_device,
+                                        virtio_pci_blk_device_irq_fn,
+                                        disk_ctx);
+
+    bool found = false;
+    pci_msix_vector_ctx_t* msix_item = NULL;
+
+    FOR_LLIST(disk_ctx->pci_device.msix_vector_list, msix_item)
+        if (msix_item->intid == queue_intid) {
+            found = true;
+            break;
+        }
+    END_FOR_LLIST()
+
+    ASSERT(found);
+
     virtio_virtq_ctx_t requestq;
-    virtio_alloc_queue(common_cfg, VIRTIO_QUEUE_BLOCK_REQUESTQ, 8, 98304, &requestq);
+    virtio_alloc_queue(common_cfg,
+                       VIRTIO_QUEUE_BLOCK_REQUESTQ,
+                       8, 98304,
+                       &requestq,
+                       msix_item->entry_idx);
     disk_ctx->virtio_requestq = requestq;
+    disk_ctx->virtio_requestq.intid = queue_intid;
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER_OK);
 
@@ -122,6 +150,9 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
     blk_cfg_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
     ASSERT(blk_cfg_cap != NULL);
     disk_ctx->device_config = *((virtio_blk_config_t*)(pci_ctx->bar[blk_cfg_cap->bar].vmem + blk_cfg_cap->bar_offset));
+
+    pci_enable_vector(&disk_ctx->pci_device, disk_ctx->virtio_requestq.intid);
+    pci_enable_interrupts(&disk_ctx->pci_device);
 }
 
 static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buffer, uint64_t len) {
@@ -152,7 +183,7 @@ static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buf
 
     virtio_virtq_notify(pci_ctx, &disk_ctx->virtio_requestq);
 
-    virtio_poll_virtq(&disk_ctx->virtio_requestq, true);
+    virtio_poll_virtq_irq(&disk_ctx->virtio_requestq);
 
     memcpy(buffer, read_buffers[0].ptr, len);
 
@@ -280,12 +311,8 @@ static fd_ops_t s_bulk_file_ops = {
     .close = NULL
 };
 
-static void virtio_pci_blk_ctx(void* ctx_msg) {
-
-    console_write("virtio-pci-blk got ctx\n");
-    console_flush();
-
-    discovery_pci_ctx_t* pci_ctx = ctx_msg;
+static void virtio_pci_blk_late_init(void* ctx) {
+    discovery_pci_ctx_t* pci_ctx = ctx;
 
     blk_disk_ctx_t* disk_ctx = vmalloc(sizeof(blk_disk_ctx_t));
     disk_ctx->device_pos = 0;
@@ -303,11 +330,27 @@ static void virtio_pci_blk_ctx(void* ctx_msg) {
 
     llist_append_ptr(s_blk_disks, disk_ctx);
 
+    vfree(pci_ctx);
+
     //uint8_t superblock[1024];
     //read_blk_device(&s_pci_device, 0, superblock, sizeof(superblock));
 
     //console_printf("Magic: %c\n", superblock[120]);
     //console_flush();
+}
+
+
+static void virtio_pci_blk_ctx(void* ctx) {
+
+    console_write("virtio-pci-blk got ctx\n");
+    console_flush();
+
+
+    discovery_pci_ctx_t* pci_ctx = ctx;
+    discovery_pci_ctx_t* pci_ctx_copy = vmalloc(sizeof(discovery_pci_ctx_t));
+    *pci_ctx_copy = *pci_ctx;
+
+    driver_register_late_init(virtio_pci_blk_late_init, pci_ctx_copy);
 }
 
 static discovery_register_t s_virtio_pci_blk_register = {

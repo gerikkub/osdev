@@ -99,6 +99,10 @@ void run_prompt() {
         if (c == ';') {
             parse_prompt(inbuf, count);
             break;
+        } else if (c == '\r') {
+            count = 0;
+            console_write("\n> ");
+            console_flush();
         } else {
             inbuf[count] = c;
             count++;

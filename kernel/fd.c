@@ -51,9 +51,11 @@ int64_t syscall_open(uint64_t device, uint64_t path, uint64_t flags, uint64_t du
     ret = vfs_open_device(device_kptr, path_kptr, flags, &task->fds[fd_num].ops, &task->fds[fd_num].ctx);
     if (ret >= 0) {
         task->fds[fd_num].valid = true;
+        return fd_num;
+    } else {
+        return -1;
     }
 
-    return fd_num;
 }
 
 int64_t syscall_read(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags) {
@@ -114,8 +116,8 @@ int64_t syscall_ioctl(uint64_t fd, uint64_t ioctl, uint64_t args, uint64_t arg_c
         return -1;
     }
 
-    if (!task->fds[fd].valid &&
-        task->fds[fd].ops.ioctl != NULL) {
+    if ((!task->fds[fd].valid) ||
+         task->fds[fd].ops.ioctl != NULL) {
         return -1;
     }
 

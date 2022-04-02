@@ -3,9 +3,12 @@
 
 #include "kernel/lib/libpci.h"
 #include "kernel/lib/libvirtio.h"
+#include "kernel/lib/llist.h"
+#include "kernel/lib/vmalloc.h"
 #include "kernel/console.h"
 #include "kernel/assert.h"
 #include "kernel/kernelspace.h"
+#include "kernel/interrupt/interrupt.h"
 
 #include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
@@ -75,6 +78,14 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t
             }
         }
     }
+
+    device->msix_vector_list = llist_create();
+    device->msix_cap = (pci_msix_capability_t*)pci_get_capability(device, PCI_CAP_MSIX, 0);
+    ASSERT(device->msix_cap != NULL);
+
+    uint32_t num_msix_entries = (device->msix_cap->msg_ctrl & PCI_MSIX_CTRL_SIZE_MASK) + 1;
+
+    bitalloc_init(&device->msix_vector_alloc, 0, num_msix_entries, vmalloc);
 }
 
 pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx) {
@@ -104,8 +115,116 @@ pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint6
     }
 }
 
-void pci_register_interrupt_handler(pcie_irq_handler fn, void* ctx) {
-    
+uint32_t pci_register_interrupt_handler(pci_device_ctx_t* device_ctx, pci_irq_handler_fn fn, void* ctx) {
+
+    pci_msix_vector_ctx_t* msix_ctx = vmalloc(sizeof(pci_msix_vector_ctx_t));
+
+    // Find an available msi-x vector
+    uint64_t msix_entry_idx = 0;
+    bool msix_alloc_ok;
+    msix_alloc_ok = bitalloc_alloc_any(&device_ctx->msix_vector_alloc, &msix_entry_idx);
+    ASSERT(msix_alloc_ok == true);
+
+    pci_msix_table_entry_t* msix_entry = NULL;
+    uint32_t msix_table_bar = device_ctx->msix_cap->table_offset & 0x7;
+    ASSERT(device_ctx->bar[msix_table_bar].allocated);
+    uint32_t msix_table_offset = device_ctx->msix_cap->table_offset & 0xFFFFFFF8;
+    msix_entry = device_ctx->bar[msix_table_bar].vmem + msix_table_offset +
+                 (sizeof(pci_msix_table_entry_t)*msix_entry_idx);
+
+    // Allocate an available SPI interrupt
+    uint64_t intid;
+    uint64_t msix_data;
+    uintptr_t msix_ptr;
+    interrupt_get_msi(&intid, &msix_data, &msix_ptr);
+    interrupt_register_irq_handler(intid, fn, ctx);
+
+    // Populate the msi-x table
+    msix_entry->msg_addr_lower = msix_ptr & 0xFFFFFFFF;
+    msix_entry->msg_addr_upper = (msix_ptr >> 32UL) & 0xFFFFFFFF;
+    msix_entry->msg_data = msix_data & 0xFFFFFFFF;
+
+    msix_ctx->entry = msix_entry;
+    msix_ctx->entry_idx = msix_entry_idx;
+    msix_ctx->intid = intid;
+    msix_ctx->handler = fn;
+    msix_ctx->ctx = ctx;
+
+    llist_append_ptr(device_ctx->msix_vector_list, msix_ctx);
+
+    return intid;
+}
+
+void pci_enable_interrupts(pci_device_ctx_t* device_ctx) {
+    device_ctx->msix_cap->msg_ctrl |= PCI_MSIX_CTRL_ENABLE;
+    MEM_DSB();
+}
+
+void pci_disable_interrupts(pci_device_ctx_t* device_ctx) {
+    device_ctx->msix_cap->msg_ctrl &= ~(PCI_MSIX_CTRL_ENABLE);
+    MEM_DSB();
+}
+
+void pci_enable_vector(pci_device_ctx_t* device_ctx, uint32_t intid) {
+
+    bool found = false;
+    pci_msix_vector_ctx_t* item = NULL;
+
+    FOR_LLIST(device_ctx->msix_vector_list, item)
+        if (item->intid == intid) {
+            found = true;
+            break;
+        }
+    END_FOR_LLIST()
+
+    ASSERT(found);
+    item->entry->vector_ctrl &= ~(PCI_MSIX_VECTOR_MASKED);
+
+    interrupt_enable_irq(intid);
+}
+
+void pci_disable_vector(pci_device_ctx_t* device_ctx, uint32_t intid) {
+
+    interrupt_disable_irq(intid);
+    bool found = false;
+    pci_msix_vector_ctx_t* item = NULL;
+
+    FOR_LLIST(device_ctx->msix_vector_list, item)
+        if (item->intid == intid) {
+            found = true;
+            break;
+        }
+    END_FOR_LLIST()
+
+    ASSERT(found);
+    item->entry->vector_ctrl |= PCI_MSIX_VECTOR_MASKED;
+}
+
+void pci_interrupt_clear_pending(pci_device_ctx_t* device_ctx, uint32_t intid) {
+
+    bool found = false;
+    pci_msix_vector_ctx_t* item = NULL;
+
+    FOR_LLIST(device_ctx->msix_vector_list, item)
+        if (item->intid == intid) {
+            found = true;
+            break;
+        }
+    END_FOR_LLIST()
+
+    ASSERT(found);
+
+    uint8_t pba_bar = device_ctx->msix_cap->pba_offset & 7;
+    uint64_t pba_addr = device_ctx->msix_cap->pba_offset & (~7);
+    ASSERT(device_ctx->bar[pba_bar].allocated);
+    uint64_t* pend_table = device_ctx->bar[pba_bar].vmem + pba_addr;
+
+    uint64_t pend_word = item->entry_idx / 64;
+    uint64_t pend_bit = item->entry_idx % 64;
+
+    pend_table[pend_word] &= ~(pend_bit);
+
+    MEM_DMB();
 }
 
 void print_pci_header(pci_device_ctx_t* device_ctx) {

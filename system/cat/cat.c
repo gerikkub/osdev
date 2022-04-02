@@ -18,13 +18,30 @@
 
 int64_t main(uint64_t tid, char** ctx) {
 
+    if (ctx[0] == NULL ||
+        ctx[1] == NULL) {
+        console_printf("Invalid Arguments\n");
+        console_flush();
+        return -1;
+    }
+
     int64_t fd;
     fd = system_open(ctx[0], ctx[1], 0);
+    if (fd < 0) {
+        console_printf("%s:%s does not exist\n", ctx[0], ctx[1]);
+        return -1;
+    }
     SYS_ASSERT(fd >= 0);
 
     int64_t len;
     len = system_ioctl(fd, BLK_IOCTL_SIZE, NULL, 0);
-    SYS_ASSERT(len > 0);
+    if (len < 0) {
+        console_printf("Invalid length\n");
+        console_flush();
+        return -1;
+    } else if (len == 0) {
+        return 0;
+    }
 
     char* buffer = malloc(len);
     int64_t read_len;

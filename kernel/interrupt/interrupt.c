@@ -18,14 +18,16 @@ typedef struct {
     bool awaited;
 } intc_irq_handler_ctx_t;
 
-struct {
+typedef struct {
     bool registered;
     intc_funcs_t intc_fn;
     void* intc_ctx;
 
     intc_irq_handler_ctx_t* handlers;
     uint64_t num_handlers;
-} s_interrupt_ctx;
+} intc_irq_ctx_t;
+
+static intc_irq_ctx_t s_interrupt_ctx;
 
 void interrupt_init(void) {
     s_interrupt_ctx.registered = false;
