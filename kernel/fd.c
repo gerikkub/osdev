@@ -117,7 +117,7 @@ int64_t syscall_ioctl(uint64_t fd, uint64_t ioctl, uint64_t args, uint64_t arg_c
     }
 
     if ((!task->fds[fd].valid) ||
-         task->fds[fd].ops.ioctl != NULL) {
+         task->fds[fd].ops.ioctl == NULL) {
         return -1;
     }
 

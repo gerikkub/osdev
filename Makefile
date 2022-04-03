@@ -34,15 +34,17 @@ SOURCE_DIR := $(shell pwd)
 
 TOOLS_DIR = $(SOURCE_DIR)/../tools
 
-#COMP_DIR = $(TOOLS_DIR)/compiler/bin
-COMP_DIR = /usr/local/bin
+COMP_DIR = $(TOOLS_DIR)/compiler/bin
+#COMP_DIR = /usr/local/bin
 
 SYSTEMS_DIR = system
 
 MODULES_BUILD = $(SYSTEMS_DIR)/build
 
-#QEMU_BIN = /usr/local/share/qemu/bin/qemu-system-aarch64
-QEMU_BIN = /usr/local/bin/qemu-system-aarch64
+QEMU_BIN = /usr/local/share/qemu/bin/qemu-system-aarch64
+#QEMU_BIN = /usr/local/bin/qemu-system-aarch64
+
+GENEXT2FS_BIN = /home/gerik/projects/osdev-monolithic/tools/genext2fs/bin/genext2fs
 
 ######################################
 # source
@@ -248,8 +250,9 @@ $(DISKIMG): $(MODULES)
 	rm -rf diskdata
 	mkdir -p diskdata/bin
 	cp $(MODULES) diskdata/bin/
-	genext2fs -b 1440 -d diskdata/ $@
-	rm -rf diskdata
+	cp -r diskextras/* diskdata/
+	$(GENEXT2FS_BIN) -b 1440 -d diskdata/ $@
+#	rm -rf diskdata
 
 print-% : ; @echo $* = $($*)
 

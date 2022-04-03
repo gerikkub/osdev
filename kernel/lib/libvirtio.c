@@ -210,7 +210,7 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
     MEM_DMB();
 
 #pragma GCC diagnostic push
-//#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     volatile uint16_t* used_idx_ptr = &queue_ctx->used_ptr->idx;
 #pragma GCC diagnostic pop
 
@@ -232,7 +232,7 @@ bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx) {
     MEM_DMB();
 
 #pragma GCC diagnostic push
-//#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     volatile uint16_t* used_idx_ptr = &queue_ctx->used_ptr->idx;
 #pragma GCC diagnostic pop
 

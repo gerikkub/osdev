@@ -187,6 +187,7 @@ uint32_t ext2_get_inode_in_dir(ext2_fs_ctx_t* fs, const ext2_inode_t* inode, con
         ext2_read_inode_data(fs, inode, block_idx, 1, block_buffer);
         while (block_idx < BLOCK_SIZE(fs->sb)) {
             entry = (ext2_dir_entry_t*)&block_buffer[block_idx];
+            ASSERT(entry != NULL);
 
             if (entry->inode != 0 &&
                 entry->name_len == name_len &&
