@@ -67,6 +67,8 @@ void parse_prompt(char* inbuf, uint64_t len) {
                 idx++;
             }
 
+            argc++;
+
             if (inbuf[idx] == ' ') {
                 inbuf[idx] = '\0';
                 idx++;
@@ -74,8 +76,8 @@ void parse_prompt(char* inbuf, uint64_t len) {
                 break;
             }
 
-            argc++;
         }
+        argv[argc] = NULL;
     }
 
     uint64_t tid = system_exec(device, path, name, argv);
@@ -96,8 +98,13 @@ void run_prompt() {
         console_read(&c, 1);
         console_putc(c);
         console_flush();
-        if (c == ';') {
+        if (c == '\r') {
+            console_write("\n");
             parse_prompt(inbuf, count);
+
+            count = 0;
+            console_write("\n> ");
+            console_flush();
             break;
         } else if (c == '\r') {
             count = 0;

@@ -107,6 +107,11 @@ static elf_result_t elf_add_memspace_entry(memory_space_t* memspace, _elf64_phdr
         memcpy((void*)PHY_TO_KSPACE(phy_mem), &elf_data[phdr->p_offset], phdr->p_filesz);
     }
 
+    // Zero remaining memory if necessary
+    if (phdr->p_memsz > phdr->p_filesz) {
+        memset(PHY_TO_KSPACE_PTR(phy_mem + phdr->p_filesz), 0, phdr->p_memsz - phdr->p_filesz);
+    }
+
     // Translate memory permission flags
     uint32_t memspace_flags = 0;
     if ((phdr->p_flags & PF_PERM_MASK) == PF_R) {

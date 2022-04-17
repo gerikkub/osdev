@@ -196,6 +196,7 @@ uint32_t ext2_get_inode_in_dir(ext2_fs_ctx_t* fs, const ext2_inode_t* inode, con
                 goto found_inode;
             }
 
+            ASSERT(entry->rec_len > 0);
             block_idx += entry->rec_len;
         }
 

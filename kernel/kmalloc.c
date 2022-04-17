@@ -11,11 +11,12 @@
 #include "kernel/console.h"
 #include "stdlib/printf.h"
 
-#define MEM_SIZE (256*1024*1024)
+#define MEM_SIZE (1024*1024*1024)
 #define PAGE_SIZE (4*1024)
-#define NUM_MEM_BLOCKS (4096)
+#define NUM_MEM_BLOCKS (4096*256)
 
 #define MEMBLOCK_FLAG_ALLOCATED (1 << 0)
+#define MEMBLOCK_MAGIC (0xABAB1234)
 
 #define PAGES(X) (((X) + PAGE_SIZE - 1)/PAGE_SIZE)
 #define PAGEMEM(X) (PAGES((X)) * PAGE_SIZE)
@@ -23,6 +24,7 @@
 typedef struct {
     uintptr_t ptr;
     uint64_t size;
+    uint64_t magic;
     uint8_t flags;
 } memblock_t;
 
@@ -44,7 +46,9 @@ void kmalloc_init(void) {
 
     s_memblocks[0].ptr = heap_base_phy;
     s_memblocks[0].size = heap_limit_phy - heap_base_phy;
+    s_memblocks[0].magic = MEMBLOCK_MAGIC;
     s_memblocks[0].flags = 0;
+
 
     s_last_memblock = 0;
 }
@@ -56,6 +60,7 @@ void kmalloc_check_structure(void) {
  
     for (idx = 0; idx <= s_last_memblock; idx++) {
         memblock_t* this_block = &s_memblocks[idx];
+        ASSERT(this_block->magic == MEMBLOCK_MAGIC);
         ASSERT(exp_ptr == this_block->ptr);
 
         exp_ptr += this_block->size;
@@ -95,6 +100,7 @@ void* kmalloc_phy(uint64_t bytes) {
         memblock_t new_block = {
             .ptr = s_memblocks[idx].ptr + pagebytes,
             .size = leftover_pagebytes,
+            .magic = MEMBLOCK_MAGIC,
             .flags = 0
         };
 

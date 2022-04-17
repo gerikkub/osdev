@@ -28,6 +28,10 @@ void memspace_map_phy_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint
 void memspace_map_device_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint32_t flags);
 void memspace_update_kernel_vmem(void);
 
+void* memspace_alloc_kernel_virt(uint64_t len, uint64_t align);
+
+memory_entry_t* memspace_get_entry_at_addr_kernel(void* addr_ptr);
+
 void* get_userspace_ptr(_vmem_table* table_ptr, uintptr_t userptr);
 
 #endif

@@ -10,6 +10,7 @@
 #define VMEM_PAGE_SIZE (4096)
 
 #define PAGE_CEIL(x) (((x) + VMEM_PAGE_SIZE - 1) & (~(VMEM_PAGE_SIZE - 1)))
+#define PAGE_FLOOR(x) ((x) & (~(VMEM_PAGE_SIZE -1)))
 
 typedef uint64_t _vmem_entry_invalid_t;
 typedef uint64_t _vmem_entry_block_t ;
@@ -124,6 +125,9 @@ void vmem_print_l0_table(_vmem_table* table_ptr);
 void vmem_deallocate_table(_vmem_table* table_ptr);
 
 void vmem_flush_tlb(void);
+
+// Check if address is currently mapped with "AT S1E1R"
+uint64_t vmem_check_address(uint64_t addr);
 
 
 #endif

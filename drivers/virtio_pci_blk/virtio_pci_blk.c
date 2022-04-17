@@ -10,6 +10,10 @@
 #include "kernel/drivers.h"
 #include "kernel/fd.h"
 #include "kernel/sys_device.h"
+#include "kernel/kernelspace.h"
+#include "kernel/memoryspace.h"
+#include "kernel/vmem.h"
+#include "kernel/kmalloc.h"
 
 #include "include/k_ioctl_common.h"
 
@@ -49,6 +53,7 @@ typedef struct {
     uint64_t device_pos;
     virtio_blk_config_t device_config;
     char name[MAX_SYS_DEVICE_NAME_LEN];
+    void* cache_virtaddr;
 } blk_disk_ctx_t;
 
 static llist_head_t s_blk_disks;
@@ -184,6 +189,7 @@ static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buf
     virtio_virtq_notify(pci_ctx, &disk_ctx->virtio_requestq);
 
     virtio_poll_virtq_irq(&disk_ctx->virtio_requestq);
+    //virtio_poll_virtq(&disk_ctx->virtio_requestq, true);
 
     memcpy(buffer, read_buffers[0].ptr, len);
 
@@ -204,6 +210,31 @@ static void print_blk_device(pci_device_ctx_t* pci_ctx) {
     print_blk_config(pci_ctx);
 }
 
+static bool virtio_blk_populate_virt_cache(void* ctx, uintptr_t addr, memcache_phy_entry_t* new_entry) {
+
+    blk_disk_ctx_t* disk_ctx = ctx;
+
+    void* phy_addr = kmalloc_phy(VMEM_PAGE_SIZE);
+
+    uintptr_t addr_page = PAGE_FLOOR(addr);
+    ASSERT(addr_page >= (uintptr_t)disk_ctx->cache_virtaddr);
+    uint64_t offset = addr_page - (uintptr_t)disk_ctx->cache_virtaddr;
+    uint64_t sector = offset / 512;
+    ASSERT(sector <= disk_ctx->device_config.capacity);
+
+    read_blk_device(disk_ctx, sector, PHY_TO_KSPACE_PTR(phy_addr), VMEM_PAGE_SIZE);
+
+    new_entry->offset = offset;
+    new_entry->phy_addr = (uintptr_t)phy_addr;
+    new_entry->len = VMEM_PAGE_SIZE;
+
+    return true;
+}
+
+memcache_ops_t s_virtio_blk_memcache_ops = {
+    .populate_virt_fn = virtio_blk_populate_virt_cache
+};
+
 static int64_t virtio_pci_blk_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
     *ctx_out = ctx;
     return 0;
@@ -217,45 +248,41 @@ static int64_t virtio_pci_blk_read_op(void* ctx, uint8_t* buffer, const int64_t 
     blk_disk_ctx_t* blk_ctx = (blk_disk_ctx_t*)ctx;
 
     uint64_t pos = blk_ctx->device_pos;
+
     int64_t size_left = size;
 
     // Prevent reading past the device capacity
     if (blk_ctx->device_config.capacity * 512 < (pos + size_left)) {
         size_left = (blk_ctx->device_config.capacity * 512) - pos;
     }
-    int64_t read_size = size_left;
+    int64_t read_size = size_left < size ? size_left : size;
 
-    uint8_t unaligned_buf[512];
-
-    // Handle situations where the current pos is not aligned to a sector
-    if ((pos % 512) != 0) {
-        uint64_t pos_sector = ALIGN_DOWN(pos, 512) / 512;
-        read_blk_device(blk_ctx, pos_sector, unaligned_buf, 512);
-
-        uint64_t valid_idx = pos % 512;
-        uint64_t valid_len = 512 - valid_idx;
-
-        if (size_left <= valid_len) {
-            memcpy(buffer, &unaligned_buf[valid_idx], size_left);
-            blk_ctx->device_pos += read_size;
-            return size_left;
-        } else {
-            memcpy(buffer, &unaligned_buf[valid_idx], valid_len);
-            buffer += valid_len;
-            size_left -= valid_len;
-            pos += valid_len;
+    // Map all necessary memory
+    uint64_t pos_page = PAGE_FLOOR(pos);
+    uint64_t read_max = pos + read_size;
+    bool updated_vm = false;
+    while (pos_page < read_max) {
+        uint64_t par_el1 = vmem_check_address((uintptr_t)blk_ctx->cache_virtaddr + pos_page);
+        if ((par_el1 & 1) == 1) {
+            // Translation failed. Read in page
+            memory_entry_cache_t* mem_entry = (memory_entry_cache_t*)memspace_get_entry_at_addr_kernel(blk_ctx->cache_virtaddr);
+            ASSERT(mem_entry != NULL && mem_entry->type == MEMSPACE_CACHE);
+            memcache_phy_entry_t* new_phy_entry = vmalloc(sizeof(memcache_phy_entry_t));
+            bool ok;
+            ok = virtio_blk_populate_virt_cache(blk_ctx, (uintptr_t)blk_ctx->cache_virtaddr + pos_page, new_phy_entry);
+            ASSERT(ok);
+            llist_append_ptr(mem_entry->phy_addr_list, new_phy_entry);
+            updated_vm = true;
         }
+
+        pos_page += VMEM_PAGE_SIZE;
     }
 
-    // Pos is now aligned to a sector. Copy the remaining data
-    while (size_left > 0) {
-        uint64_t pos_sector = pos / 512;
-        uint64_t cycle_size = size_left > 16384 ? 16384 : size_left;
-        read_blk_device(blk_ctx, pos_sector, buffer, cycle_size);
-        size_left -= cycle_size;
-        pos += cycle_size;
-        buffer += cycle_size;
+    if (updated_vm) {
+        memspace_update_kernel_vmem();
     }
+
+    memcpy(buffer, blk_ctx->cache_virtaddr + pos, read_size);
 
     blk_ctx->device_pos += read_size;
 
@@ -332,11 +359,23 @@ static void virtio_pci_blk_late_init(void* ctx) {
 
     vfree(pci_ctx);
 
-    //uint8_t superblock[1024];
-    //read_blk_device(&s_pci_device, 0, superblock, sizeof(superblock));
+    uint64_t len_page = PAGE_CEIL(disk_ctx->device_config.capacity * 512);
+    disk_ctx->cache_virtaddr = memspace_alloc_kernel_virt(len_page, VMEM_PAGE_SIZE);
+    memory_entry_cache_t blk_cache_entry = {
+        .start = (uintptr_t)disk_ctx->cache_virtaddr,
+        .end = (uintptr_t)disk_ctx->cache_virtaddr + len_page,
+        .type = MEMSPACE_CACHE,
+        .flags = MEMSPACE_FLAG_PERM_KRO,
+        .phy_addr_list = NULL,
+        .cacheops_ptr = &s_virtio_blk_memcache_ops,
+        .cacheops_ctx = disk_ctx,
+        .res = {0}
+    };
+    blk_cache_entry.phy_addr_list = llist_create();
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&blk_cache_entry);
 
-    //console_printf("Magic: %c\n", superblock[120]);
-    //console_flush();
+    memspace_update_kernel_vmem();
+
 }
 
 

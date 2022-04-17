@@ -71,10 +71,15 @@ typedef struct {
     uint64_t irq;
 } wait_irqnotify_t;
 
+typedef struct {
+    uint64_t x0;
+} wait_initthread_t;
+
 typedef union {
     wait_lock_t lock;
     wait_getmsgs_t getmsgs;
     wait_irqnotify_t irqnotify;
+    wait_initthread_t init_thread;
 } wait_ctx_t;
 
 typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);

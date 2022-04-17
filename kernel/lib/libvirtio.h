@@ -19,6 +19,9 @@ typedef struct __attribute__((__packed__)) {
     uint32_t bar_len;
 } pci_virtio_capability_t;
 
+#define GET_CAP_PTR(pci_ctx, cap_ptr) pci_ctx->bar[cap_ptr->bar].vmem + cap_ptr->bar_offset
+
+
 typedef struct __attribute__((__packed__)) {
     pci_virtio_capability_t cap;
     uint32_t notify_off_multiplier;
@@ -95,6 +98,12 @@ enum {
     VIRTIO_BLK_F_CONFIG_WCE = 11,
     VIRTIO_BLK_F_DISCARD = 13,
     VIRTIO_BLK_F_WRITE_ZEROES = 14
+};
+
+enum {
+    VIRTIO_CONSOLE_F_SIZE = 0,
+    VIRTIO_CONSOLE_F_MULTIPORT = 1,
+    VIRTIO_CONSOLE_F_EMERG_WRITE = 2
 };
 
 enum {
@@ -190,6 +199,7 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
                     
 bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block);
 bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx);
+int64_t virtio_get_used_elem(virtio_virtq_ctx_t* queue_ctx, int64_t desc_idx);
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx);
 
@@ -198,5 +208,9 @@ void print_pci_capability_qemu(pci_device_ctx_t* device_ctx, pci_vendor_capabili
 void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_virtio_capability_t* cap_ptr);
 
 void print_virtio_feature_bits(uint32_t feat_low, uint32_t feat_high, uint64_t device_id);
+
+bool virtio_init_with_features(pci_device_ctx_t* pci_ctx, uint64_t features);
+
+#define VIRTIO_HAS_FEATURE(features, feat) (features & (1 << feat))
 
 #endif

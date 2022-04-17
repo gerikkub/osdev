@@ -59,6 +59,7 @@ drivers/pl011_uart.c \
 drivers/qemu_fw_cfg.c \
 drivers/pcie/pcie.c \
 drivers/virtio_pci_blk/virtio_pci_blk.c \
+drivers/virtio_pci_console/virtio_pci_console.c \
 drivers/console/console_dev.c \
 drivers/gicv3/gicv3.c \
 drivers/aarch64/aarch64.c
@@ -271,15 +272,20 @@ clean:
 
 run: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
 	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -s -kernel $< \
-	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
+	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on \
+	-device virtio-serial-pci,disable-legacy=on -chardev stdio,id=virtiocon0 -device virtconsole,chardev=virtiocon0 \
+	-monitor none -serial none
 
 debug: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
 	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -S -s -kernel $< \
-	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on
+	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on \
+	-device virtio-serial-pci,disable-legacy=on -chardev stdio,id=virtiocon0 -device virtconsole,chardev=virtiocon0 \
+	-monitor none -serial none
 
 dts:
 	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -S -s \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on \
+	-chardev stdio,id=con0 -device virtio-serial-pci \
 	-machine dumpdtb=dtb.dtb
 	dtc -I dtb -O dts -o tools/dts.txt dtb.dtb
 

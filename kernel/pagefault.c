@@ -8,6 +8,7 @@
 #include "kernel/task.h"
 #include "kernel/console.h"
 #include "kernel/kernelspace.h"
+#include "kernel/lib/vmalloc.h"
 
 void pagefault_print_backtrace(task_t* task) {
 
@@ -39,6 +40,8 @@ void pagefault_print_backtrace(task_t* task) {
 
     console_printf("\n");
 }
+
+bool pagefault_handler_kern(uint32_t esr);
 
 void pagefault_handler(uint64_t vector, uint32_t esr) {
 
@@ -102,6 +105,56 @@ void pagefault_handler(uint64_t vector, uint32_t esr) {
             break;
     }
 
+}
+
+bool pagefault_handler_kern(uint32_t esr) {
+
+    uint8_t far_notvalid = (esr >> 10) & 1;
+    uint8_t cm = (esr >> 8) & 1;
+    uint8_t wnr = (esr >> 6) & 1;
+    uint8_t dfsc = esr & 0x3F;
+
+    if (!(!far_notvalid &&
+          !cm &&
+          !wnr &&
+          dfsc >= 4 && dfsc < 8)) {
+
+        return false;
+    }
+
+    // Check if a valid cache mapping exists for the memory space in question
+    uint64_t far;
+    READ_SYS_REG(FAR_EL1, far);
+
+    if (!((far >> 63) & 1)) {
+        // Only handle kernel addresses
+        return false;
+    }
+
+    memory_entry_t* mem_entry = memspace_get_entry_at_addr_kernel((void*)far);
+    if (mem_entry == NULL) {
+        return false;
+    }
+
+    if (mem_entry->type != MEMSPACE_CACHE) {
+        return false;
+    }
+
+    // Handle a read from a cache entry
+    memory_entry_cache_t* memcache_entry = (memory_entry_cache_t*)mem_entry;
+    memcache_phy_entry_t* new_phy_entry = vmalloc(sizeof(memcache_phy_entry_t));
+    bool ok;
+    ok = memcache_entry->cacheops_ptr->populate_virt_fn(memcache_entry->cacheops_ctx, far, new_phy_entry);
+
+    if (!ok) {
+        return false;
+    }
+
+    llist_append_ptr(memcache_entry->phy_addr_list, new_phy_entry);
+
+    memspace_update_kernel_vmem();
+
+    return true;
 }
 
 void pagefault_init(void) {

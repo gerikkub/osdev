@@ -18,7 +18,7 @@ static uint64_t s_console_idx = 0;
 
 void console_open(void) {
     const char* device = "sys";
-    const char* path = "con";
+    const char* path = "con0";
     int64_t fd;
     SYSCALL_CALL_RET(SYSCALL_OPEN, (uint64_t)device, (uint64_t)path, 0, 0, fd);
 

@@ -251,6 +251,17 @@ bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx) {
     return false;
 }
 
+int64_t virtio_get_used_elem(virtio_virtq_ctx_t* queue_ctx, int64_t desc_idx) {
+    for (int idx = 0; idx < queue_ctx->queue_size; idx++) {
+        if (queue_ctx->used_ptr->ring[idx].id == desc_idx) {
+            return queue_ctx->used_ptr->ring[idx].len;
+        }
+    }
+    ASSERT(false);
+
+    return -1;
+}
+
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx) {
     void* cap_ptr = virtio_get_capability(ctx, VIRTIO_PCI_CAP_NOTIFY_CFG);
     ASSERT(cap_ptr != NULL);
@@ -412,4 +423,36 @@ void print_virtio_feature_bits(uint32_t feat_low, uint32_t feat_high, uint64_t d
         }
     }
     console_flush();
+}
+
+bool virtio_init_with_features(pci_device_ctx_t* pci_ctx, uint64_t features_req) {
+
+    pci_virtio_common_cfg_t* common_cfg = NULL;
+    pci_virtio_capability_t* cap_ptr = NULL;
+
+    cap_ptr = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(cap_ptr);
+
+    common_cfg = GET_CAP_PTR(pci_ctx, cap_ptr);
+
+    virtio_set_status(common_cfg, VIRTIO_STATUS_ACKNOWLEGE);
+    virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER);
+
+    // Check for expected feature bits
+    uint64_t features = virtio_get_features(common_cfg);
+
+    if ((features & features_req) != features_req) {
+        return false;
+    }
+
+    virtio_set_features(common_cfg, features_req);
+
+    virtio_set_status(common_cfg, VIRTIO_STATUS_FEATURES_OK);
+    uint8_t device_status = virtio_get_status(common_cfg);
+
+    if (!(device_status & VIRTIO_STATUS_FEATURES_OK)) {
+        return false;
+    }
+
+    return true;
 }

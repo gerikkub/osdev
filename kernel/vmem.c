@@ -379,7 +379,7 @@ void vmem_free_table(_vmem_table* table_ptr, uint64_t level) {
             _vmem_entry_t entry = table_ptr[idx];
             if (VMEM_ENTRY_IS_TABLE(entry)) {
                 _vmem_table* next_table = vmem_get_table_addr(entry);
-                vmem_free_table(next_table, level+1);
+                vmem_free_table(PHY_TO_KSPACE_PTR(next_table), level+1);
                 kfree_phy((uint8_t*)next_table);
             }
         }
@@ -392,6 +392,11 @@ void vmem_free_table(_vmem_table* table_ptr, uint64_t level) {
             }
         }
     }
+}
+
+void vmem_deallocate_table(_vmem_table* table_ptr) {
+    vmem_free_table(table_ptr, 0);
+    kfree_phy(KSPACE_TO_PHY_PTR(table_ptr));
 }
 
 bool vmem_walk_table(_vmem_table* table_ptr, uint64_t vmem_addr, uint64_t* phy_addr) {
@@ -478,11 +483,15 @@ void vmem_print_l0_table(_vmem_table* table_ptr) {
     }
 }
 
-void vmem_deallocate_table(_vmem_table* table_ptr) {
-    // One day...
-}
-
 void vmem_flush_tlb(void) {
     asm volatile("TLBI VMALLE1");
     MEM_DSB();
+}
+
+uint64_t vmem_check_address(uint64_t addr) {
+
+    uint64_t par_el1;
+    asm volatile("AT S1E1R, %0\n" : : "r" (addr));
+    READ_SYS_REG(PAR_EL1, par_el1);
+    return par_el1;
 }

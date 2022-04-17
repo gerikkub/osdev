@@ -9,15 +9,14 @@
 .global task_wait_kernel_c
 
 .macro dummy_exception name num
+.align 7
 \name :
     mov x0, #\num
     b unhandled_exception
-.rept 30
-.word 0
-.endr
 .endm
 
 .macro generic_exception name impl
+.align 7
 \name :
     stp x9, x10, [sp], #-16
     stp x11, x12, [sp], #-16
@@ -29,12 +28,10 @@
     ldp x11, x12, [sp, #0]!
     ldp x9, x10, [sp, #0]!
     eret
-.rept 22
-.word 0
-.endr
 .endm
 
 .macro save_context_asm_user name spreg num func
+.align 7
 \name:
     # Save all registers to this stack frame
     stp x30, xzr, [sp, #-16]!
@@ -63,12 +60,10 @@
     # x1: This exception number
     # x2: Exception handler to call after saving context
     bl save_context
-.rept 19
-.word 0
-.endr
 .endm
 
 .macro save_context_asm_user_irq name spreg num func
+.align 7
 # Similar to save_context, but don't automatically
 # call save_context. Higher up function may decide
 # to call this directly
@@ -141,12 +136,10 @@
     # x2: Exception handler to call after saving context
     bl save_context
 
-.rept 8
-.word 0
-.endr
 .endm
 
 .macro save_context_asm_task_kern_irq name spreg num func
+.align 7
 \name:
     # Save all registers to this stack frame
     # The zero write will be overriden with pc for a fake stack frame
@@ -159,7 +152,9 @@
 
     # Store the return address in the zero write above
     mrs x0, ELR_EL1
+    mrs x1, SPSR_EL1
     str x0, [fp]
+    stp x0, x1, [sp, #-16]!
 
     # Store context information about this exception
     mov x0, #\num
@@ -167,6 +162,11 @@
     # Arguments to save_context are as follows
     # x0: This exception number
     bl \func
+
+    # Restore exception link register
+    ldp x0, x1, [sp], #16
+    msr ELR_EL1, x0
+    msr SPSR_EL1, x1
 
     # Restore all registers but x30
     bl restore_most_reg
@@ -180,18 +180,22 @@
     eret
 
 
-.rept 20
-.word 0
-.endr
 .endm
 
 .macro panic_exception_asm name num func
+.align 7
 # Setup just enough to panic
 \name:
 
     # Setup a valid stack
     ldr x0, =_stack_base
     mov sp, x0
+    mrs x1, ELR_EL1
+    stp fp, lr, [sp, #-16]!
+    mov fp, sp
+    stp fp, x1, [sp, #-16]!
+    mov fp, sp
+
 
     mov x0, #\num
 
@@ -202,11 +206,10 @@
 \name\()_loop:
     b \name\()_loop
 
-.rept 27
-.word 0
-.endr
 .endm
 
+
+    
 
 .global restore_context_asm
 
@@ -401,23 +404,24 @@ restore_context_kernel_asm:
 
 .section .exception_vector
 
-# Exception while processing in SP0
+# Exception while processing in EL1t
 panic_exception_asm curr_el_sp_0_sync 0 panic_exception_handler
+//panic_exception_asm curr_el_sp_0_irq 1 panic_exception_handler
 save_context_asm_task_kern_irq curr_el_sp_0_irq SP_EL0 1 exception_handler_irq
 dummy_exception curr_el_sp_0_fiq 2
-dummy_exception curr_el_sp_0_serror 3
+panic_exception_asm curr_el_sp_0_serror 3 panic_exception_handler
 
-# Exception while processing in SP1 (in kernel or irq)
-panic_exception_asm curr_el_sp_X_sync 4 panic_exception_handler
+# Exception while processing in EL1h (in kernel or irq)
+save_context_asm_task_kern_irq curr_el_sp_X_sync SP_EL1 4 exception_handler_sync
 save_context_asm_task_kern_irq curr_el_sp_X_irq SP_EL1 5 exception_handler_irq
 dummy_exception curr_el_sp_X_fiq 6
-dummy_exception curr_el_sp_X_serror 7
+panic_exception_asm curr_el_sp_X_serror 7 panic_exception_handler
 
-# Exception while in user space
+# Exception while in EL0t
 save_context_asm_user lower_el_sp_64_sync SP_EL0 8 exception_handler_sync
 save_context_asm_user_irq lower_el_sp_64_irq SP_EL0 9 exception_handler_irq
 dummy_exception lower_el_64_fiq 10
-dummy_exception lower_el_64_serror 11
+panic_exception_asm lower_el_64_serror 11 panic_exception_handler
 
 # Not implementing AARCH32 so all dummy exceptions
 dummy_exception lower_el_32_sync 12

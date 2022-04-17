@@ -155,6 +155,10 @@ bool create_task_canwakeup_f(wait_ctx_t* wait_ctx) {
     return true;
 }
 
+int64_t create_task_wakeup_f(task_t* task) {
+    return task->wait_ctx.init_thread.x0;
+}
+
 uint64_t create_task(uint64_t* user_stack_base,
                      uint64_t user_stack_size,
                      uint64_t* kernel_stack_base,
@@ -230,11 +234,9 @@ uint64_t create_task(uint64_t* user_stack_base,
 
         task->run_state = TASK_RUNABLE;
     } else {
-        // task->reg.sp = (uint64_t)&kernel_stack_base[-2];
-        // task->reg.gp[TASK_REG_FP] = (uint64_t)&kernel_stack_base[-2];
-
         task->wait_canwakeup_fn = create_task_canwakeup_f;
-        task->wait_wakeup_fn = NULL;
+        task->wait_wakeup_fn = create_task_wakeup_f;
+        task->wait_ctx.init_thread.x0 = task->reg.gp[TASK_REG(1)];
         task->run_state = TASK_WAIT;
 
         // Set kernel registers to 0
@@ -274,7 +276,7 @@ uint64_t create_kernel_task(uint64_t stack_size,
     reg.spsr = TASK_SPSR_M(4); // EL1t SP
     reg.elr = (uint64_t)task_entry;
 
-    return create_task(NULL, 0, stack_ptr, stack_size, &reg, NULL, true, "kernel");
+    return create_task(NULL, 0, ((void*)stack_ptr)+stack_size, stack_size, &reg, NULL, true, "kernel");
 }
 
 uint64_t create_system_task(uint64_t kernel_stack_size,
@@ -300,12 +302,14 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
         .maxlimit = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size)
     };
 
+    /*
     bool memspace_result;
     memspace_result = memspace_add_entry_to_kernel_memory((memory_entry_t*)&kernel_stack_entry);
     if (!memspace_result) {
         kfree_phy(kernel_stack_ptr_phy);
         return 0;
     }
+    */
 
     task_reg_t reg;
     for (uint64_t idx = 0; idx < 31; idx++) {
@@ -316,7 +320,7 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
     reg.elr = (uint64_t)task_entry;
 
     return create_task((uint64_t*)user_stack_base, user_stack_size,
-                       (uint64_t*)kernel_stack_entry.base, kernel_stack_size,
+                       (uint64_t*)kernel_stack_entry.limit, kernel_stack_size,
                        &reg, memspace, false, name);
 }
 

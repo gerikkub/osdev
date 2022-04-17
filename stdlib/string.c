@@ -16,6 +16,16 @@ void * memcpy(void *restrict dst, const void *restrict src, size_t n) {
     return dst;
 }
 
+void * memmove(void *dst, const void *src, size_t n) {
+    uint8_t *dst_8 = dst;
+    const uint8_t *src_8 = src;
+
+    for (size_t i = 0; i < n; i++) {
+        dst_8[i] = src_8[i];
+    }
+    return dst;
+}
+
 int memcmp(const void *s1, const void *s2, size_t n) {
     const int8_t* s1_8 = s1;
     const int8_t* s2_8 = s2;
