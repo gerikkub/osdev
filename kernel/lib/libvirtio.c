@@ -7,6 +7,7 @@
 #include "kernel/interrupt/interrupt.h"
 #include "kernel/console.h"
 #include "kernel/assert.h"
+#include "kernel/task.h"
 #include "kernel/kernelspace.h"
 
 #include "stdlib/bitutils.h"
@@ -227,29 +228,69 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
     return false;
 }
 
-bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx) {
+void virtio_add_irq_to_ctx(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx) {
+    queue_ctx->should_wakeup = false;
 
-    MEM_DMB();
+    if (llist_len(irq_ctx->wait_queue) == 0) {
+        interrupt_await_reset(irq_ctx->intid);
+    }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
-    volatile uint16_t* used_idx_ptr = &queue_ctx->used_ptr->idx;
-#pragma GCC diagnostic pop
+    llist_append_ptr(irq_ctx->wait_queue, queue_ctx);
+}
+
+bool virtio_canwakeup_irq(wait_ctx_t* wait_ctx) {
+    virtio_virtq_ctx_t* queue_ctx = wait_ctx->virtioirq.ctx;
+
+    return queue_ctx->should_wakeup;
+}
+
+void virtio_wait_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx) {
+
+    wait_ctx_t wait_ctx = {
+        .virtioirq = {
+            .ctx = irq_ctx
+        }
+    };
+
+    if (llist_at(irq_ctx->wait_queue, 0) == queue_ctx) {
+        // Do an irq wait
+        interrupt_await(irq_ctx->intid);
+    } else {
+        // Wait for a signal from the irq handler
+        task_wait_kernel(get_active_task(), WAIT_VIRTIOIRQ, &wait_ctx, NULL, virtio_canwakeup_irq);
+    }
+
+}
+
+bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx) {
 
     do {
-        interrupt_await_reset(queue_ctx->intid);
-        if (*used_idx_ptr != queue_ctx->last_used_idx) {
-            queue_ctx->last_used_idx = *used_idx_ptr;
-            MEM_DMB();
-            return true;
+        uint64_t crit_ctx;
+        BEGIN_CRITICAL(crit_ctx);
+
+        bool done = virtio_poll_virtq(queue_ctx, false);
+        if (done) {
+            break;
         }
-        interrupt_await(queue_ctx->intid);
-        MEM_DSB();
-        // TODO: Flush cache if not device memory
+        virtio_add_irq_to_ctx(queue_ctx, irq_ctx);
+        END_CRITICAL(crit_ctx);
+
+        virtio_wait_irq(queue_ctx, irq_ctx);
     } while (true);
 
     return false;
 }
+
+void virtio_handle_irq(virtio_virtq_shared_irq_ctx_t* irq_ctx) {
+    
+    virtio_virtq_ctx_t* queue_ctx;
+    FOR_LLIST(irq_ctx->wait_queue, queue_ctx)
+        queue_ctx->should_wakeup = true;
+    END_FOR_LLIST()
+
+    llist_empty(irq_ctx->wait_queue);
+}
+
 
 int64_t virtio_get_used_elem(virtio_virtq_ctx_t* queue_ctx, int64_t desc_idx) {
     for (int idx = 0; idx < queue_ctx->queue_size; idx++) {

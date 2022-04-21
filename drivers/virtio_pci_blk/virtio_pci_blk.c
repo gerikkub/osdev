@@ -54,6 +54,7 @@ typedef struct {
     virtio_blk_config_t device_config;
     char name[MAX_SYS_DEVICE_NAME_LEN];
     void* cache_virtaddr;
+    virtio_virtq_shared_irq_ctx_t virtio_irq_ctx;
 } blk_disk_ctx_t;
 
 static llist_head_t s_blk_disks;
@@ -99,6 +100,8 @@ static void print_blk_config(pci_device_ctx_t* pci_ctx) {
 static void virtio_pci_blk_device_irq_fn(uint32_t intid, void* ctx) {
     blk_disk_ctx_t* disk_ctx = ctx;
     pci_interrupt_clear_pending(&disk_ctx->pci_device, intid);
+
+    virtio_handle_irq(&disk_ctx->virtio_irq_ctx);
 }
 
 static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
@@ -139,14 +142,14 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
 
     ASSERT(found);
 
-    virtio_virtq_ctx_t requestq;
+    disk_ctx->virtio_irq_ctx.wait_queue = llist_create();
+    disk_ctx->virtio_irq_ctx.intid = queue_intid;
+
     virtio_alloc_queue(common_cfg,
                        VIRTIO_QUEUE_BLOCK_REQUESTQ,
                        8, 98304,
-                       &requestq,
+                       &disk_ctx->virtio_requestq,
                        msix_item->entry_idx);
-    disk_ctx->virtio_requestq = requestq;
-    disk_ctx->virtio_requestq.intid = queue_intid;
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER_OK);
 
@@ -156,7 +159,7 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
     ASSERT(blk_cfg_cap != NULL);
     disk_ctx->device_config = *((virtio_blk_config_t*)(pci_ctx->bar[blk_cfg_cap->bar].vmem + blk_cfg_cap->bar_offset));
 
-    pci_enable_vector(&disk_ctx->pci_device, disk_ctx->virtio_requestq.intid);
+    pci_enable_vector(&disk_ctx->pci_device, queue_intid);
     pci_enable_interrupts(&disk_ctx->pci_device);
 }
 
@@ -188,7 +191,7 @@ static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buf
 
     virtio_virtq_notify(pci_ctx, &disk_ctx->virtio_requestq);
 
-    virtio_poll_virtq_irq(&disk_ctx->virtio_requestq);
+    virtio_poll_virtq_irq(&disk_ctx->virtio_requestq, &disk_ctx->virtio_irq_ctx);
     //virtio_poll_virtq(&disk_ctx->virtio_requestq, true);
 
     memcpy(buffer, read_buffers[0].ptr, len);

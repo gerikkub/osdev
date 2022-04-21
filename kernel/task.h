@@ -57,6 +57,7 @@ typedef enum {
     WAIT_LOCK = 1,
     WAIT_GETMSGS = 2,
     WAIT_IRQNOTIFY = 3,
+    WAIT_VIRTIOIRQ = 4,
 } wait_reason_t;
 
 typedef struct {
@@ -75,11 +76,16 @@ typedef struct {
     uint64_t x0;
 } wait_initthread_t;
 
+typedef struct {
+    void* ctx;
+} wait_virtioirq_t;
+
 typedef union {
     wait_lock_t lock;
     wait_getmsgs_t getmsgs;
     wait_irqnotify_t irqnotify;
     wait_initthread_t init_thread;
+    wait_virtioirq_t virtioirq;
 } wait_ctx_t;
 
 typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);

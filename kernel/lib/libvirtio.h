@@ -151,6 +151,11 @@ typedef struct __attribute__((__packed__)) {
 } virtio_virtq_used_t;
 
 typedef struct {
+    llist_head_t wait_queue;
+    int32_t intid;
+} virtio_virtq_shared_irq_ctx_t;
+
+typedef struct {
     uint16_t queue_size;
     uint16_t queue_num;
     uintptr_t desc_phy;
@@ -168,7 +173,7 @@ typedef struct {
     uint64_t buffer_pool_size;
     malloc_state_t buffer_malloc_state;
 
-    int32_t intid;
+    bool should_wakeup;
 } virtio_virtq_ctx_t;
 
 typedef struct {
@@ -198,7 +203,8 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
                        uint64_t num_read_buffers);
                     
 bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block);
-bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx);
+bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx);
+void virtio_handle_irq(virtio_virtq_shared_irq_ctx_t* irq_ctx);
 int64_t virtio_get_used_elem(virtio_virtq_ctx_t* queue_ctx, int64_t desc_idx);
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx);

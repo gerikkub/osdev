@@ -69,3 +69,29 @@ void llist_delete_ptr(llist_head_t head, void* delitem) {
     }
 }
 
+bool llist_empty(llist_head_t head) {
+    return llist_len(head) == 0;
+}
+
+int64_t llist_len(llist_head_t head) {
+    int64_t len = 0;
+    void* item = NULL;
+    FOR_LLIST(head, item)
+        len++;
+        (void)item;
+    END_FOR_LLIST()
+    return len;
+}
+
+void* llist_at(llist_head_t head, int64_t idx) {
+    int64_t curr_idx = 0;
+    void* item;
+    FOR_LLIST(head, item)
+        if (idx == curr_idx) {
+            return item;
+        }
+        curr_idx++;
+    END_FOR_LLIST()
+
+    return NULL;
+}

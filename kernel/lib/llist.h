@@ -36,4 +36,8 @@ void llist_delete_ptr(llist_head_t head, void* delitem);
 
 bool llist_empty(llist_head_t head);
 
+int64_t llist_len(llist_head_t head);
+
+void* llist_at(llist_head_t head, int64_t idx);
+
 #endif
