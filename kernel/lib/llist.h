@@ -2,6 +2,9 @@
 #ifndef __LLIST_H__
 #define __LLIST_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 struct llist_struct;
 
 typedef struct llist_struct {

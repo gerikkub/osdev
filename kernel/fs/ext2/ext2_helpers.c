@@ -7,8 +7,8 @@
 #include "kernel/fd.h"
 #include "kernel/lib/vmalloc.h"
 
-#include "kernel/fs/ext2_helpers.h"
-#include "kernel/fs/ext2_structures.h"
+#include "kernel/fs/ext2/ext2_helpers.h"
+#include "kernel/fs/ext2/ext2_structures.h"
 
 #include "include/k_ioctl_common.h"
 

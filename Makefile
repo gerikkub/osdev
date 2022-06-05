@@ -100,8 +100,11 @@ kernel/lock/lock.c \
 kernel/lock/mutex.c \
 
 C_SRC_KERNEL_FS = \
-kernel/fs/ext2.c \
-kernel/fs/ext2_helpers.c
+kernel/fs/file.c \
+kernel/fs/ext2/ext2.c \
+kernel/fs/ext2/ext2_helpers.c \
+kernel/fs/sysfs/sysfs.c \
+kernel/fs/sysfs/sysfs_task.c
 
 C_SRC_LIBS = \
 stdlib/string.c \
@@ -109,7 +112,8 @@ stdlib/printf.c \
 stdlib/bitutils.c \
 stdlib/linalloc.c \
 stdlib/malloc.c \
-stdlib/bitalloc.c
+stdlib/bitalloc.c \
+stdlib/snprintf.c
 
 
 # C sources

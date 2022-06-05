@@ -19,6 +19,7 @@ typedef struct {
 enum {
     FS_TYPE_UNKNOWN = 0,
     FS_TYPE_EXT2 = 1,
+    FS_TYPE_SYSFS = 2,
     MAX_NUM_FS_TYPE
 };
 

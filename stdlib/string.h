@@ -18,6 +18,8 @@ char * strncpy(char * dst, const char * src, size_t len);
 int strcmp(const char *s1, const char *s2);
 int strncmp(const char *s1, const char *s2, size_t n);
 
+int snprintf(char* str, size_t size, const char* format, ...);
+
 /**
  * hextoi64
  * Transfrom a hex string to a 64-bit integer

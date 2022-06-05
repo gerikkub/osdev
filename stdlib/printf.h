@@ -36,4 +36,5 @@ void console_set_log_level(console_log_level_t level);
 
 void console_log(console_log_level_t level, const char* fmt, ...);
 
+
 #endif

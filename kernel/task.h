@@ -122,6 +122,7 @@ typedef struct task_t_ {
 
 void task_init(uint64_t* exstack);
 task_t* get_active_task(void);
+task_t* get_task_at_idx(int64_t idx);
 task_t* get_task_for_tid(uint64_t tid);
 void restore_context(uint64_t tid);
 void restore_context_kernel(uint64_t tid, uint64_t x0, void* sp);

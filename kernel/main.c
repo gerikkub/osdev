@@ -27,7 +27,8 @@
 #include "kernel/vfs.h"
 #include "kernel/sys_device.h"
 #include "kernel/fs_manager.h"
-#include "kernel/fs/ext2.h"
+#include "kernel/fs/ext2/ext2.h"
+#include "kernel/fs/sysfs/sysfs.h"
 #include "kernel/exec.h"
 
 #include "kernel/lib/vmalloc.h"
@@ -135,6 +136,7 @@ void main() {
 void kernel_init_lower_thread(void* ctx) {
 
     ext2_register();
+    sysfs_register();
 
     dtb_init();
 
@@ -166,8 +168,8 @@ void kernel_init_lower_thread(void* ctx) {
 
     uint64_t cat_tid;
     char* cat_argv[] = {
-        "home",
-        "hello.txt",
+        "sysfs",
+        "tasks",
         NULL
     };
     cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);

@@ -33,23 +33,24 @@ int64_t main(uint64_t tid, char** ctx) {
     }
     SYS_ASSERT(fd >= 0);
 
-    int64_t len;
-    len = system_ioctl(fd, BLK_IOCTL_SIZE, NULL, 0);
-    if (len < 0) {
-        console_printf("Invalid length\n");
-        console_flush();
-        return -1;
-    } else if (len == 0) {
-        return 0;
-    }
+    // int64_t len;
+    // len = system_ioctl(fd, BLK_IOCTL_SIZE, NULL, 0);
+    // if (len < 0) {
+    //     console_printf("Invalid length\n");
+    //     console_flush();
+    //     return -1;
+    // } else if (len == 0) {
+    //     return 0;
+    // }
 
-    char* buffer = malloc(len);
+    char* buffer = malloc(4096);
     int64_t read_len;
-    read_len = system_read(fd, buffer, len, 0);
-    SYS_ASSERT(read_len > 0);
+    do {
+        read_len = system_read(fd, buffer, 4096, 0);
+        console_write_len(buffer, read_len);
+        console_flush();
+    } while (read_len > 0);
 
-    console_write_len(buffer, read_len);
-    console_flush();
 
     free(buffer);
 

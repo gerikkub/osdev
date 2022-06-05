@@ -48,6 +48,18 @@ task_t* get_active_task(void) {
     return &s_task_list[s_active_task_idx];
 }
 
+task_t* get_task_at_idx(int64_t idx) {
+    if (idx >= MAX_NUM_TASKS) {
+        return NULL;
+    }
+
+    if (s_task_list[idx].tid == 0) {
+        return NULL;
+    }
+
+    return &s_task_list[idx];
+}
+
 void bad_task_return(void) {
     ASSERT(0);
 }

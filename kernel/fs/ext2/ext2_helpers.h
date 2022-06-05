@@ -6,7 +6,7 @@
 
 #include "kernel/lock/lock.h"
 
-#include "kernel/fs/ext2_structures.h"
+#include "kernel/fs/ext2/ext2_structures.h"
 
 #define BLOCK_SIZE(sb) (1024 << (sb.log_block_size))
 

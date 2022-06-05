@@ -15,8 +15,8 @@
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
 
-#include "kernel/fs/ext2_helpers.h"
-#include "kernel/fs/ext2_structures.h"
+#include "kernel/fs/ext2/ext2_helpers.h"
+#include "kernel/fs/ext2/ext2_structures.h"
 
 typedef struct {
     uint64_t inode_num;

@@ -3,7 +3,7 @@
 #define __FD_H__
 
 #include <stdint.h>
-
+#include <stdbool.h>
 
 typedef int64_t (*fd_read_op)(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags);
 typedef int64_t (*fd_write_op)(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags);
