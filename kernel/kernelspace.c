@@ -6,6 +6,7 @@
 #include "kernel/memoryspace.h"
 #include "kernel/kmalloc.h"
 #include "kernel/assert.h"
+#include "kernel/lib/vmalloc.h"
 
 static memory_space_t s_kernelspace;
 static memory_space_t s_systemspace;
@@ -31,47 +32,39 @@ void memspace_init_kernelspace(void) {
 
     bool result;
 
-    void* kentries_phy = kmalloc_phy(KERNELSPACE_ENTRIES * sizeof(memory_entry_t));
-    ASSERT(kentries_phy != NULL);
-    memory_entry_t* kentries = (memory_entry_t*)PHY_TO_KSPACE(kentries_phy);
+    result = memspace_alloc(&s_kernelspace, NULL);
+    ASSERT(result);
 
-    s_kernelspace.entries = kentries;
-    s_kernelspace.num = 0;
-    s_kernelspace.maxnum = KERNELSPACE_ENTRIES;
+    memory_entry_phy_t* text_entry = memspace_alloc_entry();
+    text_entry->start = ((uint64_t)&_text_start);
+    text_entry->end = ((uint64_t)&_text_end);
+    text_entry->type = MEMSPACE_PHY;
+    text_entry->flags = MEMSPACE_FLAG_PERM_KRE;
+    text_entry->phy_addr = ((uint64_t)&_text_start) & 0xFFFFFFFFFFFF;
 
-    memory_entry_phy_t text_entry = {
-        .start = ((uint64_t)&_text_start),
-        .end = ((uint64_t)&_text_end),
-        .type = MEMSPACE_PHY,
-        .flags = MEMSPACE_FLAG_PERM_KRE,
-        .phy_addr = ((uint64_t)&_text_start) & 0xFFFFFFFFFFFF
-    };
-
-    result = memspace_add_entry_to_memory(&s_kernelspace, (memory_entry_t*)&text_entry);
+    result = memspace_add_entry_to_memory(&s_kernelspace, (memory_entry_t*)text_entry);
     ASSERT(result);
 
     if (((addr_phy_t)&_data_start) != ((addr_phy_t)&_data_end)) {
-        memory_entry_phy_t data_entry = {
-            .start = ((uint64_t)&_data_start),
-            .end = ((uint64_t)&_data_end),
-            .type = MEMSPACE_PHY,
-            .flags = MEMSPACE_FLAG_PERM_KRW,
-            .phy_addr = ((uint64_t)&_data_start) & 0xFFFFFFFFFFFF
-        };
+        memory_entry_phy_t* data_entry = memspace_alloc_entry();
+        data_entry->start = ((uint64_t)&_data_start);
+        data_entry->end = ((uint64_t)&_data_end);
+        data_entry->type = MEMSPACE_PHY;
+        data_entry->flags = MEMSPACE_FLAG_PERM_KRW;
+        data_entry->phy_addr = ((uint64_t)&_data_start) & 0xFFFFFFFFFFFF;
 
-        result = memspace_add_entry_to_memory(&s_kernelspace, (memory_entry_t*)&data_entry);
+        result = memspace_add_entry_to_memory(&s_kernelspace, (memory_entry_t*)data_entry);
         ASSERT(result);
     }
 
-    memory_entry_phy_t bss_entry = {
-        .start = ((uint64_t)&_bss_start),
-        .end = ((uint64_t)&_bss_end),
-        .type = MEMSPACE_PHY,
-        .flags = MEMSPACE_FLAG_PERM_KRW,
-        .phy_addr = ((uint64_t)&_bss_start) & 0xFFFFFFFFFFFF
-    };
+    memory_entry_phy_t* bss_entry = memspace_alloc_entry();
+    bss_entry->start = ((uint64_t)&_bss_start);
+    bss_entry->end = ((uint64_t)&_bss_end);
+    bss_entry->type = MEMSPACE_PHY;
+    bss_entry->flags = MEMSPACE_FLAG_PERM_KRW;
+    bss_entry->phy_addr = ((uint64_t)&_bss_start) & 0xFFFFFFFFFFFF;
 
-    result = memspace_add_entry_to_memory(&s_kernelspace, (memory_entry_t*)&bss_entry);
+    result = memspace_add_entry_to_memory(&s_kernelspace, (memory_entry_t*)bss_entry);
     ASSERT(result);
 
     s_kernelspace_virttop = PHY_TO_KSPACE(256ULL * 1024 * 1024 * 1024);
@@ -89,6 +82,10 @@ void memspace_init_systemspace(void) {
 
 bool memspace_add_entry_to_kernel_memory(memory_entry_t* entry) {
     return memspace_add_entry_to_memory(&s_kernelspace, entry);
+}
+
+void memspace_update_kernel_cache(memory_entry_cache_t* entry) {
+    memspace_update_cache(&s_kernelspace, entry);
 }
 
 _vmem_table* memspace_build_kernel_vmem(void) {
@@ -133,9 +130,6 @@ void memspace_update_kernel_vmem(void) {
     vmem_set_kernel_table(kernel_vmem_table);
     vmem_flush_tlb();
 
-    if (s_kernelspace_vmem != NULL) {
-        vmem_deallocate_table(s_kernelspace_vmem);
-    }
     s_kernelspace_vmem = kernel_vmem_table;
 }
 

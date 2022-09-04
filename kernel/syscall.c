@@ -147,6 +147,7 @@ static int64_t syscall_sbrk(uint64_t amount_unsigned,
         if (amount == 0) {
             return entry->end;
         } else {
+            memspace_remove_entry_from_memory(memspace, (memory_entry_t*)entry);
 
             uint64_t old_amount = entry->end - entry->start;
             uint64_t new_amount = old_amount + PAGE_CEIL(amount);
@@ -167,13 +168,13 @@ static int64_t syscall_sbrk(uint64_t amount_unsigned,
             entry->end = entry->start + new_amount;
             entry->phy_addr = (uintptr_t)new_phy;
             entry->kmem_addr = PHY_TO_KSPACE(new_phy);
+
+            memspace_add_entry_to_memory(memspace, (memory_entry_t*)entry);
         }
     }
 
     // Update the task's vm table
-    _vmem_table* new_table = memspace_build_vmem(memspace);
-    vmem_deallocate_table(this_task->low_vm_table);
-    this_task->low_vm_table = new_table;
+    this_task->low_vm_table = memspace_build_vmem(memspace);
     vmem_flush_tlb();
 
     // Return the new heap limit

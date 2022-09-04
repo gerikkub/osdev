@@ -19,6 +19,7 @@
 
 void memspace_init_kernelspace(void);
 bool memspace_add_entry_to_kernel_memory(memory_entry_t* entry);
+void memspace_update_kernel_cache(memory_entry_cache_t* entry);
 _vmem_table* memspace_build_kernel_vmem(void);
 
 void memspace_init_systemspace(void);

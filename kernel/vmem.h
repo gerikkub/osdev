@@ -112,8 +112,10 @@ typedef enum {
 
 
 _vmem_table* vmem_allocate_empty_table(void);
-void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
-void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr);
+void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr, bool assert_on_entry);
+void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr, bool assert_on_entry);
+void vmem_unmap_address(_vmem_table* table_ptr, addr_virt_t addr_virt);
+void vmem_unmap_address_range(_vmem_table* table_ptr, addr_virt_t addr_virt, uint64_t len);
 _vmem_table* vmem_create_kernel_map(void);
 void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr);
 void vmem_set_kernel_table(_vmem_table* kernel_table);

@@ -264,16 +264,18 @@ static int64_t virtio_pci_blk_read_op(void* ctx, uint8_t* buffer, const int64_t 
     uint64_t pos_page = PAGE_FLOOR(pos);
     uint64_t read_max = pos + read_size;
     bool updated_vm = false;
+    memory_entry_cache_t* mem_entry = NULL;
     while (pos_page < read_max) {
         uint64_t par_el1 = vmem_check_address((uintptr_t)blk_ctx->cache_virtaddr + pos_page);
         if ((par_el1 & 1) == 1) {
             // Translation failed. Read in page
-            memory_entry_cache_t* mem_entry = (memory_entry_cache_t*)memspace_get_entry_at_addr_kernel(blk_ctx->cache_virtaddr);
+            mem_entry = (memory_entry_cache_t*)memspace_get_entry_at_addr_kernel(blk_ctx->cache_virtaddr);
             ASSERT(mem_entry != NULL && mem_entry->type == MEMSPACE_CACHE);
+
             memcache_phy_entry_t* new_phy_entry = vmalloc(sizeof(memcache_phy_entry_t));
-            bool ok;
-            ok = virtio_blk_populate_virt_cache(blk_ctx, (uintptr_t)blk_ctx->cache_virtaddr + pos_page, new_phy_entry);
+            bool ok = virtio_blk_populate_virt_cache(blk_ctx, (uintptr_t)blk_ctx->cache_virtaddr + pos_page, new_phy_entry);
             ASSERT(ok);
+
             llist_append_ptr(mem_entry->phy_addr_list, new_phy_entry);
             updated_vm = true;
         }
@@ -282,6 +284,7 @@ static int64_t virtio_pci_blk_read_op(void* ctx, uint8_t* buffer, const int64_t 
     }
 
     if (updated_vm) {
+        memspace_update_kernel_cache(mem_entry);
         memspace_update_kernel_vmem();
     }
 

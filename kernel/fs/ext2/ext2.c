@@ -129,6 +129,10 @@ static int64_t ext2_read(void* ctx, uint8_t* buffer, const int64_t size_ro, cons
 
     const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
     uint32_t size = size_ro;
+    // Only read up to the end of the file
+    if (file_ctx->inode->size < (size + file_ctx->pos)) {
+        size = file_ctx->inode->size - file_ctx->pos;
+    }
     int32_t read_size = 0;
 
     // Copy first bit of data

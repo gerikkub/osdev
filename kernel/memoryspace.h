@@ -98,9 +98,11 @@ typedef struct {
 } memory_valloc_ctx_t;
 
 typedef struct {
-    memory_entry_t* entries;
-    uint64_t num;
-    uint64_t maxnum;
+    llist_head_t entries;
+    llist_head_t new_entries;
+    llist_head_t del_entries;
+    llist_head_t update_cache_entries;
+    _vmem_table* l0_table;
     memory_valloc_ctx_t valloc_ctx;
 } memory_space_t;
 
@@ -120,11 +122,12 @@ typedef struct {
 
 memory_entry_t* memspace_get_entry_at_addr(memory_space_t* space, void* addr_ptr);
 bool memspace_add_entry_to_memory(memory_space_t* space, memory_entry_t* entry);
+void memspace_remove_entry_from_memory(memory_space_t* space, memory_entry_t* entry);
 _vmem_table* memspace_build_vmem(memory_space_t* space);
-bool memspace_remove_entry_from_memory(memory_space_t* space, memory_entry_t* entry);
+void memspace_update_cache(memory_space_t* space, memory_entry_cache_t* entry);
 bool memspace_alloc_space(memory_space_t* space, uint64_t len, memory_entry_t* entry_out);
+void* memspace_alloc_entry(void);
+bool memspace_alloc(memory_space_t* space, memory_valloc_ctx_t* ctx);
 void memspace_deallocate(memory_space_t* space);
-
-
 
 #endif

@@ -52,6 +52,8 @@ void main() {
     pagefault_init();
     exception_init();
 
+    vmalloc_init(16 * 1024 * 1024);
+
     memspace_init_kernelspace();
     memspace_init_systemspace();
     memory_entry_device_t virtuart_device = {
@@ -85,8 +87,6 @@ void main() {
     _vmem_table* dummy_user_table = vmem_allocate_empty_table();
 
     vmem_set_tables(kernel_vmem_table, dummy_user_table);
-
-    vmalloc_init(16 * 1024 * 1024);
 
     console_log(LOG_DEBUG, "UART_VMEM is Mapped\n");
 

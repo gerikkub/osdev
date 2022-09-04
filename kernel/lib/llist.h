@@ -18,6 +18,7 @@ typedef llist_t* llist_head_t;
 llist_head_t llist_create();
 
 void llist_free(llist_head_t);
+void llist_free_all(llist_head_t);
 
 #define FOR_LLIST(head, x) \
 { \

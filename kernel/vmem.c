@@ -110,7 +110,7 @@ _vmem_table* vmem_allocate_empty_table(void) {
     return table_ptr;
 }
 
-void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr) {
+void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr, bool assert_on_existing) {
 
     ASSERT(table_ptr != NULL);
 
@@ -202,7 +202,13 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
     ASSERT(level_3_idx < 512);
     _vmem_entry_t level_3_entry = level_3_table_ptr[level_3_idx];
 
-    ASSERT(VMEM_ENTRY_IS_INVALID(level_3_entry));
+    if (assert_on_existing) {
+        ASSERT(VMEM_ENTRY_IS_INVALID(level_3_entry));
+    } else {
+        if (!(VMEM_ENTRY_IS_INVALID(level_3_entry))) {
+            return;
+        }
+    }
 
     uint64_t attr_hi = VMEM_AP_ALLOW_UX(ap_flags) ? 0 : VMEM_STG1_BLK_UXN |
                        VMEM_AP_ALLOW_PX(ap_flags) ? 0 : VMEM_STG1_BLK_PXN;
@@ -221,7 +227,8 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
 }
 
 void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t addr_virt,
-                            uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr) {
+                            uint64_t len, _vmem_ap_flags ap_flags, vmem_attr_t mem_attr,
+                            bool assert_on_entry) {
 
     // Lengths must be multiples of 4K
     ASSERT((len & (VMEM_PAGE_SIZE - 1)) == 0);
@@ -236,7 +243,7 @@ void vmem_map_address_range(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_vi
         vmem_map_address(table_ptr,
                          addr_phy + (idx * VMEM_PAGE_SIZE),
                          addr_virt + (idx * VMEM_PAGE_SIZE),
-                         ap_flags, mem_attr);
+                         ap_flags, mem_attr, assert_on_entry);
     }
 
 }
@@ -252,13 +259,112 @@ void vmem_map_range_flat(_vmem_table* table_ptr, addr_phy_t addr_lo, addr_phy_t 
     addr_phy_t addr_map = addr_lo;
 
     if (addr_lo == addr_hi) {
-        vmem_map_address(table_ptr, addr_lo, addr_lo, ap_flags, VMEM_ATTR_MEM);
+        vmem_map_address(table_ptr, addr_lo, addr_lo, ap_flags, VMEM_ATTR_MEM, true);
     } else {
 
         // For each page, map the physical address to an indentical virtual address
         for (addr_map = addr_lo; addr_map < addr_hi; addr_map += 0x1000) {
-            vmem_map_address(table_ptr, addr_map, addr_map, ap_flags, VMEM_ATTR_MEM);
+            vmem_map_address(table_ptr, addr_map, addr_map, ap_flags, VMEM_ATTR_MEM, true);
         }
+    }
+}
+
+void vmem_unmap_address(_vmem_table* table_ptr, addr_virt_t addr_virt) {
+
+    ASSERT(table_ptr != NULL);
+
+    uintptr_t level_0_idx = (addr_virt >> 39) & 0x1FF;
+    uintptr_t level_1_idx = (addr_virt >> 30) & 0x1FF;
+    uintptr_t level_2_idx = (addr_virt >> 21) & 0x1FF;
+    uintptr_t level_3_idx = (addr_virt >> 12) & 0x1FF;
+
+    // Level 0 Table Walk
+    ASSERT(level_0_idx < 512);
+    _vmem_entry_t level_0_entry = table_ptr[level_0_idx];
+
+    if (VMEM_ENTRY_IS_INVALID(level_0_entry)) {
+        return;
+    }
+
+    ASSERT(VMEM_ENTRY_IS_TABLE(level_0_entry));
+
+    _vmem_table* level_1_table_ptr = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(level_0_entry));
+    _vmem_entry_t level_1_entry = level_1_table_ptr[level_1_idx];
+
+    if (VMEM_ENTRY_IS_INVALID(level_1_entry)) {
+        return;
+    }
+
+    ASSERT(VMEM_ENTRY_IS_TABLE(level_1_entry));
+
+    _vmem_table* level_2_table_ptr = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(level_1_entry));
+    _vmem_entry_t level_2_entry = level_2_table_ptr[level_2_idx];
+
+    if (VMEM_ENTRY_IS_INVALID(level_2_entry)) {
+        return;
+    }
+
+    ASSERT(VMEM_ENTRY_IS_TABLE(level_2_entry));
+
+    _vmem_table* level_3_table_ptr = (_vmem_table*)PHY_TO_KSPACE(vmem_get_table_addr(level_2_entry));
+    _vmem_entry_t level_3_entry = level_3_table_ptr[level_3_idx];
+
+    if (VMEM_ENTRY_IS_INVALID(level_3_entry)) {
+        return;
+    } else {
+        // Clear the level 3 entry
+        level_3_table_ptr[level_3_idx] = 0;
+
+        // Walk back through the page tables and remove any that are empty
+        // Return on the first non-empty table or page
+        uint64_t idx;
+        for (idx = 0; idx < VMEM_4K_TABLE_ENTRIES; idx++) {
+            if (!VMEM_ENTRY_IS_INVALID(level_3_table_ptr[idx])) {
+                return;
+            }
+        }
+
+        // Level 3 table is empty. Remove it
+        level_2_table_ptr[level_2_idx] = 0;
+        kfree_phy(KSPACE_TO_PHY_PTR(level_3_table_ptr));
+
+        for (idx = 0; idx < VMEM_4K_TABLE_ENTRIES; idx++) {
+            if (!VMEM_ENTRY_IS_INVALID(level_2_table_ptr[idx])) {
+                return;
+            }
+        }
+
+        // Level 2 table is empty. Remove it
+        level_1_table_ptr[level_1_idx] = 0;
+        kfree_phy(KSPACE_TO_PHY_PTR(level_2_table_ptr));
+
+        for (idx = 0; idx < VMEM_4K_TABLE_ENTRIES; idx++) {
+            if (!VMEM_ENTRY_IS_INVALID(level_1_table_ptr[idx])) {
+                return;
+            }
+        }
+
+        // Level 1 table is empty. Remove it
+        table_ptr[level_0_idx] = 0;
+        kfree_phy(KSPACE_TO_PHY_PTR(level_1_table_ptr));
+
+        // Never remove the root table
+    }
+}
+
+void vmem_unmap_address_range(_vmem_table* table_ptr, addr_virt_t addr_virt, uint64_t len) {
+
+    // Lengths must be multiples of 4K
+    ASSERT((len & (VMEM_PAGE_SIZE - 1)) == 0);
+
+    uint64_t pages = PAGE_CEIL(len) / VMEM_PAGE_SIZE;
+
+    ASSERT(pages > 0);
+    ASSERT(pages < 0x80000000);
+
+    int idx;
+    for (idx = 0; idx < pages; idx++) {
+        vmem_unmap_address(table_ptr, addr_virt + (idx * VMEM_PAGE_SIZE));
     }
 }
 

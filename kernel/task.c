@@ -221,12 +221,7 @@ uint64_t create_task(uint64_t* user_stack_base,
         task->memory = *memspace;
         task->low_vm_table = memspace_build_vmem(memspace);
     } else {
-        memory_space_t null_memspace = {
-            .entries = NULL,
-            .num = 0,
-            .maxnum = 0
-        };
-        task->memory = null_memspace;
+        memspace_alloc(&task->memory, NULL);
         task->low_vm_table = s_dummy_user_table;
     }
 

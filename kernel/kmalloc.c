@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
 
 #include "kernel/assert.h"
@@ -120,6 +121,8 @@ void* kmalloc_phy(uint64_t bytes) {
     MEM_DMB();
 
     kmalloc_check_structure();
+
+    memset(PHY_TO_KSPACE_PTR(s_memblocks[idx].ptr), 0, pagebytes);
 
     return (void*)s_memblocks[idx].ptr;
 }

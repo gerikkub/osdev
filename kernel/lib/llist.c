@@ -24,6 +24,21 @@ void llist_free(llist_head_t head) {
     vfree(head);
 }
 
+void llist_free_all(llist_head_t head) {
+
+    llist_t* item = head;
+    while (item != NULL) {
+        llist_t* n = item->n;
+        vfree(item);
+        item = n;
+    }
+
+    head->n = NULL;
+    head->p = NULL;
+    head->dataptr = NULL;
+}
+
+
 llist_t* llist_find_helper(llist_head_t head, void* x, uint64_t len) {
 
     llist_t* item = head;
