@@ -151,6 +151,15 @@ void kernel_init_lower_thread(void* ctx) {
                                        "home");
     ASSERT(open_res >= 0);
 
+    uint64_t cat_tid;
+    char* cat_argv[] = {
+        "home",
+        "hello.txt",
+        NULL
+    };
+    cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
+    (void)cat_tid;
+
     uint64_t gsh_tid;
     char* gsh_argv[] = {
         NULL
@@ -166,14 +175,14 @@ void kernel_init_lower_thread(void* ctx) {
     echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
     (void)echo_tid;
 
-    uint64_t cat_tid;
-    char* cat_argv[] = {
+    uint64_t cat2_tid;
+    char* cat2_argv[] = {
         "sysfs",
         "tasks",
         NULL
     };
-    cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
-    (void)cat_tid;
+    cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+    (void)cat2_tid;
 
     console_printf("Starting Timer\n");
 

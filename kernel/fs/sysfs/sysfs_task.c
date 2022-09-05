@@ -47,6 +47,7 @@ void* sysfs_task_open(void) {
             data_entry->data = data_str;
             data_entry->len = written;
             data_entry->dirty = 0;
+            data_entry->available = 1;
 
             llist_append_ptr(free_ctx->data_list, data_entry);
 
@@ -62,7 +63,9 @@ void* sysfs_task_open(void) {
         .seek_idx = 0,
         .can_write = false,
         .close_op = sysfs_task_close,
-        .free_ctx = free_ctx,
+        .populate_op = NULL,
+        .flush_data_op = NULL,
+        .op_ctx = free_ctx,
     };
 
     void* file_ctx = file_create_ctx(&file_ctx_in);

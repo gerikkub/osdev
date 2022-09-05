@@ -9,6 +9,7 @@
 #include "kernel/lock/lock.h"
 #include "kernel/lock/lock.h"
 #include "kernel/lock/mutex.h"
+#include "kernel/fs/file.h"
 
 #include "include/k_ioctl_common.h"
 
@@ -24,6 +25,7 @@ typedef struct {
     uint64_t pos;
     lock_t inode_lock;
     ext2_fs_ctx_t* fs_ctx;
+    file_ctx_t* file_ctx;
 } ext2_fid_ctx_t;
 
 static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_out) {
@@ -92,6 +94,106 @@ ext2_mount_failure:
     return -1;
 }
 
+static void ext2_populate_data(void* ctx, file_data_entry_t* entry) {
+
+    ext2_fid_ctx_t* file_ctx = ctx;
+
+    const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
+    const uint64_t alloc_size = ((entry->len + block_size - 1) / block_size) * block_size;
+    entry->data = vmalloc(alloc_size);
+
+    lock_acquire(&file_ctx->inode_lock, true);
+    lock_acquire(&file_ctx->fs_ctx->fs_lock, true);
+
+    uint32_t block_num = entry->offset / block_size;
+
+    ext2_read_inode_data(file_ctx->fs_ctx, file_ctx->inode,
+                         block_num, 1, entry->data);
+
+    lock_release(&file_ctx->fs_ctx->fs_lock);
+    lock_release(&file_ctx->inode_lock);
+
+    entry->available = 1;
+}
+
+static void ext2_flush_data(void* ctx, file_data_entry_t* entry) {
+    ASSERT(0);
+}
+
+static int64_t ext2_close(void* ctx) {
+
+    ext2_fid_ctx_t* file_ctx = ctx;
+
+    file_data_entry_t* data_entry;
+
+    FOR_LLIST(file_ctx->file_ctx->file_data, data_entry)
+        vfree(data_entry->data);
+    END_FOR_LLIST()
+
+    vfree(file_ctx->inode);
+    return 0;
+}
+
+static llist_head_t ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
+
+    llist_head_t file_data = llist_create();
+
+    // Only support direct and 1 indirect blocks right now...
+
+    int idx;
+    int size_remaining = file_ctx->inode->size;
+    uint64_t offset = 0;
+    const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
+    for (idx = 0; idx < 12; idx++) {
+        // Break if no file data is present
+        if (file_ctx->inode->block_direct[idx] == 0) {
+            break;
+        }
+
+        file_data_entry_t* fd_entry = vmalloc(sizeof(file_data_entry_t));
+        fd_entry->data = NULL;
+        fd_entry->len = size_remaining < block_size ? size_remaining : block_size;
+        fd_entry->offset = offset;
+        fd_entry->dirty = 0;
+        fd_entry->available = 0;
+
+        llist_append_ptr(file_data, fd_entry);
+
+        size_remaining -= block_size;
+        offset += block_size;
+    }
+
+    if (file_ctx->inode->block_1indirect != 0) {
+        uint32_t* indirect_block = vmalloc(block_size);
+
+        ext2_read_block(file_ctx->fs_ctx,
+                        file_ctx->inode->block_1indirect,
+                        (void*)indirect_block);
+
+        for (idx = 0; idx < (block_size/sizeof(uint32_t)); idx++) {
+            if (indirect_block[idx] == 0) {
+                break;
+            }
+
+            file_data_entry_t* fd_entry = vmalloc(sizeof(file_data_entry_t));
+            fd_entry->data = NULL;
+            fd_entry->len = size_remaining < block_size ? size_remaining : block_size;
+            fd_entry->offset = offset;
+            fd_entry->dirty = 0;
+            fd_entry->available = 0;
+
+            llist_append_ptr(file_data, fd_entry);
+
+            size_remaining -= block_size;
+            offset += block_size;
+        }
+
+        vfree(indirect_block);
+    }
+
+    return file_data;
+}
+
 static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void** ctx_out) {
 
     ext2_fs_ctx_t* fs_ctx = ctx;
@@ -104,145 +206,42 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
         return -1;
     }
 
-    ext2_fid_ctx_t* file_ctx = vmalloc(sizeof(ext2_fid_ctx_t));
+    ext2_fid_ctx_t* ext2_file_ctx = vmalloc(sizeof(ext2_fid_ctx_t));
     ext2_inode_t* inode = vmalloc(sizeof(ext2_inode_t));
 
-    file_ctx->inode_num = inode_num;
-    file_ctx->inode = inode;
-    file_ctx->fs_ctx = fs_ctx;
-    file_ctx->pos = 0;
-    mutex_init(&file_ctx->inode_lock, 32);
+    ext2_file_ctx->inode_num = inode_num;
+    ext2_file_ctx->inode = inode;
+    ext2_file_ctx->fs_ctx = fs_ctx;
+    ext2_file_ctx->pos = 0;
+    mutex_init(&ext2_file_ctx->inode_lock, 32);
     ext2_get_inode(fs_ctx, inode_num, inode);
+
+    file_ctx_t* file_ctx = vmalloc(sizeof(file_ctx_t));
+
+    file_ctx->file_data = ext2_create_file_data(ext2_file_ctx);
+    file_ctx->size = ext2_file_ctx->inode->size;
+    file_ctx->seek_idx = 0;
+    file_ctx->can_write = 0;
+    file_ctx->close_op = ext2_close;
+    file_ctx->populate_op = ext2_populate_data;
+    file_ctx->flush_data_op = ext2_flush_data;
+    file_ctx->op_ctx = ext2_file_ctx;
 
     *ctx_out = file_ctx;
 
     lock_release(&fs_ctx->fs_lock);
+
     return 0;
-}
-
-static int64_t ext2_read(void* ctx, uint8_t* buffer, const int64_t size_ro, const uint64_t flags) {
-
-    ext2_fid_ctx_t* file_ctx = ctx;
-
-    lock_acquire(&file_ctx->inode_lock, true);
-    lock_acquire(&file_ctx->fs_ctx->fs_lock, true);
-
-    const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
-    uint32_t size = size_ro;
-    // Only read up to the end of the file
-    if (file_ctx->inode->size < (size + file_ctx->pos)) {
-        size = file_ctx->inode->size - file_ctx->pos;
-    }
-    int32_t read_size = 0;
-
-    // Copy first bit of data
-    if (file_ctx->pos % block_size != 0) {
-        uint8_t* block_buffer = vmalloc(block_size);
-        uint32_t block_num = file_ctx->pos / block_size;
-        uint32_t overlap = block_size - (file_ctx->pos % block_size);
-
-        ext2_read_inode_block(file_ctx->fs_ctx, file_ctx->inode, block_num, block_buffer);
-
-        if (size <= overlap) {
-            memcpy(buffer, &block_buffer[file_ctx->pos % block_size], size);
-            file_ctx->pos += size;
-            vfree(block_buffer);
-            return size;
-        } else {
-            memcpy(buffer, &block_buffer[file_ctx->pos % block_size], overlap);
-            file_ctx->pos += overlap;
-            read_size += overlap;
-            size -= overlap;
-            buffer += overlap;
-            vfree(block_buffer);
-        }
-    }
-
-    // Read block aligned sections
-    if (size >= block_size) {
-        uint32_t block_num = file_ctx->pos / block_size;
-        uint32_t num_blocks = size / block_size;
-        uint32_t full_block_size = num_blocks * block_size;
-
-        ext2_read_inode_data(file_ctx->fs_ctx, file_ctx->inode,
-                             block_num, num_blocks, buffer);
-        read_size += full_block_size;
-        file_ctx->pos += full_block_size;
-        size -= full_block_size;
-        buffer += full_block_size;
-    }
-
-    // Read remaining data
-    if (size > 0) {
-        uint8_t* block_buffer = vmalloc(block_size);
-        uint32_t block_num = file_ctx->pos / block_size;
-
-        ext2_read_inode_block(file_ctx->fs_ctx, file_ctx->inode, block_num, block_buffer);
-
-        memcpy(buffer, block_buffer, size);
-        read_size += size;
-        file_ctx->pos += size;
-    }
-
-    lock_release(&file_ctx->fs_ctx->fs_lock);
-    lock_release(&file_ctx->inode_lock);
-
-    return read_size;
-}
-
-static int64_t ext2_write(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
-    return -1;
-}
-
-static int64_t ext2_seek(void* ctx, const int64_t pos, const uint64_t flags) {
-    ext2_fid_ctx_t* file_ctx = ctx;
-
-    file_ctx->pos = pos;
-    return pos;
-}
-
-static int64_t ext2_ioctl(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
-
-    ext2_fid_ctx_t* file_ctx = ctx;
-
-    int64_t ret;
-
-    lock_acquire(&file_ctx->inode_lock, true);
-    lock_acquire(&file_ctx->fs_ctx->fs_lock, true);
-
-    switch (ioctl) {
-        case IOCTL_SEEK:
-            if (arg_count != 2) {
-                return -1;
-            }
-            ret = ext2_seek(ctx, args[0], args[1]);
-            break;
-        case BLK_IOCTL_SIZE:
-            ret = file_ctx->inode->size;
-            break;
-        default:
-            ret = -1;
-            break;
-    }
-
-    lock_release(&file_ctx->fs_ctx->fs_lock);
-    lock_release(&file_ctx->inode_lock);
-
-    return ret;
-}
-
-static int64_t ext2_close(void* ctx) {
-    return -1;
 }
 
 static fs_ops_t ext2_opts = {
     .mount = ext2_mount,
     .open = ext2_open,
     .ops = {
-        .read = ext2_read,
-        .write = ext2_write,
-        .ioctl = ext2_ioctl,
-        .close = ext2_close
+        .read = file_read_op,
+        .write = file_write_op,
+        .ioctl = file_ioctl_op,
+        .close = file_close_op
     }
 };
 

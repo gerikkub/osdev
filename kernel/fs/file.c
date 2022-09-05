@@ -38,6 +38,12 @@ int64_t file_read_op(void* ctx, uint8_t* buffer, const int64_t size, const uint6
         uint64_t end_idx = data_idx + entry->len;
         if (file_ctx->seek_idx >= data_idx &&
             file_ctx->seek_idx < end_idx) {
+            
+            if (!entry->available) {
+                ASSERT(file_ctx->populate_op != NULL);
+                file_ctx->populate_op(file_ctx->op_ctx, entry);
+                ASSERT(entry->available);
+            }
 
             uint64_t remaining_block = end_idx - file_ctx->seek_idx;
             uint64_t entry_idx = file_ctx->seek_idx - data_idx;
@@ -75,6 +81,12 @@ int64_t file_write_op(void* ctx, const uint8_t* buffer, const int64_t size, cons
             if (file_ctx->seek_idx >= data_idx &&
                 file_ctx->seek_idx < end_idx) {
 
+                if (!entry->available) {
+                    ASSERT(file_ctx->populate_op != NULL);
+                    file_ctx->populate_op(file_ctx->op_ctx, entry);
+                    ASSERT(entry->available);
+                }
+
                 uint64_t remaining_block = end_idx - file_ctx->seek_idx;
                 uint64_t entry_idx = file_ctx->seek_idx - data_idx;
                 uint64_t copy_len = remaining < remaining_block ? remaining : remaining_block;
@@ -82,7 +94,7 @@ int64_t file_write_op(void* ctx, const uint8_t* buffer, const int64_t size, cons
                 memcpy(&entry->data[entry_idx], &buffer[count], copy_len);
                 remaining -= copy_len;
                 count += copy_len;
-                entry->dirty = true;
+                entry->dirty = 1;
                 file_ctx->seek_idx += copy_len;
             }
 
@@ -114,6 +126,9 @@ int64_t file_ioctl_op(void* ctx, const uint64_t ioctl, const uint64_t* args, con
                 return 0;
             }
             break;
+        case BLK_IOCTL_SIZE:
+            return file_ctx->size;
+            break;
         default:
             return -1;
     }
@@ -124,7 +139,19 @@ int64_t file_ioctl_op(void* ctx, const uint64_t ioctl, const uint64_t* args, con
 int64_t file_close_op(void* ctx) {
 
     file_ctx_t* file_ctx = ctx;
-    file_ctx->close_op(file_ctx->free_ctx);
+    file_data_entry_t* entry;
+    if (file_ctx->can_write) {
+        ASSERT(file_ctx->flush_data_op != NULL);
+        FOR_LLIST(file_ctx->file_data, entry)
+            if (entry->dirty) {
+                file_ctx->flush_data_op(file_ctx->op_ctx, entry);
+            }
+        END_FOR_LLIST()
+    }
+
+    file_ctx->close_op(file_ctx->op_ctx);
+
+    llist_free_all(file_ctx->file_data);
     vfree(file_ctx);
 
     return 0;

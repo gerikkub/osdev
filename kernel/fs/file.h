@@ -7,20 +7,26 @@
 #include <kernel/fd.h>
 #include <kernel/lib/llist.h>
 
-
 typedef struct {
     uint8_t* data;
     uint64_t len;
-    bool dirty;
+    uint64_t offset;
+    uint64_t dirty:1;
+    uint64_t available:1;
 } file_data_entry_t;
+
+typedef void (*populate_data_fn)(void* ctx, file_data_entry_t* entry);
+typedef void (*flush_data_fn)(void* ctx, file_data_entry_t* entry);
 
 typedef struct {
     llist_head_t file_data;
     int64_t size;
     int64_t seek_idx;
-    bool can_write;
+    int64_t can_write:1;
     fd_close_op close_op;
-    void* free_ctx;
+    populate_data_fn populate_op;
+    flush_data_fn flush_data_op;
+    void* op_ctx;
 } file_ctx_t;
 
 void* file_create_ctx(file_ctx_t* file_ctx);
