@@ -35,11 +35,13 @@ void sysfs_create_file(char* name, sysfs_open_op open_op, fd_ops_t* ops) {
 
 int64_t sysfs_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
 
+    sysfs_file_t* file_item = NULL;
     sysfs_file_t* file = NULL;
     bool found = false;
-    FOR_LLIST(g_sysfs_files, file)
-        if (strncmp(path, file->filename, SYSFS_FILENAME_MAX) == 0) {
+    FOR_LLIST(g_sysfs_files, file_item)
+        if (file == NULL && strncmp(path, file_item->filename, SYSFS_FILENAME_MAX) == 0) {
             found = true;
+            file = file_item;
             break;
         }
     END_FOR_LLIST()
@@ -126,4 +128,5 @@ void sysfs_register() {
     g_sysfs_files = llist_create();
 
     sysfs_task_init();
+    sysfs_time_init();
 }

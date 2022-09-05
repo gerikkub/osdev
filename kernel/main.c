@@ -41,6 +41,8 @@ void kernel_init_lower_thread(void* ctx);
 
 void main() {
 
+    gtimer_early_init();
+
     kmalloc_init();
 
     pl011_init(VIRT_UART);

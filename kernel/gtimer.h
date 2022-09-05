@@ -12,6 +12,7 @@
 #define SYS_CNTP_CTL_IMASK   BIT(1)
 #define SYS_CNTP_CTL_ENABLE BIT(0)
 
+void gtimer_early_init(void);
 void gtimer_init(void);
 
 uint64_t gtimer_get_frequency();

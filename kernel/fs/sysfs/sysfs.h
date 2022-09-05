@@ -16,6 +16,7 @@ typedef void* (*sysfs_open_op)(void);
 void sysfs_create_file(char* name, sysfs_open_op open_op, fd_ops_t* ops);
 
 void sysfs_task_init(void);
+void sysfs_time_init(void);
 
 void sysfs_register(void);
 

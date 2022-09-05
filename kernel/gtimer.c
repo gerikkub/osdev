@@ -15,16 +15,15 @@ void gtimer_irq_handler(uint32_t intid, void* ctx) {
     WRITE_SYS_REG(CNTP_CTL_EL0, cntp_ctl);
 }
 
-
-void gtimer_init(void) {
-
-    // Setup frequency
+void gtimer_early_init(void) {
 
     // Enable the timer
-    uint32_t cntp_ctl = 0; // Disable the timer
+    uint32_t cntp_ctl = SYS_CNTP_CTL_ENABLE; // Disable the timer
 
     WRITE_SYS_REG(CNTP_CTL_EL0, cntp_ctl);
+}
 
+void gtimer_init(void) {
     interrupt_register_irq_handler(GTIMER_EL0_IRQn, gtimer_irq_handler, NULL);
 }
 
@@ -38,9 +37,7 @@ void gtimer_start_downtimer(int32_t downcount, bool enable_interrupt) {
 
     ASSERT(downcount > 0);
 
-    // Disable timer output
     uint32_t cntp_ctl = 0;
-    WRITE_SYS_REG(CNTP_CTL_EL0, cntp_ctl);
 
     if (enable_interrupt) {
         cntp_ctl = SYS_CNTP_CTL_ENABLE;

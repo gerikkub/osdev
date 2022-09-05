@@ -104,7 +104,8 @@ kernel/fs/file.c \
 kernel/fs/ext2/ext2.c \
 kernel/fs/ext2/ext2_helpers.c \
 kernel/fs/sysfs/sysfs.c \
-kernel/fs/sysfs/sysfs_task.c
+kernel/fs/sysfs/sysfs_task.c \
+kernel/fs/sysfs/sysfs_time.c
 
 C_SRC_LIBS = \
 stdlib/string.c \
