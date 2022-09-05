@@ -20,6 +20,8 @@ _start:
     // Main should not return
     bl main
 
+    bl system_deinit
+
     // If main returns the kernel has setup a trap for us
     // Call syscall exit with the main return value
     svc #11

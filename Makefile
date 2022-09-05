@@ -105,7 +105,8 @@ kernel/fs/ext2/ext2.c \
 kernel/fs/ext2/ext2_helpers.c \
 kernel/fs/sysfs/sysfs.c \
 kernel/fs/sysfs/sysfs_task.c \
-kernel/fs/sysfs/sysfs_time.c
+kernel/fs/sysfs/sysfs_time.c \
+kernel/fs/sysfs/sysfs_vmalloc.c
 
 C_SRC_LIBS = \
 stdlib/string.c \
@@ -130,7 +131,8 @@ kernel/exception_asm.s
 SYS_MODS = \
 $(SYSTEMS_DIR)/cat \
 $(SYSTEMS_DIR)/echo \
-$(SYSTEMS_DIR)/gsh
+$(SYSTEMS_DIR)/gsh \
+$(SYSTEMS_DIR)/time \
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 

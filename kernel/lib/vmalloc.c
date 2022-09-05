@@ -46,3 +46,7 @@ void* vmalloc(uint64_t size) {
 void vfree(void* mem) {
     // free_p(mem, &s_vmalloc_state);
 }
+
+void vmalloc_calc_stat(malloc_stat_t* stat_out) {
+    malloc_calc_stat(&s_vmalloc_state, stat_out);
+}

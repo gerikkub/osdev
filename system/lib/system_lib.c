@@ -13,6 +13,10 @@ void system_init(void) {
     console_open();
 }
 
+void system_deinit(void) {
+    console_flush();
+}
+
 void* system_map_device(uintptr_t device, uint64_t len) {
     intptr_t dev_ptr;
     syscall_mapdev_ctx_t return_ctx = {0};

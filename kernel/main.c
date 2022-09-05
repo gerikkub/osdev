@@ -153,6 +153,7 @@ void kernel_init_lower_thread(void* ctx) {
                                        "home");
     ASSERT(open_res >= 0);
 
+    /*
     uint64_t cat_tid;
     char* cat_argv[] = {
         "home",
@@ -177,14 +178,7 @@ void kernel_init_lower_thread(void* ctx) {
     echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
     (void)echo_tid;
 
-    uint64_t cat2_tid;
-    char* cat2_argv[] = {
-        "sysfs",
-        "tasks",
-        NULL
-    };
-    cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
-    (void)cat2_tid;
+    */
 
     console_printf("Starting Timer\n");
 
@@ -196,6 +190,22 @@ void kernel_init_lower_thread(void* ctx) {
         // while (!gtimer_downtimer_triggered()) {}
         //console_printf("Tick %d\n", ticknum);
         ticknum++;
+
+
+        uint64_t time_tid;
+        //time_tid = exec_user_task("home", "bin/time.elf", "time", NULL);
+        (void)time_tid;
+
+        uint64_t cat2_tid;
+        char* cat2_argv[] = {
+            "sysfs",
+            "vmalloc_stat",
+            NULL
+        };
+        cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+        (void)cat2_tid;
+
+        console_printf("\n");
     }
 
     while (1) {

@@ -27,8 +27,16 @@ typedef struct _malloc_state_t{
     void* add_mem_ctx;
 } malloc_state_t;
 
+typedef struct {
+    uint64_t total_mem;
+    uint64_t avail_mem;
+    uint64_t largest_chunk;
+} malloc_stat_t;
+
 void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void* ctx);
 void* malloc_p(uint64_t size, malloc_state_t* state);
 void free_p(void* mem, malloc_state_t* state);
+
+void malloc_calc_stat(malloc_state_t* state, malloc_stat_t* stat_out);
 
 #endif

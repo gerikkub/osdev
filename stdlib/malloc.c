@@ -173,6 +173,32 @@ void free_p(void* mem, malloc_state_t* state) {
     malloc_check_structure_p(state);
 }
 
+void malloc_calc_stat(malloc_state_t* state, malloc_stat_t* stat_out) {
+
+    uint64_t total_mem = state->limit - state->base;
+
+    uint64_t avail_mem = 0;
+    uint64_t largest_chunk = 0;
+
+    malloc_entry_t* entry = state->first_entry;
+    while (entry != NULL) {
+
+        if (!entry->inuse) {
+            avail_mem += entry->size;
+
+            if (entry->size > largest_chunk) {
+                largest_chunk = entry->size;
+            }
+        }
+
+        entry = entry->next;
+    }
+
+
+    stat_out->total_mem = total_mem;
+    stat_out->avail_mem = avail_mem;
+    stat_out->largest_chunk = largest_chunk;
+}
 
 // void malloc_init(void) {
 //     malloc_init_p(&s_malloc_state, malloc_add_mem_p, NULL, 0);

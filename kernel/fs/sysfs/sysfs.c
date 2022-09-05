@@ -33,6 +33,38 @@ void sysfs_create_file(char* name, sysfs_open_op open_op, fd_ops_t* ops) {
     llist_append_ptr(g_sysfs_files, f_new);
 }
 
+int64_t sysfs_ro_file_close(void* ctx) {
+
+    vfree(ctx);
+    return 0;
+}
+
+void sysfs_ro_file_helper(char* data_str, uint64_t data_str_len, file_ctx_t* file_ctx_out) {
+
+    llist_head_t data_list = llist_create();
+    
+    file_data_entry_t* data_entry = vmalloc(sizeof(file_data_entry_t));
+    data_entry->data = (void*)data_str;
+    data_entry->len = data_str_len;
+    data_entry->dirty = 0;
+    data_entry->available = 1;
+
+    llist_append_ptr(data_list, data_entry);
+
+    file_ctx_t file_ctx = {
+        .file_data = data_list,
+        .size = data_str_len,
+        .seek_idx = 0,
+        .can_write = false,
+        .close_op = sysfs_ro_file_close,
+        .populate_op = NULL,
+        .flush_data_op = NULL,
+        .op_ctx = data_str
+    };
+
+    *file_ctx_out = file_ctx;
+}
+
 int64_t sysfs_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
 
     sysfs_file_t* file_item = NULL;
@@ -129,4 +161,5 @@ void sysfs_register() {
 
     sysfs_task_init();
     sysfs_time_init();
+    sysfs_vmalloc_init();
 }
