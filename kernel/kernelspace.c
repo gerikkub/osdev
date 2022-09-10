@@ -123,6 +123,10 @@ void memspace_map_device_kernel(void* phy_addr, void* virt_addr, uint64_t len, u
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&entry);
 }
 
+void memspace_unmap_kernel(memory_entry_t* entry) {
+    memspace_remove_entry_from_memory(&s_kernelspace, entry);
+}
+
 void memspace_update_kernel_vmem(void) {
 
     _vmem_table* kernel_vmem_table = memspace_build_kernel_vmem();

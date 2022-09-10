@@ -244,6 +244,10 @@ _vmem_table* memspace_build_vmem(memory_space_t* space) {
     llist_free_all(space->del_entries);
     llist_free_all(space->update_cache_entries);
 
+    space->new_entries = llist_create();
+    space->del_entries = llist_create();
+    space->update_cache_entries = llist_create();
+
     return space->l0_table;
 }
 
@@ -298,7 +302,23 @@ bool memspace_alloc(memory_space_t* space, memory_valloc_ctx_t* ctx) {
 
 void memspace_deallocate(memory_space_t* space) {
 
-    //TODO: Implement this
-    // We can always download more RAM...
+    memory_entry_t* entry;
+    FOR_LLIST(space->entries, entry)
+        vfree(entry);
+    END_FOR_LLIST()
+    FOR_LLIST(space->new_entries, entry)
+        vfree(entry);
+    END_FOR_LLIST()
+    FOR_LLIST(space->del_entries, entry)
+        vfree(entry);
+    END_FOR_LLIST()
+    FOR_LLIST(space->update_cache_entries, entry)
+        vfree(entry);
+    END_FOR_LLIST()
+    llist_free_all(space->entries);
+    llist_free_all(space->new_entries);
+    llist_free_all(space->del_entries);
+    llist_free_all(space->update_cache_entries);
 
+    vmem_deallocate_table(space->l0_table);
 }

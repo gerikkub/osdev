@@ -127,17 +127,21 @@ static int64_t ext2_close(void* ctx) {
     file_data_entry_t* data_entry;
 
     FOR_LLIST(file_ctx->file_ctx->file_data, data_entry)
-        vfree(data_entry->data);
+        if (data_entry->data != NULL) {
+            vfree(data_entry->data);
+        }
     END_FOR_LLIST()
 
+    mutex_destroy(&file_ctx->inode_lock);
     vfree(file_ctx->inode);
+    vfree(file_ctx);
     return 0;
 }
 
 static llist_head_t ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
 
     llist_head_t file_data = llist_create();
-
+    
     // Only support direct and 1 indirect blocks right now...
 
     int idx;
@@ -207,16 +211,16 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
     }
 
     ext2_fid_ctx_t* ext2_file_ctx = vmalloc(sizeof(ext2_fid_ctx_t));
+    file_ctx_t* file_ctx = vmalloc(sizeof(file_ctx_t));
     ext2_inode_t* inode = vmalloc(sizeof(ext2_inode_t));
 
     ext2_file_ctx->inode_num = inode_num;
     ext2_file_ctx->inode = inode;
     ext2_file_ctx->fs_ctx = fs_ctx;
+    ext2_file_ctx->file_ctx = file_ctx;
     ext2_file_ctx->pos = 0;
     mutex_init(&ext2_file_ctx->inode_lock, 32);
     ext2_get_inode(fs_ctx, inode_num, inode);
-
-    file_ctx_t* file_ctx = vmalloc(sizeof(file_ctx_t));
 
     file_ctx->file_data = ext2_create_file_data(ext2_file_ctx);
     file_ctx->size = ext2_file_ctx->inode->size;
@@ -226,6 +230,7 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
     file_ctx->populate_op = ext2_populate_data;
     file_ctx->flush_data_op = ext2_flush_data;
     file_ctx->op_ctx = ext2_file_ctx;
+
 
     *ctx_out = file_ctx;
 

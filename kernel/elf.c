@@ -207,6 +207,11 @@ uint64_t create_elf_task(uint8_t* elf_data,
         }
     }
 
+/*
+    memspace_deallocate(&elf_space);
+    return 0; // Leak 0 bytes
+    */
+
     // Allocate a stack for the task
     uint8_t* stack_phy_space = kmalloc_phy(USER_STACK_SIZE);
     if (stack_phy_space == NULL) {
@@ -273,7 +278,7 @@ uint64_t create_elf_task(uint8_t* elf_data,
     }
     ((char**)argv_base_kptr)[argc] = 0;
 
-    uint64_t tid;
+    uint64_t tid = 0;
     if (system_task) {
         tid = create_system_task(KERNEL_STD_STACK_SIZE,
                                  stack_base,

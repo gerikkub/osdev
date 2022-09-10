@@ -5,6 +5,7 @@
 
 #include "kernel/assert.h"
 #include "kernel/fd.h"
+#include "kernel/console.h"
 #include "kernel/lib/vmalloc.h"
 
 #include "kernel/fs/ext2/ext2_helpers.h"
@@ -61,6 +62,7 @@ void ext2_read_blocks(ext2_fs_ctx_t* fs,
 
 void ext2_populate_inode_cache(ext2_fs_ctx_t* fs, const uint32_t bg) {
 
+    console_printf("Updating inode cache\n");
     uint64_t num_inode_blocks = (fs->sb.inodes_per_group * fs->sb_ext.inode_size) / BLOCK_SIZE(fs->sb);
 
     if (fs->inodes[bg].inodes == NULL) {
@@ -253,6 +255,8 @@ uint32_t ext2_get_inode_for_path_rel(ext2_fs_ctx_t* fs, const ext2_inode_t* inod
 
         path_idx = path_sep_idx + 1;
     }
+
+    vfree(path_copy);
 
     return last_path ? next_inode_num : 0;
 }

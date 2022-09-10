@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/lib/vmalloc.h"
 #include "kernel/kmalloc.h"
@@ -7,6 +8,48 @@
 #include "kernel/assert.h"
 
 #include "stdlib/malloc.h"
+#include "stdlib/linalloc.h"
+
+//#define DEBUG_VMALLOC
+
+#ifdef DEBUG_VMALLOC
+
+
+void vmalloc_init(uint64_t size) {
+    (void)size;
+    return;
+}
+
+void* vmalloc(uint64_t size) {
+
+    uint64_t page_size = PAGE_CEIL(size);
+
+    uint64_t mem_phy = (uint64_t)kmalloc_phy(page_size);
+    void* mem_virt = memspace_alloc_kernel_virt(page_size, 4096);
+
+    memspace_map_phy_kernel((void*)mem_phy, mem_virt, page_size, 0);
+    memspace_update_kernel_vmem();
+
+    memset(mem_virt, 0, page_size);
+    return mem_virt;
+}
+
+void vfree(void* mem) {
+    memory_entry_t* entry = memspace_get_entry_at_addr_kernel(mem);
+    ASSERT(entry->type == MEMSPACE_PHY);
+    uint64_t mem_phy = ((memory_entry_phy_t*)entry)->phy_addr;
+    memspace_unmap_kernel(mem);
+
+    kfree_phy((void*)mem_phy);
+}
+
+void vmalloc_calc_stat(malloc_stat_t* stat_out) {
+    stat_out->total_mem = 0;
+    stat_out->avail_mem = 0;
+    stat_out->largest_chunk = 0;
+}
+
+#else
 
 typedef struct {
     uintptr_t mem;
@@ -40,13 +83,17 @@ void vmalloc_init(uint64_t size) {
 }
 
 void* vmalloc(uint64_t size) {
-    return malloc_p(size, &s_vmalloc_state);
+    void* ret = malloc_p(size, &s_vmalloc_state);
+    memset(ret, 0, size);
+    return ret;
 }
 
 void vfree(void* mem) {
-    // free_p(mem, &s_vmalloc_state);
+    free_p(mem, &s_vmalloc_state);
 }
 
 void vmalloc_calc_stat(malloc_stat_t* stat_out) {
     malloc_calc_stat(&s_vmalloc_state, stat_out);
 }
+
+#endif

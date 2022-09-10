@@ -298,6 +298,7 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
     ASSERT(kernel_stack_ptr_phy != NULL);
     uint64_t* kernel_stack_ptr = (uint64_t*)PHY_TO_KSPACE(kernel_stack_ptr_phy);
 
+    /*
     memory_entry_stack_t  kernel_stack_entry = {
         .start = (uintptr_t)kernel_stack_ptr,
         .end = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size),
@@ -308,6 +309,7 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
         .limit = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size),
         .maxlimit = PAGE_CEIL(((uintptr_t)kernel_stack_ptr) + kernel_stack_size)
     };
+    */
 
     /*
     bool memspace_result;
@@ -326,9 +328,17 @@ uint64_t create_system_task(uint64_t kernel_stack_size,
     reg.spsr = TASK_SPSR_M(0); // EL0t SP
     reg.elr = (uint64_t)task_entry;
 
-    return create_task((uint64_t*)user_stack_base, user_stack_size,
-                       (uint64_t*)kernel_stack_entry.limit, kernel_stack_size,
+    /*
+    uint64_t tid = create_task((uint64_t*)user_stack_base, user_stack_size,
+                       kernel_stack_ptr + kernel_stack_size, kernel_stack_size,
                        &reg, memspace, false, name);
+    task_cleanup(get_task_for_tid(tid), 0);
+    return 0; // Leak 0 bytes
+    */
+
+    return create_task((uint64_t*)user_stack_base, user_stack_size,
+                       (uint64_t*)(PAGE_CEIL((uintptr_t)kernel_stack_ptr) + kernel_stack_size), kernel_stack_size,
+                       &reg, memspace, false, name); // Leak 416-760 bytes
 }
 
 uint64_t create_user_task(uint64_t kernel_stack_size,
@@ -396,6 +406,39 @@ void task_wakeup(task_t* task, wait_reason_t reason) {
 
 void task_cleanup(task_t* task, uint64_t ret_val) {
     task->tid = 0;
+
+    int idx;
+    for (idx = 0; idx < MAX_TASK_FDS; idx++) {
+        if (task->fds[idx].valid &&
+            task->fds[idx].ops.close != NULL) {
+
+            task->fds[idx].ops.close(task->fds[idx].ctx);
+        }
+    }
+
+    memory_entry_t* entry;
+    FOR_LLIST(task->memory.entries, entry)
+        switch (entry->type) {
+            case MEMSPACE_PHY:
+                kfree_phy((void*)((memory_entry_phy_t*)entry)->phy_addr);
+                break;
+            case MEMSPACE_STACK:
+                kfree_phy((void*)((memory_entry_stack_t*)entry)->phy_addr);
+                break;
+            case MEMSPACE_DEVICE:
+            case MEMSPACE_CACHE:
+            default:
+                // Can't occur in userspace
+                ASSERT(false);
+                break;
+        }
+    END_FOR_LLIST()
+
+    memspace_deallocate(&task->memory);
+
+    // TODO: cleanup kernel stack
+    // We're on kernel_stack_base, so need to switch stacks?
+    //kfree_phy(kernel_stack_base);
 }
 
 void schedule(void) {

@@ -19,6 +19,11 @@ uint64_t exec_user_task(const char* device, const char* path, const char* name, 
     if (open_res < 0) {
         return 0;
     }
+    /*
+    file_ops.close(file_ctx);
+    return 0; // No Leak
+    */
+
 
     int64_t file_size = file_ops.ioctl(file_ctx, BLK_IOCTL_SIZE, NULL, 0);
     if (file_size < 0) {
@@ -30,14 +35,16 @@ uint64_t exec_user_task(const char* device, const char* path, const char* name, 
     int64_t size = file_ops.read(file_ctx, read_buffer, file_size, 0);
     if(size != file_size) {
         vfree(read_buffer);
+        file_ops.close(file_ctx);
         return 0;
     }
 
-    uint64_t tid;
+    uint64_t tid = 0;
     elf_result_t res;
     tid = create_elf_task(read_buffer, size, &res, false, name, argv);
 
     vfree(read_buffer);
+    file_ops.close(file_ctx);
 
     return res == ELF_VALID ? tid : 0;
 }

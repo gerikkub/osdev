@@ -8,7 +8,7 @@
 
 .extern
 
-_start:
+_start: 
     // Registers and stack should already be setup by the kernel
     // We can also assume data and bss section are setup correctly
 
@@ -16,7 +16,7 @@ _start:
     stp x0, x1, [sp, #-16]!
     bl system_init
     ldp x0, x1, [sp], #16
-
+    
     // Main should not return
     bl main
 

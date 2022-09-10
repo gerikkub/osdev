@@ -27,6 +27,8 @@ memory_space_t* memspace_get_systemspace(void);
 
 void memspace_map_phy_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint32_t flags);
 void memspace_map_device_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint32_t flags);
+void memspace_unmap_kernel(memory_entry_t* entry);
+
 void memspace_update_kernel_vmem(void);
 
 void* memspace_alloc_kernel_virt(uint64_t len, uint64_t align);

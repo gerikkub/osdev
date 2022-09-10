@@ -184,8 +184,9 @@ void kernel_init_lower_thread(void* ctx) {
 
     uint64_t freq = gtimer_get_frequency();
     uint64_t ticknum = 0;
+    //int64_t lastmem = 0;
     while (1) {
-        gtimer_start_downtimer(freq, true);
+        gtimer_start_downtimer(freq/10, true);
         gtimer_wait_for_trigger();
         // while (!gtimer_downtimer_triggered()) {}
         //console_printf("Tick %d\n", ticknum);
@@ -193,9 +194,10 @@ void kernel_init_lower_thread(void* ctx) {
 
 
         uint64_t time_tid;
-        //time_tid = exec_user_task("home", "bin/time.elf", "time", NULL);
+        time_tid = exec_user_task("home", "bin/time.elf", "time", NULL);
         (void)time_tid;
 
+/*
         uint64_t cat2_tid;
         char* cat2_argv[] = {
             "sysfs",
@@ -205,7 +207,20 @@ void kernel_init_lower_thread(void* ctx) {
         cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
         (void)cat2_tid;
 
+        malloc_stat_t stat;
+        int64_t deltamem = 0;
+        vmalloc_calc_stat(&stat);
+        if (lastmem != 0) {
+            deltamem = lastmem - stat.avail_mem;
+        }
+        lastmem = stat.avail_mem;
+        console_printf("%u %u %u %d",
+                       stat.total_mem,
+                       stat.avail_mem,
+                       stat.largest_chunk,
+                       deltamem);
         console_printf("\n");
+        */
     }
 
     while (1) {
