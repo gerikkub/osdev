@@ -200,6 +200,16 @@ void kernel_init_lower_thread(void* ctx) {
 /*
         uint64_t cat2_tid;
         char* cat2_argv[] = {
+            "home",
+            "hello.txt",
+            NULL
+        };
+        cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+        (void)cat2_tid;
+        */
+/*
+        uint64_t cat2_tid;
+        char* cat2_argv[] = {
             "sysfs",
             "vmalloc_stat",
             NULL

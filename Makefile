@@ -96,8 +96,9 @@ kernel/lib/libpci.c \
 kernel/lib/libvirtio.c \
 kernel/lib/vmalloc.c \
 kernel/lib/llist.c \
+kernel/lib/hashmap.c \
 kernel/lock/lock.c \
-kernel/lock/mutex.c \
+kernel/lock/mutex.c
 
 C_SRC_KERNEL_FS = \
 kernel/fs/file.c \

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "kernel/lock/lock.h"
+#include "kernel/lib/hashmap.h"
 
 #include "kernel/fs/ext2/ext2_structures.h"
 
@@ -25,6 +26,8 @@ typedef struct {
     ext2_blockgroup_t* bgs;
 
     ext2_inode_cache_t* inodes;
+
+    hashmap_ctx_t* filecache;
 
     void* disk_ctx;
     fd_ops_t disk_ops;

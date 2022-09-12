@@ -20,13 +20,38 @@
 #include "kernel/fs/ext2/ext2_structures.h"
 
 typedef struct {
-    uint64_t inode_num;
+    uint32_t inode_num;
     ext2_inode_t* inode;
-    uint64_t pos;
     lock_t inode_lock;
     ext2_fs_ctx_t* fs_ctx;
     file_ctx_t* file_ctx;
 } ext2_fid_ctx_t;
+
+typedef struct {
+    llist_head_t filedata;
+    ext2_inode_t* inode;
+} ext2_file_hash_data_t;
+
+static uint64_t ext2_hash_hash(void* key) {
+
+    uint32_t* inode_key = key;
+
+    return *inode_key;
+}
+
+static bool ext2_hash_cmp(void* key1, void* key2) {
+
+    uint32_t* inode_key1 = key1;
+    uint32_t* inode_key2 = key2;
+    return *inode_key1 == *inode_key2;
+}
+
+static void ext2_hash_free(void* ctx, void* key, void* dataptr) {
+    (void)ctx;
+    (void)key;
+    (void)dataptr;
+    ASSERT(true);
+}
 
 static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_out) {
 
@@ -85,6 +110,12 @@ static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_ou
 
     mutex_init(&fs_ctx->fs_lock, 32);
 
+    fs_ctx->filecache = hashmap_alloc(ext2_hash_hash,
+                                      ext2_hash_cmp,
+                                      ext2_hash_free,
+                                      8,
+                                      fs_ctx);
+
     *ctx_out = fs_ctx;
 
     return 0;
@@ -124,19 +155,11 @@ static int64_t ext2_close(void* ctx) {
 
     ext2_fid_ctx_t* file_ctx = ctx;
 
-    file_data_entry_t* data_entry;
-
-    FOR_LLIST(file_ctx->file_ctx->file_data, data_entry)
-        if (data_entry->data != NULL) {
-            vfree(data_entry->data);
-        }
-    END_FOR_LLIST()
-
     mutex_destroy(&file_ctx->inode_lock);
-    vfree(file_ctx->inode);
     vfree(file_ctx);
     return 0;
 }
+
 
 static llist_head_t ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
 
@@ -212,17 +235,35 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
 
     ext2_fid_ctx_t* ext2_file_ctx = vmalloc(sizeof(ext2_fid_ctx_t));
     file_ctx_t* file_ctx = vmalloc(sizeof(file_ctx_t));
-    ext2_inode_t* inode = vmalloc(sizeof(ext2_inode_t));
+    ext2_inode_t* inode = NULL;
 
     ext2_file_ctx->inode_num = inode_num;
-    ext2_file_ctx->inode = inode;
     ext2_file_ctx->fs_ctx = fs_ctx;
     ext2_file_ctx->file_ctx = file_ctx;
-    ext2_file_ctx->pos = 0;
-    mutex_init(&ext2_file_ctx->inode_lock, 32);
-    ext2_get_inode(fs_ctx, inode_num, inode);
 
-    file_ctx->file_data = ext2_create_file_data(ext2_file_ctx);
+    mutex_init(&ext2_file_ctx->inode_lock, 32);
+
+    ext2_file_hash_data_t* ext2_hash_data = hashmap_get(fs_ctx->filecache, &inode_num);
+    //ext2_file_hash_data_t* ext2_hash_data = NULL;
+    if (ext2_hash_data != NULL) {
+        inode = ext2_hash_data->inode;
+        ext2_file_ctx->inode = inode;
+        file_ctx->file_data = ext2_hash_data->filedata;
+    } else {
+        console_printf("Creating inode cache for %s\n", file);
+        inode = vmalloc(sizeof(ext2_inode_t));
+        ext2_get_inode(fs_ctx, inode_num, inode);
+        ext2_file_ctx->inode = inode;
+        file_ctx->file_data = ext2_create_file_data(ext2_file_ctx);
+
+        ext2_hash_data = vmalloc(sizeof(ext2_file_hash_data_t));
+        ext2_hash_data->inode = inode;
+        ext2_hash_data->filedata = file_ctx->file_data;
+        uint32_t* inode_key = vmalloc(sizeof(uint32_t));
+        *inode_key = inode_num;
+        hashmap_add(fs_ctx->filecache, inode_key, ext2_hash_data);
+    }
+
     file_ctx->size = ext2_file_ctx->inode->size;
     file_ctx->seek_idx = 0;
     file_ctx->can_write = 0;
@@ -230,7 +271,6 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
     file_ctx->populate_op = ext2_populate_data;
     file_ctx->flush_data_op = ext2_flush_data;
     file_ctx->op_ctx = ext2_file_ctx;
-
 
     *ctx_out = file_ctx;
 

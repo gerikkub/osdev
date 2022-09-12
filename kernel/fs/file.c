@@ -151,10 +151,6 @@ int64_t file_close_op(void* ctx) {
 
     file_ctx->close_op(file_ctx->op_ctx);
 
-    FOR_LLIST(file_ctx->file_data, entry)
-        vfree(entry);
-    END_FOR_LLIST()
-    llist_free_all(file_ctx->file_data);
     vfree(file_ctx);
 
     return 0;
