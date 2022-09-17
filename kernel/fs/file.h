@@ -6,6 +6,7 @@
 
 #include <kernel/fd.h>
 #include <kernel/lib/llist.h>
+#include <kernel/lock/mutex.h>
 
 typedef struct {
     uint8_t* data;
@@ -19,14 +20,22 @@ typedef void (*populate_data_fn)(void* ctx, file_data_entry_t* entry);
 typedef void (*flush_data_fn)(void* ctx, file_data_entry_t* entry);
 
 typedef struct {
-    llist_head_t file_data;
+    llist_head_t data_list;
     int64_t size;
-    int64_t seek_idx;
-    int64_t can_write:1;
+
+    uint64_t ref_count;
+    lock_t ref_lock;
+
     fd_close_op close_op;
     populate_data_fn populate_op;
     flush_data_fn flush_data_op;
     void* op_ctx;
+} file_data_t;
+
+typedef struct {
+    file_data_t* file_data;
+    int64_t seek_idx;
+    int64_t can_write:1;
 } file_ctx_t;
 
 void* file_create_ctx(file_ctx_t* file_ctx);

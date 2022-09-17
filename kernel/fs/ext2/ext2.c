@@ -28,7 +28,7 @@ typedef struct {
 } ext2_fid_ctx_t;
 
 typedef struct {
-    llist_head_t filedata;
+    file_data_t* filedata;
     ext2_inode_t* inode;
 } ext2_file_hash_data_t;
 
@@ -153,17 +153,23 @@ static void ext2_flush_data(void* ctx, file_data_entry_t* entry) {
 
 static int64_t ext2_close(void* ctx) {
 
-    ext2_fid_ctx_t* file_ctx = ctx;
+    file_data_t* file_ctx = ctx;
+    ext2_fid_ctx_t* ext2_file_ctx = file_ctx->op_ctx;
 
-    mutex_destroy(&file_ctx->inode_lock);
-    vfree(file_ctx);
+    lock_acquire(&file_ctx->ref_lock, true);
+    file_ctx->ref_count--;
+    lock_release(&file_ctx->ref_lock);
+
+    mutex_destroy(&ext2_file_ctx->inode_lock);
+    vfree(ext2_file_ctx);
     return 0;
 }
 
 
-static llist_head_t ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
+static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
 
-    llist_head_t file_data = llist_create();
+    file_data_t* file_data = vmalloc(sizeof(file_data_t));
+    file_data->data_list = llist_create();
     
     // Only support direct and 1 indirect blocks right now...
 
@@ -184,7 +190,7 @@ static llist_head_t ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
         fd_entry->dirty = 0;
         fd_entry->available = 0;
 
-        llist_append_ptr(file_data, fd_entry);
+        llist_append_ptr(file_data->data_list, fd_entry);
 
         size_remaining -= block_size;
         offset += block_size;
@@ -209,7 +215,7 @@ static llist_head_t ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
             fd_entry->dirty = 0;
             fd_entry->available = 0;
 
-            llist_append_ptr(file_data, fd_entry);
+            llist_append_ptr(file_data->data_list, fd_entry);
 
             size_remaining -= block_size;
             offset += block_size;
@@ -217,6 +223,14 @@ static llist_head_t ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
 
         vfree(indirect_block);
     }
+
+    file_data->size = file_ctx->inode->size;
+    file_data->ref_count = 0;
+    file_data->close_op = ext2_close;
+    file_data->populate_op = ext2_populate_data;
+    file_data->flush_data_op = ext2_flush_data;
+    file_data->op_ctx = NULL;
+    mutex_init(&file_data->ref_lock, 16);
 
     return file_data;
 }
@@ -264,13 +278,13 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
         hashmap_add(fs_ctx->filecache, inode_key, ext2_hash_data);
     }
 
-    file_ctx->size = ext2_file_ctx->inode->size;
     file_ctx->seek_idx = 0;
     file_ctx->can_write = 0;
-    file_ctx->close_op = ext2_close;
-    file_ctx->populate_op = ext2_populate_data;
-    file_ctx->flush_data_op = ext2_flush_data;
-    file_ctx->op_ctx = ext2_file_ctx;
+    file_ctx->file_data->op_ctx = ext2_file_ctx;
+
+    lock_acquire(&file_ctx->file_data->ref_lock, true);
+    file_ctx->file_data->ref_count++;
+    lock_release(&file_ctx->file_data->ref_lock);
 
     *ctx_out = file_ctx;
 

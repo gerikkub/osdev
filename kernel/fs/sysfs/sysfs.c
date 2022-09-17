@@ -35,31 +35,37 @@ void sysfs_create_file(char* name, sysfs_open_op open_op, fd_ops_t* ops) {
 
 int64_t sysfs_ro_file_close(void* ctx) {
 
-    vfree(ctx);
+    file_data_t* file_ctx = ctx;
+
+    vfree(file_ctx->op_ctx);
+    vfree(file_ctx);
     return 0;
 }
 
-void sysfs_ro_file_helper(char* data_str, uint64_t data_str_len, file_ctx_t* file_ctx_out) {
+void sysfs_ro_file_helper(void* data_str, uint64_t data_str_len, file_ctx_t* file_ctx_out) {
 
-    llist_head_t data_list = llist_create();
+    file_data_t* file_data = vmalloc(sizeof(file_data_t));
+    file_data->data_list = llist_create();
     
     file_data_entry_t* data_entry = vmalloc(sizeof(file_data_entry_t));
-    data_entry->data = (void*)data_str;
+    data_entry->data = data_str;
     data_entry->len = data_str_len;
     data_entry->dirty = 0;
     data_entry->available = 1;
 
-    llist_append_ptr(data_list, data_entry);
+    llist_append_ptr(file_data->data_list, data_entry);
+
+    file_data->size = data_str_len;
+    file_data->ref_count = 1;
+    file_data->close_op = sysfs_ro_file_close;
+    file_data->populate_op = NULL;
+    file_data->flush_data_op = NULL;
+    file_data->op_ctx = data_str;
 
     file_ctx_t file_ctx = {
-        .file_data = data_list,
-        .size = data_str_len,
+        .file_data = file_data,
         .seek_idx = 0,
-        .can_write = false,
-        .close_op = sysfs_ro_file_close,
-        .populate_op = NULL,
-        .flush_data_op = NULL,
-        .op_ctx = data_str
+        .can_write = 0,
     };
 
     *file_ctx_out = file_ctx;

@@ -12,7 +12,8 @@ typedef enum {
     MEMSPACE_PHY,
     MEMSPACE_DEVICE,
     MEMSPACE_STACK,
-    MEMSPACE_CACHE
+    MEMSPACE_CACHE,
+    MEMSPACE_FILE
 } memspace_type_t;
 
 typedef struct __attribute__((packed)) {
@@ -92,6 +93,19 @@ typedef struct __attribute__((packed)) {
     void* cacheops_ctx; // Context to pass in cache maintenance calls
     uint64_t res[1];
 } memory_entry_cache_t;
+
+/*
+typedef struct __attribute__((packed)) {
+    uint64_t start;
+    uint64_t end;
+    uint32_t type;
+    uint32_t flags;
+    uint64_t callsite;
+    file_ctx_t* file_ctx;
+} memory_entry_file_t;
+*/
+
+
 
 typedef struct {
     uint64_t systemspace_end;

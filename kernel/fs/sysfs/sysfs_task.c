@@ -19,8 +19,8 @@ int64_t sysfs_task_close(void*);
 
 void* sysfs_task_open(void) {
 
-    sysfs_task_ctx_t* free_ctx = vmalloc(sizeof(sysfs_task_ctx_t));
-    free_ctx->data_list = llist_create();
+    file_data_t* file_data = vmalloc(sizeof(file_data_t));
+    file_data->data_list = llist_create();
 
     uint64_t task_size = 0;
     uint64_t task_idx = 0;
@@ -49,7 +49,7 @@ void* sysfs_task_open(void) {
             data_entry->dirty = 0;
             data_entry->available = 1;
 
-            llist_append_ptr(free_ctx->data_list, data_entry);
+            llist_append_ptr(file_data->data_list, data_entry);
 
             task_size += written;
         }
@@ -57,15 +57,17 @@ void* sysfs_task_open(void) {
         task_idx++;
     }
 
+    file_data->size = task_size;
+    file_data->ref_count = 1;
+    file_data->close_op = sysfs_task_close;
+    file_data->populate_op = NULL;
+    file_data->flush_data_op = NULL;
+    file_data->op_ctx = NULL;
+
     file_ctx_t file_ctx_in = {
-        .file_data = free_ctx->data_list,
-        .size = task_size,
+        .file_data = file_data,
         .seek_idx = 0,
-        .can_write = false,
-        .close_op = sysfs_task_close,
-        .populate_op = NULL,
-        .flush_data_op = NULL,
-        .op_ctx = free_ctx,
+        .can_write = 0,
     };
 
     void* file_ctx = file_create_ctx(&file_ctx_in);
@@ -75,15 +77,16 @@ void* sysfs_task_open(void) {
 
 int64_t sysfs_task_close(void* ctx) {
 
-    sysfs_task_ctx_t* task_ctx = ctx;
+    file_data_t* file_ctx = ctx;
     file_data_entry_t* entry;
 
-    FOR_LLIST(task_ctx->data_list, entry)
+    FOR_LLIST(file_ctx->data_list, entry)
         vfree(entry->data);
         vfree(entry);
     END_FOR_LLIST()
 
-    llist_free(task_ctx->data_list);
+    llist_free(file_ctx->data_list);
+    vfree(file_ctx);
 
     return 0;
 }
