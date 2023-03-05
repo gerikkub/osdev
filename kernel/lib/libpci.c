@@ -167,18 +167,18 @@ void pci_disable_interrupts(pci_device_ctx_t* device_ctx) {
 
 void pci_enable_vector(pci_device_ctx_t* device_ctx, uint32_t intid) {
 
-    bool found = false;
     pci_msix_vector_ctx_t* item = NULL;
+    pci_msix_vector_ctx_t* founditem = NULL;
 
     FOR_LLIST(device_ctx->msix_vector_list, item)
         if (item->intid == intid) {
-            found = true;
+            founditem = item;
             break;
         }
     END_FOR_LLIST()
 
-    ASSERT(found);
-    item->entry->vector_ctrl &= ~(PCI_MSIX_VECTOR_MASKED);
+    ASSERT(founditem != NULL);
+    founditem->entry->vector_ctrl &= ~(PCI_MSIX_VECTOR_MASKED);
 
     interrupt_enable_irq(intid);
 }
@@ -186,45 +186,59 @@ void pci_enable_vector(pci_device_ctx_t* device_ctx, uint32_t intid) {
 void pci_disable_vector(pci_device_ctx_t* device_ctx, uint32_t intid) {
 
     interrupt_disable_irq(intid);
-    bool found = false;
+
     pci_msix_vector_ctx_t* item = NULL;
+    pci_msix_vector_ctx_t* founditem = NULL;
 
     FOR_LLIST(device_ctx->msix_vector_list, item)
         if (item->intid == intid) {
-            found = true;
+            founditem = item;
             break;
         }
     END_FOR_LLIST()
 
-    ASSERT(found);
-    item->entry->vector_ctrl |= PCI_MSIX_VECTOR_MASKED;
+    ASSERT(founditem != NULL);
+    founditem->entry->vector_ctrl |= PCI_MSIX_VECTOR_MASKED;
 }
 
 void pci_interrupt_clear_pending(pci_device_ctx_t* device_ctx, uint32_t intid) {
 
-    bool found = false;
     pci_msix_vector_ctx_t* item = NULL;
+    pci_msix_vector_ctx_t* founditem = NULL;
 
     FOR_LLIST(device_ctx->msix_vector_list, item)
         if (item->intid == intid) {
-            found = true;
+            founditem = item;
             break;
         }
     END_FOR_LLIST()
 
-    ASSERT(found);
+    ASSERT(founditem != NULL);
 
     uint8_t pba_bar = device_ctx->msix_cap->pba_offset & 7;
     uint64_t pba_addr = device_ctx->msix_cap->pba_offset & (~7);
     ASSERT(device_ctx->bar[pba_bar].allocated);
     uint64_t* pend_table = device_ctx->bar[pba_bar].vmem + pba_addr;
 
-    uint64_t pend_word = item->entry_idx / 64;
-    uint64_t pend_bit = item->entry_idx % 64;
+    uint64_t pend_word = founditem->entry_idx / 64;
+    uint64_t pend_bit = founditem->entry_idx % 64;
 
     pend_table[pend_word] &= ~(pend_bit);
 
     MEM_DMB();
+}
+
+pci_msix_vector_ctx_t* pci_get_msix_entry(pci_device_ctx_t* device_ctx, uint32_t intid) {
+
+    pci_msix_vector_ctx_t* msix_item = NULL;
+
+    FOR_LLIST(device_ctx->msix_vector_list, msix_item)
+        if (msix_item->intid == intid) {
+            return msix_item;
+        }
+    END_FOR_LLIST()
+
+    return NULL;
 }
 
 void print_pci_header(pci_device_ctx_t* device_ctx) {

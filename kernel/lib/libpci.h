@@ -255,6 +255,7 @@ void pci_disable_interrupts(pci_device_ctx_t* device_ctx);
 void pci_enable_vector(pci_device_ctx_t* device_ctx, uint32_t intid);
 void pci_disable_vector(pci_device_ctx_t* device_ctx, uint32_t intid);
 void pci_interrupt_clear_pending(pci_device_ctx_t* device_ctx, uint32_t intid);
+pci_msix_vector_ctx_t* pci_get_msix_entry(pci_device_ctx_t* device_ctx, uint32_t intid);
 
 void pci_wait_irq(pci_device_ctx_t* device_ctx);
 

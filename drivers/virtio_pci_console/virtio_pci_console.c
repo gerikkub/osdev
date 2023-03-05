@@ -24,6 +24,7 @@ typedef struct {
     virtio_virtq_ctx_t receiveq;
     virtio_virtq_ctx_t transmitq;
     virtio_virtq_buffer_t recv_buffer;
+    virtio_virtq_shared_irq_ctx_t recv_irq_ctx;
 } virtio_multiport_ctx_t;
 
 typedef struct {
@@ -32,10 +33,9 @@ typedef struct {
     virtio_multiport_ctx_t* virtqueues;
     uint32_t num_virtqueues;
     virtio_virtq_ctx_t virtio_ctrl_receiveq;
-    uint64_t ctrl_receiveq_intid;
     virtio_virtq_ctx_t virtio_ctrl_transmitq;
+    virtio_virtq_shared_irq_ctx_t ctrl_irq_ctx;
     lock_t console_lock;
-    virtio_virtq_shared_irq_ctx_t virtio_irq_ctx;
 } virtio_console_ctx_t;
 
 typedef struct {
@@ -50,7 +50,16 @@ static void virtio_pci_console_device_irq_fn(uint32_t intid, void* ctx) {
     virtio_console_ctx_t* console_ctx = ctx;
     pci_interrupt_clear_pending(&console_ctx->pci_device, intid);
 
-    virtio_handle_irq(&console_ctx->virtio_irq_ctx);
+    if (console_ctx->ctrl_irq_ctx.intid == intid) {
+        virtio_handle_irq(&console_ctx->ctrl_irq_ctx);
+    } else {
+        for (int64_t idx = 0; idx < console_ctx->num_virtqueues; idx++) {
+            if (console_ctx->virtqueues[idx].recv_irq_ctx.intid == intid) {
+                virtio_handle_irq(&console_ctx->virtqueues[idx].recv_irq_ctx);
+            }
+        }
+    }
+
 }
 
 static void populate_receiveq_for_port(virtio_console_ctx_t* console_ctx, virtio_multiport_ctx_t* port_ctx) {
@@ -138,7 +147,7 @@ static int64_t virtio_pci_console_read_op(void* ctx, uint8_t* buffer, const int6
     virtio_virtq_ctx_t* receiveq = &console_ctx->virtqueues[port].receiveq;
     virtio_virtq_buffer_t* recv_buffer = &console_ctx->virtqueues[port].recv_buffer;
 
-    virtio_poll_virtq_irq(receiveq, &console_ctx->virtio_irq_ctx);
+    virtio_poll_virtq_irq(receiveq, &console_ctx->virtqueues[port].recv_irq_ctx);
     const int64_t recv_len = virtio_get_used_elem(receiveq, 0);
     ASSERT(recv_len > 0);
 
@@ -236,6 +245,8 @@ static void handle_ctrl_message_add(virtio_console_ctx_t* console_ctx, virtio_co
     name[4] = (dev_ctx->port % 10) + '0';
     sys_device_register(&s_virtio_pci_console_file_ops, virtio_pci_console_open_op, dev_ctx, name);
 
+    pci_enable_vector(&console_ctx->pci_device, console_ctx->virtqueues[msg->port].recv_irq_ctx.intid);
+
     send_control_message(console_ctx, msg->port, VIRTIO_CONSOLE_PORT_READY, 1);
 }
 
@@ -273,7 +284,7 @@ static void virtio_pci_control_monitor_thread(void* ctx) {
         virtio_virtq_send(receiveq, NULL, 0, &recv_buffer, 1);
         virtio_virtq_notify(&console_ctx->pci_device, receiveq);
 
-        virtio_poll_virtq_irq(receiveq, &console_ctx->virtio_irq_ctx);
+        virtio_poll_virtq_irq(receiveq, &console_ctx->ctrl_irq_ctx);
 
         handle_ctrl_message(console_ctx, (virtio_console_ctrl_msg_t*)recv_buffer.ptr, recv_buffer.len);
 
@@ -301,23 +312,15 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
     bool status = virtio_init_with_features(pci_ctx, features_req);
     ASSERT(status);
 
-    uint32_t ctrl_intid;
-    ctrl_intid = pci_register_interrupt_handler(
+
+    uint32_t port0_rq_intid;
+    port0_rq_intid = pci_register_interrupt_handler(
                                         &console_ctx->pci_device,
                                         virtio_pci_console_device_irq_fn,
                                         console_ctx);
 
-    bool found = false;
-    pci_msix_vector_ctx_t* msix_item = NULL;
-
-    FOR_LLIST(console_ctx->pci_device.msix_vector_list, msix_item)
-        if (msix_item->intid == ctrl_intid) {
-            found = true;
-            break;
-        }
-    END_FOR_LLIST()
-
-    ASSERT(found);
+    pci_msix_vector_ctx_t* port0_rq_msix_item = pci_get_msix_entry(&console_ctx->pci_device, port0_rq_intid);
+    ASSERT(port0_rq_msix_item != NULL);
 
     pci_virtio_capability_t* console_cfg_cap;
     console_cfg_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
@@ -326,39 +329,59 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
     console_ctx->num_virtqueues = console_ctx->virtio_console_cfg->max_nr_ports;
     console_ctx->virtqueues = vmalloc(console_ctx->num_virtqueues * sizeof(virtio_multiport_ctx_t));
-    console_ctx->ctrl_receiveq_intid = ctrl_intid;
 
     mutex_init(&console_ctx->console_lock, 8);
-
-    console_ctx->virtio_irq_ctx.wait_queue = llist_create();
-    console_ctx->virtio_irq_ctx.intid = ctrl_intid;
 
     virtio_alloc_queue(common_cfg,
                        VIRTIO_QUEUE_CONSOLE_RECEIVEQ_0,
                        1, 4096,
                        &console_ctx->virtqueues[0].receiveq,
-                       msix_item->entry_idx);
+                       port0_rq_msix_item->entry_idx);
 
     virtio_alloc_queue(common_cfg,
                        VIRTIO_QUEUE_CONSOLE_TRANSMITQ_0,
                        4, 4096,
                        &console_ctx->virtqueues[0].transmitq,
-                       msix_item->entry_idx);
+                       VIRTIO_MSI_NO_VECTOR);
+
+    console_ctx->virtqueues[0].recv_irq_ctx.wait_queue = llist_create();
+    console_ctx->virtqueues[0].recv_irq_ctx.intid = port0_rq_intid;
 
     for (int idx = 1; idx < console_ctx->num_virtqueues; idx++) {
+
+        uint32_t portn_rq_intid;
+        portn_rq_intid = pci_register_interrupt_handler(
+                                            &console_ctx->pci_device,
+                                            virtio_pci_console_device_irq_fn,
+                                            console_ctx);
+
+        pci_msix_vector_ctx_t* portn_rq_msix_item = pci_get_msix_entry(&console_ctx->pci_device, portn_rq_intid);
+        ASSERT(portn_rq_msix_item != NULL);
 
         virtio_alloc_queue(common_cfg,
                             VIRTIO_QUEUE_CONSOLE_RECEIVEQ_N(idx),
                             1, 4096,
                             &console_ctx->virtqueues[idx].receiveq,
-                            msix_item->entry_idx);
+                            portn_rq_msix_item->entry_idx);
 
         virtio_alloc_queue(common_cfg,
                             VIRTIO_QUEUE_CONSOLE_TRANSMITQ_N(idx),
                             4, 4096,
                             &console_ctx->virtqueues[idx].transmitq,
-                            msix_item->entry_idx);
+                            VIRTIO_MSI_NO_VECTOR);
+                        
+        console_ctx->virtqueues[idx].recv_irq_ctx.wait_queue = llist_create();
+        console_ctx->virtqueues[idx].recv_irq_ctx.intid = portn_rq_intid;
     }
+
+    uint32_t ctrl_intid;
+    ctrl_intid = pci_register_interrupt_handler(
+                                        &console_ctx->pci_device,
+                                        virtio_pci_console_device_irq_fn,
+                                        console_ctx);
+
+    pci_msix_vector_ctx_t* msix_item = pci_get_msix_entry(&console_ctx->pci_device, ctrl_intid);
+    ASSERT(msix_item != NULL);
 
     virtio_alloc_queue(common_cfg,
                        VIRTIO_QUEUE_CONSOLE_CTRL_RECEIVEQ,
@@ -370,12 +393,18 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
                        VIRTIO_QUEUE_CONSOLE_CTRL_TRANSMITQ,
                        1, 4096,
                        &console_ctx->virtio_ctrl_transmitq,
-                       msix_item->entry_idx);
+                       VIRTIO_MSI_NO_VECTOR);
+
+    console_ctx->ctrl_irq_ctx.wait_queue = llist_create();
+    console_ctx->ctrl_irq_ctx.intid = ctrl_intid;
 
 
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER_OK);
 
+    pci_enable_vector(&console_ctx->pci_device, console_ctx->ctrl_irq_ctx.intid);
+    pci_enable_vector(&console_ctx->pci_device, console_ctx->virtqueues[0].recv_irq_ctx.intid);
+    pci_enable_interrupts(&console_ctx->pci_device);
 
     send_control_message(console_ctx, 0, VIRTIO_CONSOLE_DEVICE_READY, 1);
 

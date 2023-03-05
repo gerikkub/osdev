@@ -163,6 +163,7 @@ void kernel_init_lower_thread(void* ctx) {
     cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
     (void)cat_tid;
 
+*/
     uint64_t gsh_tid;
     char* gsh_argv[] = {
         NULL
@@ -170,6 +171,7 @@ void kernel_init_lower_thread(void* ctx) {
     gsh_tid = exec_user_task("home", "bin/gsh.elf", "gsh", gsh_argv);
     (void)gsh_tid;
 
+/*
     uint64_t echo_tid;
     char* echo_argv[] = {
         "This is in echo!\n",
@@ -188,14 +190,15 @@ void kernel_init_lower_thread(void* ctx) {
     while (1) {
         gtimer_start_downtimer(freq/10, true);
         gtimer_wait_for_trigger();
-        // while (!gtimer_downtimer_triggered()) {}
-        //console_printf("Tick %d\n", ticknum);
+
         ticknum++;
 
 
+/*
         uint64_t time_tid;
         time_tid = exec_user_task("home", "bin/time.elf", "time", NULL);
         (void)time_tid;
+        */
 
 /*
         uint64_t cat2_tid;

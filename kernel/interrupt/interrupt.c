@@ -175,4 +175,5 @@ void interrupt_handle_irq(uint64_t irq) {
     if (s_interrupt_ctx.handlers[irq].awaiter_tid != 0) {
         interrupt_notify_awaiters(irq);
     }
+
 }

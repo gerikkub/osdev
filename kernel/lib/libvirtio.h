@@ -37,6 +37,8 @@ enum {
     VIRTIO_PCI_CAP_MAX = 6,
 };
 
+#define VIRTIO_MSI_NO_VECTOR (0xFFFF)
+
 typedef struct __attribute__((__packed__)) {
     uint32_t device_feature_sel;
     uint32_t device_feature;
