@@ -2,6 +2,8 @@
 #include <stdint.h>
 
 #include "pl011_uart.h"
+#include "kernel/drivers.h"
+#include "kernel/console.h"
 
 #include "kernel/interrupt/interrupt.h"
 
@@ -77,3 +79,45 @@ void _putchar(char character) {
 char _getchar(void) {
     return pl011_getc(VIRT_UART);
 }
+
+int64_t pl011_ops_write(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
+    for (int64_t idx = 0; idx < size; idx++) {
+        pl011_putc(ctx, buffer[idx]);
+    }
+
+    return size;
+}
+
+int64_t pl011_ops_read(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
+    char c = pl011_getc(ctx);
+
+    if (size > 0) {
+        *buffer = c;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+fd_ops_t pl011_ops = {
+    .write = pl011_ops_write,
+    .read = pl011_ops_read
+};
+
+void pl011_discover(void* ctx) {
+    //console_add_driver(&pl011_ops, VIRT_UART);
+}
+
+void pl011_register(void) {
+    discovery_register_t reg = {
+        .type = DRIVER_DISCOVERY_DTB,
+        .dtb = {
+            .compat = "arm,pl011\0arm,primecell"
+        },
+        .ctxfunc = pl011_discover
+    };
+    register_driver(&reg);
+}
+
+REGISTER_DRIVER(pl011)
