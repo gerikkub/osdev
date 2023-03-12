@@ -20,6 +20,8 @@ llist_head_t llist_create();
 void llist_free(llist_head_t);
 void llist_free_all(llist_head_t);
 
+// TODO: Break doesn't work inside a
+//       FOR_LLIST
 #define FOR_LLIST(head, x) \
 { \
 llist_t* __for_llist_item = head; \

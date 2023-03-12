@@ -54,7 +54,7 @@ void exception_handler_sync_lower(uint64_t vector) {
 
 void gic_irq_handler(uint32_t vector);
 
-uint64_t exception_handler_irq(uint64_t vector) {
+uint64_t exception_handler_irq(uint64_t vector, irq_stackframe_t* frame) {
     gic_irq_handler(vector);
 
     return 0;
@@ -66,4 +66,24 @@ void exception_handler_irq_lower(uint64_t vector) {
 
 void panic_exception_handler(uint64_t vector) {
     panic("Exception", vector, "Exception in SP1");
+}
+
+uint64_t exception_handler_sync_kernel(uint64_t vector, irq_stackframe_t* frame) {
+
+    uint32_t esr;
+
+    READ_SYS_REG(ESR_EL1, esr);
+
+    uint32_t ec = (esr >> 26) & 0x3F;
+
+    kernel_sync_handler handler = get_kernel_sync_handler(ec);
+
+    if (handler == 0) {
+        unhandled_exception(ec);
+        PANIC("Unhandled Exception");
+    } else {
+        handler(vector, esr, frame);
+    }
+
+    return 0;
 }

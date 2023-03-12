@@ -10,8 +10,11 @@
 #include "kernel/lock/lock.h"
 #include "kernel/lock/mutex.h"
 #include "kernel/fs/file.h"
+#include "kernel/kernelspace.h"
+#include "kernel/kmalloc.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_syscall.h"
 
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
@@ -25,7 +28,12 @@ typedef struct {
     lock_t inode_lock;
     ext2_fs_ctx_t* fs_ctx;
     file_ctx_t* file_ctx;
+    bool inode_dirty;
 } ext2_fid_ctx_t;
+
+typedef struct {
+    uint32_t block_num;
+} ext2_fid_entry_ctx_t;
 
 typedef struct {
     file_data_t* filedata;
@@ -110,6 +118,9 @@ static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_ou
 
     mutex_init(&fs_ctx->fs_lock, 32);
 
+    fs_ctx->sb_dirty = false;
+    fs_ctx->bgs_dirty = false;
+
     fs_ctx->filecache = hashmap_alloc(ext2_hash_hash,
                                       ext2_hash_cmp,
                                       ext2_hash_free,
@@ -125,7 +136,7 @@ ext2_mount_failure:
     return -1;
 }
 
-static void ext2_populate_data(void* ctx, file_data_entry_t* entry) {
+static void ext2_file_populate_data(void* ctx, file_data_entry_t* entry) {
 
     ext2_fid_ctx_t* file_ctx = ctx;
 
@@ -147,14 +158,67 @@ static void ext2_populate_data(void* ctx, file_data_entry_t* entry) {
     entry->available = 1;
 }
 
-static void ext2_flush_data(void* ctx, file_data_entry_t* entry) {
-    ASSERT(0);
+static void ext2_file_new_data(void* ctx, llist_head_t new_entries, uint64_t len) {
+
+    ext2_fid_ctx_t* file_ctx = ctx;
+    const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
+
+    // Allocate len bytes for the file
+    uint64_t num_blocks = BLOCKS_FOR_LEN(len, block_size);
+    uint64_t start_offset = file_ctx->inode->blocks * block_size;
+
+    for (uint64_t idx = 0; idx < num_blocks; idx++) {
+        file_data_entry_t* entry = vmalloc(sizeof(file_data_entry_t));
+
+        uint64_t block_num = ext2_alloc_block_to_inode(file_ctx->fs_ctx, file_ctx->inode);
+
+        uintptr_t block_data_phy = (uintptr_t)kmalloc_phy(block_size);
+        uint8_t* block_data_ptr = PHY_TO_KSPACE_PTR(block_data_phy);
+
+        memset(block_data_ptr, 0, block_size);
+
+        ext2_fid_entry_ctx_t* entry_ctx = vmalloc(sizeof(ext2_fid_entry_ctx_t));
+        entry_ctx->block_num = block_num;
+
+        entry->data = block_data_ptr;
+        entry->len = block_size;
+        entry->offset = start_offset + idx * block_size;
+        entry->ctx = entry_ctx;
+        entry->dirty = 1;
+        entry->available = 1;
+
+        llist_append_ptr(new_entries, entry);
+    }
+
+    file_ctx->inode_dirty = true;
+    ext2_mark_sb_dirty(file_ctx->fs_ctx);
 }
 
-static int64_t ext2_close(void* ctx) {
+static void ext2_file_flush_data(void* ctx, file_data_entry_t* entry) {
+    
+    ext2_fid_ctx_t* file_ctx = ctx;
+    
+    ext2_fid_entry_ctx_t* entry_ctx = entry->ctx;
+    uint32_t block_num = entry_ctx->block_num;
+
+    ext2_write_block(file_ctx->fs_ctx, block_num, entry->data);
+}
+
+static int64_t ext2_file_close(void* ctx) {
 
     file_data_t* file_ctx = ctx;
     ext2_fid_ctx_t* ext2_file_ctx = file_ctx->op_ctx;
+
+    // Update Inode
+    if (ext2_file_ctx->inode->size != file_ctx->size) {
+        ext2_file_ctx->inode->size = file_ctx->size;
+
+        // Write inode
+        ext2_flush_inode(ext2_file_ctx->fs_ctx, ext2_file_ctx->inode_num, ext2_file_ctx->inode);
+    }
+
+    // Flush filesystem metadata
+    ext2_flush_fs(ext2_file_ctx->fs_ctx);
 
     lock_acquire(&file_ctx->ref_lock, true);
     file_ctx->ref_count--;
@@ -162,6 +226,7 @@ static int64_t ext2_close(void* ctx) {
 
     mutex_destroy(&ext2_file_ctx->inode_lock);
     vfree(ext2_file_ctx);
+
     return 0;
 }
 
@@ -184,9 +249,13 @@ static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
         }
 
         file_data_entry_t* fd_entry = vmalloc(sizeof(file_data_entry_t));
+        ext2_fid_entry_ctx_t* entry_ctx = vmalloc(sizeof(ext2_fid_entry_ctx_t));
+        entry_ctx->block_num = file_ctx->inode->block_direct[idx];
+
         fd_entry->data = NULL;
-        fd_entry->len = size_remaining < block_size ? size_remaining : block_size;
+        fd_entry->len = block_size;
         fd_entry->offset = offset;
+        fd_entry->ctx = entry_ctx;
         fd_entry->dirty = 0;
         fd_entry->available = 0;
 
@@ -209,9 +278,13 @@ static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
             }
 
             file_data_entry_t* fd_entry = vmalloc(sizeof(file_data_entry_t));
+            ext2_fid_entry_ctx_t* entry_ctx = vmalloc(sizeof(ext2_fid_entry_ctx_t));
+            entry_ctx->block_num = indirect_block[idx];
+
             fd_entry->data = NULL;
-            fd_entry->len = size_remaining < block_size ? size_remaining : block_size;
+            fd_entry->len = block_size;
             fd_entry->offset = offset;
+            fd_entry->ctx = entry_ctx;
             fd_entry->dirty = 0;
             fd_entry->available = 0;
 
@@ -226,9 +299,10 @@ static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
 
     file_data->size = file_ctx->inode->size;
     file_data->ref_count = 0;
-    file_data->close_op = ext2_close;
-    file_data->populate_op = ext2_populate_data;
-    file_data->flush_data_op = ext2_flush_data;
+    file_data->close_op = ext2_file_close;
+    file_data->populate_op = ext2_file_populate_data;
+    file_data->new_data_op = ext2_file_new_data;
+    file_data->flush_data_op = ext2_file_flush_data;
     file_data->op_ctx = NULL;
     mutex_init(&file_data->ref_lock, 16);
 
@@ -243,8 +317,16 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
 
     uint32_t inode_num = ext2_get_inode_for_path(fs_ctx, file);
 
-    if (inode_num == 0) {
-        return -1;
+    if (flags & SYSCALL_OPEN_CREATE) {
+        if (inode_num != 0) {
+            return -1;
+        }
+
+        inode_num = ext2_create_inode_at_path(fs_ctx, file);
+    } else {
+        if (inode_num == 0) {
+            return -1;
+        }
     }
 
     ext2_fid_ctx_t* ext2_file_ctx = vmalloc(sizeof(ext2_fid_ctx_t));
@@ -254,11 +336,12 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
     ext2_file_ctx->inode_num = inode_num;
     ext2_file_ctx->fs_ctx = fs_ctx;
     ext2_file_ctx->file_ctx = file_ctx;
+    ext2_file_ctx->inode_dirty = false;
 
     mutex_init(&ext2_file_ctx->inode_lock, 32);
 
     ext2_file_hash_data_t* ext2_hash_data = hashmap_get(fs_ctx->filecache, &inode_num);
-    //ext2_file_hash_data_t* ext2_hash_data = NULL;
+
     if (ext2_hash_data != NULL) {
         inode = ext2_hash_data->inode;
         ext2_file_ctx->inode = inode;
@@ -279,7 +362,7 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
     }
 
     file_ctx->seek_idx = 0;
-    file_ctx->can_write = 0;
+    file_ctx->can_write = 1;
     file_ctx->file_data->op_ctx = ext2_file_ctx;
 
     lock_acquire(&file_ctx->file_data->ref_lock, true);

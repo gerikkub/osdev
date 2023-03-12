@@ -17,6 +17,9 @@
 
 #define KSPACE_EXSTACK_SIZE (8192)
 
+#define IS_KSPACE_PTR(x) (((uintptr_t)x) & 0xFFFF000000000000UL)
+#define IS_USPACE_PTR(x) (!IS_KSPACE_PTR(x))
+
 void memspace_init_kernelspace(void);
 bool memspace_add_entry_to_kernel_memory(memory_entry_t* entry);
 void memspace_update_kernel_cache(memory_entry_cache_t* entry);
@@ -36,5 +39,7 @@ void* memspace_alloc_kernel_virt(uint64_t len, uint64_t align);
 memory_entry_t* memspace_get_entry_at_addr_kernel(void* addr_ptr);
 
 void* get_userspace_ptr(_vmem_table* table_ptr, uintptr_t userptr);
+
+bool kspace_vmem_walk_table(uint64_t vmem_addr, uint64_t* phy_addr);
 
 #endif

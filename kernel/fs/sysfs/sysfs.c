@@ -50,6 +50,7 @@ void sysfs_ro_file_helper(void* data_str, uint64_t data_str_len, file_ctx_t* fil
     file_data_entry_t* data_entry = vmalloc(sizeof(file_data_entry_t));
     data_entry->data = data_str;
     data_entry->len = data_str_len;
+    data_entry->ctx = NULL;
     data_entry->dirty = 0;
     data_entry->available = 1;
 

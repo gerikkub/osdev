@@ -12,11 +12,13 @@ typedef struct {
     uint8_t* data;
     uint64_t len;
     uint64_t offset;
+    void* ctx;
     uint64_t dirty:1;
     uint64_t available:1;
 } file_data_entry_t;
 
 typedef void (*populate_data_fn)(void* ctx, file_data_entry_t* entry);
+typedef void (*new_data_fn)(void* ctx, llist_head_t new_entries, uint64_t len);
 typedef void (*flush_data_fn)(void* ctx, file_data_entry_t* entry);
 
 typedef struct {
@@ -28,6 +30,7 @@ typedef struct {
 
     fd_close_op close_op;
     populate_data_fn populate_op;
+    new_data_fn new_data_op;
     flush_data_fn flush_data_op;
     void* op_ctx;
 } file_data_t;

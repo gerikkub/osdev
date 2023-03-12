@@ -134,6 +134,11 @@ typedef struct __attribute__((__packed__)) {
 
 // Inode Structures
 
+#define EXT2_BLOCK_DIRECT_MAX(fs) (12)
+#define EXT2_BLOCK_1INDIRECT_MAX(fs) (BLOCK_SIZE(fs->sb) / sizeof(uint32_t))
+#define EXT2_BLOCK_2INDIRECT_MAX(fs) (EXT2_BLOCK_1INDIRECT_MAX(fs) * EXT2_BLOCK_1INDIRECT_MAX(fs))
+#define EXT2_BLOCK_3INDIRECT_MAX(fs) (EXT2_BLOCK_2INDIRECT_MAX(fs) * EXT2_BLOCK_1INDIRECT_MAX(fs))
+
 typedef struct __attribute__((__packed__)) {
     uint16_t mode;
     uint16_t uid;
@@ -224,6 +229,17 @@ typedef struct __attribute__((__packed__)) {
     uint8_t file_type;
     char name[];
 } ext2_dir_entry_t;
+
+enum {
+    EXT2_FT_UNKNOWN = 0,
+    EXT2_FT_REG_FILE = 1,
+    EXT2_FT_DIR = 2,
+    EXT2_FT_CHRDEV = 3,
+    EXT2_FT_BLKDEV = 4,
+    EXT2_FT_FIFO = 5,
+    EXT2_FT_SOCK = 6,
+    EXT2_FT_SYMLINK = 7
+};
 
 enum {
     EXT2_ROOT_INODE_NUM = 2

@@ -19,7 +19,8 @@
 int64_t main(uint64_t tid, char** ctx) {
 
     if (ctx[0] == NULL ||
-        ctx[1] == NULL) {
+        ctx[1] == NULL ||
+        ctx[2] == NULL) {
         console_printf("Invalid Arguments\n");
         console_flush();
         return -1;
@@ -33,30 +34,10 @@ int64_t main(uint64_t tid, char** ctx) {
     }
     SYS_ASSERT(fd >= 0);
 
-    // int64_t len;
-    // len = system_ioctl(fd, BLK_IOCTL_SIZE, NULL, 0);
-    // if (len < 0) {
-    //     console_printf("Invalid length\n");
-    //     console_flush();
-    //     return -1;
-    // } else if (len == 0) {
-    //     return 0;
-    // }
+    system_ioctl(fd, IOCTL_SEEK_END, NULL, 0);
 
-    char* buffer = malloc(4096);
-    int64_t read_len;
-    do {
-        read_len = system_read(fd, buffer, 4096, 0);
-        console_printf("Read %d bytes\n", read_len);
-        if (read_len > 0) {
-            console_printf("First: %x\n", buffer[0]);
-        }
-        console_write_len(buffer, read_len);
-        console_flush();
-    } while (read_len > 0);
-
-
-    free(buffer);
+    system_write(fd, ctx[2], strlen(ctx[2]), 0);
+    system_write(fd, "\n", 1, 0);
 
     return 0;
 }

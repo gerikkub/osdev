@@ -160,3 +160,7 @@ void* get_userspace_ptr(_vmem_table* table_ptr, uintptr_t userptr) {
     }
     return PHY_TO_KSPACE_PTR(phy_addr);
 }
+
+bool kspace_vmem_walk_table(uint64_t vmem_addr, uint64_t* phy_addr) {
+    return vmem_walk_table(s_kernelspace_vmem, vmem_addr, phy_addr);
+}

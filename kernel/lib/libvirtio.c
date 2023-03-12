@@ -206,6 +206,24 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
     return true;
 }
 
+uint64_t virtio_poll_virtq_delta(virtio_virtq_ctx_t* queue_ctx) {
+
+    MEM_DMB();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+    volatile uint16_t* used_idx_ptr = &queue_ctx->used_ptr->idx;
+#pragma GCC diagnostic pop
+
+    uint16_t used_idx = *used_idx_ptr;
+    uint16_t used_delta = used_idx - queue_ctx->last_used_idx;
+    if (used_delta) {
+        queue_ctx->last_used_idx = *used_idx_ptr;
+    }
+    MEM_DMB();
+    return used_delta;
+}
+
 bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block) {
 
     MEM_DMB();
@@ -262,15 +280,17 @@ void virtio_wait_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_
 
 }
 
-bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx) {
+uint64_t virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx) {
 
     do {
         uint64_t crit_ctx;
         BEGIN_CRITICAL(crit_ctx);
 
-        bool done = virtio_poll_virtq(queue_ctx, false);
+        uint64_t done = virtio_poll_virtq_delta(queue_ctx);
+        //bool done = virtio_poll_virtq(queue_ctx, false);
         if (done) {
-            break;
+            END_CRITICAL(crit_ctx);
+            return 1;
         }
         virtio_add_irq_to_ctx(queue_ctx, irq_ctx);
         END_CRITICAL(crit_ctx);
@@ -278,7 +298,7 @@ bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_ir
         virtio_wait_irq(queue_ctx, irq_ctx);
     } while (true);
 
-    return false;
+    return 0;
 }
 
 void virtio_handle_irq(virtio_virtq_shared_irq_ctx_t* irq_ctx) {

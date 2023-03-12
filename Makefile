@@ -134,6 +134,8 @@ $(SYSTEMS_DIR)/cat \
 $(SYSTEMS_DIR)/echo \
 $(SYSTEMS_DIR)/gsh \
 $(SYSTEMS_DIR)/time \
+$(SYSTEMS_DIR)/addline \
+$(SYSTEMS_DIR)/touch
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 
@@ -189,7 +191,8 @@ CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) \
 	     -ffreestanding -Wall -Werror \
 		 -mno-pc-relative-literal-loads \
 		 -mgeneral-regs-only \
-		 -march=armv8.2-a
+		 -march=armv8.2-a \
+		 -fno-omit-frame-pointer
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
@@ -272,6 +275,9 @@ print-% : ; @echo $* = $($*)
 clean:
 	-rm -fR $(BUILD_DIR)
   
+clean_diskimg:
+	-rm $(DISKIMG)
+
 #######################################
 # dependencies
 #######################################

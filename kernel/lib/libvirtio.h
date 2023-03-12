@@ -205,7 +205,7 @@ bool virtio_virtq_send(virtio_virtq_ctx_t* queue_ctx,
                        uint64_t num_read_buffers);
                     
 bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block);
-bool virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx);
+uint64_t virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx);
 void virtio_handle_irq(virtio_virtq_shared_irq_ctx_t* irq_ctx);
 int64_t virtio_get_used_elem(virtio_virtq_ctx_t* queue_ctx, int64_t desc_idx);
 
@@ -218,6 +218,8 @@ void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_virtio_capab
 void print_virtio_feature_bits(uint32_t feat_low, uint32_t feat_high, uint64_t device_id);
 
 bool virtio_init_with_features(pci_device_ctx_t* pci_ctx, uint64_t features);
+
+uint64_t virtio_poll_virtq_block(virtio_virtq_ctx_t* queue_ctx);
 
 #define VIRTIO_HAS_FEATURE(features, feat) (features & (1 << feat))
 

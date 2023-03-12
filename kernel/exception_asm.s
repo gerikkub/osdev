@@ -143,7 +143,7 @@
 \name:
     # Save all registers to this stack frame
     # The zero write will be overriden with pc for a fake stack frame
-    stp xzr, fp, [sp, #-16]!
+    stp fp, xzr, [sp, #-16]!
     mov fp, sp
 
     # Save all registers but x30
@@ -153,14 +153,16 @@
     # Store the return address in the zero write above
     mrs x0, ELR_EL1
     mrs x1, SPSR_EL1
-    str x0, [fp]
+    str x0, [fp, #8]
     stp x0, x1, [sp, #-16]!
 
     # Store context information about this exception
     mov x0, #\num
+    mov x1, sp
 
     # Arguments to save_context are as follows
     # x0: This exception number
+    # x1: Stack frame
     bl \func
 
     # Restore exception link register
@@ -405,7 +407,7 @@ restore_context_kernel_asm:
 .section .exception_vector
 
 # Exception while processing in EL1t
-panic_exception_asm curr_el_sp_0_sync 0 panic_exception_handler
+save_context_asm_task_kern_irq curr_el_sp_0_sync SP_EL0 0 exception_handler_sync_kernel
 //panic_exception_asm curr_el_sp_0_irq 1 panic_exception_handler
 save_context_asm_task_kern_irq curr_el_sp_0_irq SP_EL0 1 exception_handler_irq
 dummy_exception curr_el_sp_0_fiq 2

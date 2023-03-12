@@ -46,6 +46,7 @@ void* sysfs_task_open(void) {
             file_data_entry_t* data_entry = vmalloc(sizeof(file_data_entry_t));
             data_entry->data = data_str;
             data_entry->len = written;
+            data_entry->ctx = NULL;
             data_entry->dirty = 0;
             data_entry->available = 1;
 

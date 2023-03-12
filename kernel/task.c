@@ -405,7 +405,6 @@ void task_wakeup(task_t* task, wait_reason_t reason) {
 }
 
 void task_cleanup(task_t* task, uint64_t ret_val) {
-    task->tid = 0;
 
     int idx;
     for (idx = 0; idx < MAX_TASK_FDS; idx++) {
@@ -439,6 +438,8 @@ void task_cleanup(task_t* task, uint64_t ret_val) {
     // TODO: cleanup kernel stack
     // We're on kernel_stack_base, so need to switch stacks?
     //kfree_phy(kernel_stack_base);
+
+    task->tid = 0;
 }
 
 void schedule(void) {

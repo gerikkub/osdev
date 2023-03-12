@@ -79,7 +79,8 @@ CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) \
         -ffreestanding -Wall -Werror \
 		-mno-pc-relative-literal-loads \
 		-mgeneral-regs-only \
-		-march=armv8.2-a
+		-march=armv8.2-a \
+		-fno-omit-frame-pointer
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2

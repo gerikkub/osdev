@@ -15,6 +15,8 @@
 
 #include "drivers/gicv3/gicv3.h"
 
+#define NUM_FAKE_MSI_PORTS 64
+
 typedef struct {
     bitalloc_t intid_alloc;
     volatile GICD_Struct* gicd;
@@ -24,7 +26,7 @@ typedef struct {
 
 static gicv3_ctx_t s_gicv3_ctx;
 
-static uint32_t s_gicv3_msi_words[8];
+static uint32_t s_gicv3_msi_words[NUM_FAKE_MSI_PORTS];
 
 void gicv3_enable(void* ctx) {
 
@@ -93,9 +95,12 @@ void gicv3_get_spi_msi_intid(void* ctx, uint64_t* intid_out, uint64_t* data_out,
     *addr_out = KSPACE_TO_PHY(&s_gicv3_ctx.gicd->setspi_nsr);
     */
 
+    ASSERT(intid - (GIC_INTID_SPI_BASE + 500) < NUM_FAKE_MSI_PORTS);
+
     *intid_out = intid;
     *data_out = intid;
     *addr_out = KSPACE_TO_PHY(&s_gicv3_msi_words[intid - (GIC_INTID_SPI_BASE + 500)]);
+
 }
 
 void gicv3_set_spi_trigger(void* ctx, uint64_t intid, interrupt_trigger_type_t type) {
@@ -161,13 +166,18 @@ void gicv3_discover(void* ctx) {
     //bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE, GIC_INTID_SPI_LIMIT, vmalloc);
     bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE + 500, GIC_INTID_SPI_LIMIT, vmalloc);
 
+    for (uint64_t idx = 0; idx < NUM_FAKE_MSI_PORTS; idx++) {
+        s_gicv3_msi_words[idx] = 0;
+    }
+
     interrupt_register_controller(&intc_funcs, NULL, GIC_INTID_SPI_LIMIT);
 }
 
 void gicv3_poll_msi(void) {
-    for (uint64_t idx = 0; idx < 8; idx++) {
+    for (uint64_t idx = 0; idx < NUM_FAKE_MSI_PORTS; idx++) {
         volatile uint32_t* msi_word = &s_gicv3_msi_words[idx];
         if (*msi_word != 0) {
+            //console_printf("Handle MSI IRQ %d\n", idx + GIC_INTID_SPI_BASE + 500);
             interrupt_handle_irq(idx + GIC_INTID_SPI_BASE + 500);
             *msi_word = 0;
         }

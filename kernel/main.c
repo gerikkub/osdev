@@ -106,33 +106,6 @@ void main() {
 
     PANIC("Schedule Returned");
     while (1);
-
-
-    // modules_init_list();
-    // modules_start();
-
-    // schedule();
-
-    // console_write("Should not get here\n");
-
-    // gic_set_irq_handler(timer_handler, 30);
-
-    // gic_init();
-    // gic_enable_intid(30);
-    // gic_enable();
-
-
-    // while (1) {
-
-    //     timer_irq_fired = 0;
-
-    //     gtimer_start_downtimer(62500000, true);
-
-    //     while (timer_irq_fired == 0) {
-    //     }
-
-    //     console_write("Tiggered\n");
-    // }
 }
 
 void kernel_init_lower_thread(void* ctx) {
@@ -153,7 +126,16 @@ void kernel_init_lower_thread(void* ctx) {
                                        "home");
     ASSERT(open_res >= 0);
 
-    /*
+    uint64_t addline_tid;
+    char* addline_argv[] = {
+        "home",
+        "hello.txt",
+        "newline",
+        NULL
+    };
+    addline_tid = exec_user_task("home", "bin/addline.elf", "newline", addline_argv);
+    (void)addline_tid;
+
     uint64_t cat_tid;
     char* cat_argv[] = {
         "home",
@@ -163,15 +145,34 @@ void kernel_init_lower_thread(void* ctx) {
     cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
     (void)cat_tid;
 
-*/
+    uint64_t touch_tid;
+    char* touch_argv[] = {
+        "home",
+        "new.txt",
+        "This is a new file!",
+        NULL
+    };
+    touch_tid = exec_user_task("home", "bin/touch.elf", "touch", touch_argv);
+    (void)touch_tid;
+
+    uint64_t cat2_tid;
+    char* cat2_argv[] = {
+        "home",
+        "new.txt",
+        NULL
+    };
+    cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+    (void)cat2_tid;
+
+/*
     uint64_t gsh_tid;
     char* gsh_argv[] = {
         NULL
     };
     gsh_tid = exec_user_task("home", "bin/gsh.elf", "gsh", gsh_argv);
     (void)gsh_tid;
+*/
 
-/*
     uint64_t echo_tid;
     char* echo_argv[] = {
         "This is in echo!\n",
@@ -180,7 +181,6 @@ void kernel_init_lower_thread(void* ctx) {
     echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
     (void)echo_tid;
 
-    */
 
     console_printf("Starting Timer\n");
 
@@ -188,7 +188,7 @@ void kernel_init_lower_thread(void* ctx) {
     uint64_t ticknum = 0;
     //int64_t lastmem = 0;
     while (1) {
-        gtimer_start_downtimer(freq/10, true);
+        gtimer_start_downtimer(freq, true);
         gtimer_wait_for_trigger();
 
         ticknum++;

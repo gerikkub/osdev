@@ -37,5 +37,8 @@ typedef struct {
     uintptr_t phy_addr;
 } syscall_mapdev_ctx_t;
 
+enum {
+    SYSCALL_OPEN_CREATE = 1
+};
 
 #endif

@@ -10,6 +10,7 @@
 #include "kernel/fs/ext2/ext2_structures.h"
 
 #define BLOCK_SIZE(sb) (1024 << (sb.log_block_size))
+#define BLOCKS_FOR_LEN(len, bs) ((len + bs - 1) / bs)
 
 typedef struct {
     bool valid;
@@ -33,6 +34,9 @@ typedef struct {
     fd_ops_t disk_ops;
 
     lock_t fs_lock;
+
+    bool sb_dirty;
+    bool bgs_dirty;
 } ext2_fs_ctx_t;
 
 void ext2_find_inode(ext2_superblock_t* sb, const uint32_t inode,
@@ -46,6 +50,8 @@ void ext2_read_blocks(ext2_fs_ctx_t* fs,
                       const uint64_t block_start,
                       const uint64_t num_blocks,
                       void* buffer);
+
+void ext2_write_block(ext2_fs_ctx_t* fs, const uint64_t block, const void* buffer);
 
 void ext2_populate_inode_cache(ext2_fs_ctx_t* fs, const uint32_t bg);
 
@@ -66,5 +72,16 @@ uint32_t ext2_get_inode_for_path_rel(ext2_fs_ctx_t* fs, const ext2_inode_t* inod
                                  const char* path);
 
 uint32_t ext2_get_inode_for_path(ext2_fs_ctx_t* fs, const char* path);
+
+uint32_t ext2_alloc_block(ext2_fs_ctx_t* fs);
+
+uint32_t ext2_alloc_block_to_inode(ext2_fs_ctx_t* fs, ext2_inode_t* inode);
+void ext2_mark_sb_dirty(ext2_fs_ctx_t* fs);
+
+void ext2_flush_inode(ext2_fs_ctx_t* fs, const uint32_t inode_num, const ext2_inode_t* inode);
+
+void ext2_flush_fs(ext2_fs_ctx_t* fs);
+
+uint32_t ext2_create_inode_at_path(ext2_fs_ctx_t* fs, const char* file);
 
 #endif

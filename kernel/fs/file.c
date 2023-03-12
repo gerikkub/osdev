@@ -21,14 +21,18 @@ void* file_create_ctx(file_ctx_t* file_ctx) {
     return ctx_out;
 }
 
-int64_t file_read_op(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
+int64_t file_read_op(void* ctx, uint8_t* buffer, const int64_t req_size, const uint64_t flags) {
 
     file_ctx_t* file_ctx = ctx;
 
-    uint64_t remaining = size;
+    uint64_t remaining = req_size;
     uint64_t count = 0;
     uint64_t data_idx = 0;
     file_data_entry_t* entry;
+
+    if (req_size > (file_ctx->file_data->size - file_ctx->seek_idx)) {
+        remaining = file_ctx->file_data->size - file_ctx->seek_idx;
+    }
 
     FOR_LLIST(file_ctx->file_data->data_list, entry)
         if (remaining == 0) {
@@ -74,6 +78,7 @@ int64_t file_write_op(void* ctx, const uint8_t* buffer, const int64_t size, cons
 
         FOR_LLIST(file_ctx->file_data->data_list, entry)
             if (remaining == 0) {
+                // NOTE: Still walks the entire list
                 break;
             }
 
@@ -101,6 +106,44 @@ int64_t file_write_op(void* ctx, const uint8_t* buffer, const int64_t size, cons
             data_idx += entry->len;
         END_FOR_LLIST()
 
+        // Need to allocate more entires for this file
+        if (remaining > 0 && file_ctx->file_data->new_data_op != NULL) {
+            llist_head_t new_entries = llist_create();
+
+            // TODO: Assumes blocks can be obtained. The following
+            //       code will assert if not all blocks are added
+            file_ctx->file_data->new_data_op(file_ctx->file_data->op_ctx, new_entries, remaining);
+
+            FOR_LLIST(new_entries, entry)
+                if (remaining == 0) {
+                    // NOTE: Still walks the entire list
+                    break;
+                }
+
+                ASSERT(entry->available);
+
+                uint64_t copy_len = remaining < entry->len ? remaining : entry->len;
+
+                memcpy(entry->data, &buffer[count], copy_len);
+                remaining -= copy_len;
+                count += copy_len;
+                entry->dirty = 1;
+                file_ctx->seek_idx += copy_len;
+
+                llist_append_ptr(file_ctx->file_data->data_list, entry);
+
+            END_FOR_LLIST()
+
+            ASSERT(remaining == 0);
+
+            llist_free_all(new_entries);
+        }
+
+        // Update file size
+        if (file_ctx->seek_idx > file_ctx->file_data->size) {
+            file_ctx->file_data->size = file_ctx->seek_idx;
+        }
+
         return count;
 
     } else {
@@ -126,6 +169,10 @@ int64_t file_ioctl_op(void* ctx, const uint64_t ioctl, const uint64_t* args, con
                 return 0;
             }
             break;
+        case IOCTL_SEEK_END:
+            file_ctx->seek_idx = file_ctx->file_data->size;
+            return file_ctx->file_data->size;
+            break;
         case BLK_IOCTL_SIZE:
             return file_ctx->file_data->size;
             break;
@@ -145,6 +192,9 @@ int64_t file_close_op(void* ctx) {
         FOR_LLIST(file_ctx->file_data->data_list, entry)
             if (entry->dirty) {
                 file_ctx->file_data->flush_data_op(file_ctx->file_data->op_ctx, entry);
+            }
+            if (entry->ctx != NULL) {
+                //vfree(entry->ctx);
             }
         END_FOR_LLIST()
     }

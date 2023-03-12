@@ -142,6 +142,8 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
 
     ASSERT(found);
 
+    console_printf("virtio_pci_blk: Registered IRQ %d\n", queue_intid);
+
     disk_ctx->virtio_irq_ctx.wait_queue = llist_create();
     disk_ctx->virtio_irq_ctx.intid = queue_intid;
 
@@ -191,14 +193,67 @@ static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buf
 
     virtio_virtq_notify(pci_ctx, &disk_ctx->virtio_requestq);
 
-    virtio_poll_virtq_irq(&disk_ctx->virtio_requestq, &disk_ctx->virtio_irq_ctx);
+    //uint64_t delta = virtio_poll_virtq_block(&disk_ctx->virtio_requestq);
+    uint64_t delta = virtio_poll_virtq_irq(&disk_ctx->virtio_requestq, &disk_ctx->virtio_irq_ctx);
+    //virtio_poll_virtq_irq(&disk_ctx->virtio_requestq, &disk_ctx->virtio_irq_ctx);
     //virtio_poll_virtq(&disk_ctx->virtio_requestq, true);
 
+    // TODO: Necessary delay for some file reads. Not sure what the actual problem is
+    for (volatile int i = 0; i < 100000; i++);
+
     memcpy(buffer, read_buffers[0].ptr, len);
+
+    if (sector == 1912) {
+        console_printf("pre blk Read[0]: %x %d\n", ((uint8_t*)read_buffers[0].ptr)[0], sector);
+    }
+
+    if (sector == 1912) {
+        console_printf("blk Read[0]: %x %d\n", ((uint8_t*)buffer)[0], sector);
+        console_printf("blk Read[0x800]: %x %d\n", ((uint8_t*)buffer)[0x800], sector);
+        console_printf("blk delta: %d %d\n", delta, sector);
+    }
 
     virtio_return_buffer(&disk_ctx->virtio_requestq, write_buffers[0].ptr);
     virtio_return_buffer(&disk_ctx->virtio_requestq, read_buffers[0].ptr);
     virtio_return_buffer(&disk_ctx->virtio_requestq, read_buffers[1].ptr);
+}
+
+static void write_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buffer, uint64_t len) {
+
+    pci_device_ctx_t* pci_ctx = &disk_ctx->pci_device;
+    virtio_virtq_buffer_t write_buffers[2] = {0};
+    virtio_virtq_buffer_t read_buffers[1] = {0};
+
+    bool get_ok;
+    get_ok = virtio_get_buffer(&disk_ctx->virtio_requestq, sizeof(virtio_blk_req_header_t), (uintptr_t*)&write_buffers[0].ptr);
+    ASSERT(get_ok);
+    write_buffers[0].len = sizeof(virtio_blk_req_header_t);
+
+    virtio_blk_req_header_t* blk_req_header = write_buffers[0].ptr;
+    blk_req_header->type = VIRTIO_BLK_T_OUT;
+    blk_req_header->res = 0;
+    blk_req_header->sector = sector;
+
+    get_ok = virtio_get_buffer(&disk_ctx->virtio_requestq, len, (uintptr_t*)&write_buffers[1].ptr);
+    ASSERT(get_ok);
+    write_buffers[1].len = len;
+    memcpy(write_buffers[1].ptr, buffer, len);
+
+    get_ok = virtio_get_buffer(&disk_ctx->virtio_requestq, sizeof(virtio_blk_req_status_t), (uintptr_t*)&read_buffers[0].ptr);
+    ASSERT(get_ok);
+    read_buffers[0].len = sizeof(virtio_blk_req_status_t);
+
+    virtio_virtq_send(&disk_ctx->virtio_requestq, write_buffers, 2,
+                      read_buffers, 1);
+
+    virtio_virtq_notify(pci_ctx, &disk_ctx->virtio_requestq);
+
+    virtio_poll_virtq_irq(&disk_ctx->virtio_requestq, &disk_ctx->virtio_irq_ctx);
+    //virtio_poll_virtq(&disk_ctx->virtio_requestq, true);
+
+    virtio_return_buffer(&disk_ctx->virtio_requestq, write_buffers[0].ptr);
+    virtio_return_buffer(&disk_ctx->virtio_requestq, write_buffers[1].ptr);
+    virtio_return_buffer(&disk_ctx->virtio_requestq, read_buffers[0].ptr);
 }
 
 static void print_blk_device(pci_device_ctx_t* pci_ctx) {
@@ -296,13 +351,68 @@ static int64_t virtio_pci_blk_read_op(void* ctx, uint8_t* buffer, const int64_t 
 }
 
 static int64_t virtio_pci_blk_write_op(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
-    return -1;
+
+    ASSERT(ctx != NULL);
+    ASSERT(buffer != NULL);
+
+    blk_disk_ctx_t* blk_ctx = (blk_disk_ctx_t*)ctx;
+
+    uint64_t pos = blk_ctx->device_pos;
+
+    int64_t size_left = size;
+
+    // Prevent reading past the device capacity
+    if (blk_ctx->device_config.capacity * 512 < (pos + size_left)) {
+        size_left = (blk_ctx->device_config.capacity * 512) - pos;
+    }
+    int64_t write_size = size_left < size ? size_left : size;
+
+    // Map all necessary memory
+    uint64_t pos_page = PAGE_FLOOR(pos);
+    uint64_t write_max = pos + write_size;
+    bool updated_vm = false;
+    memory_entry_cache_t* mem_entry = NULL;
+    while (pos_page < write_max) {
+        uint64_t par_el1 = vmem_check_address((uintptr_t)blk_ctx->cache_virtaddr + pos_page);
+        if ((par_el1 & 1) == 1) {
+            // Translation failed. Read in page
+            mem_entry = (memory_entry_cache_t*)memspace_get_entry_at_addr_kernel(blk_ctx->cache_virtaddr);
+            ASSERT(mem_entry != NULL && mem_entry->type == MEMSPACE_CACHE);
+
+            memcache_phy_entry_t* new_phy_entry = vmalloc(sizeof(memcache_phy_entry_t));
+            bool ok = virtio_blk_populate_virt_cache(blk_ctx, (uintptr_t)blk_ctx->cache_virtaddr + pos_page, new_phy_entry);
+            ASSERT(ok);
+
+            llist_append_ptr(mem_entry->phy_addr_list, new_phy_entry);
+            updated_vm = true;
+        }
+
+        pos_page += VMEM_PAGE_SIZE;
+    }
+
+    if (updated_vm) {
+        memspace_update_kernel_cache(mem_entry);
+        memspace_update_kernel_vmem();
+    }
+
+    memcpy(blk_ctx->cache_virtaddr + pos, buffer, write_size);
+
+    uint64_t end_pos = blk_ctx->device_pos + write_size;
+
+    for (uint64_t write_page = PAGE_FLOOR(pos); write_page < end_pos; write_page += VMEM_PAGE_SIZE) {
+        uint64_t write_sector = write_page / 512;
+        write_blk_device(blk_ctx, write_sector, blk_ctx->cache_virtaddr + write_page, VMEM_PAGE_SIZE);
+    }
+
+    blk_ctx->device_pos += write_size;
+
+    return write_size;
 }
 
 static int64_t virtio_pci_blk_seek_op(void* ctx, const int64_t pos, const uint64_t flags) {
     blk_disk_ctx_t* blk_ctx = (blk_disk_ctx_t*)ctx;
 
-    if (pos > 0) {
+    if (pos >= 0) {
         if (pos < (blk_ctx->device_config.capacity * 512)) {
             blk_ctx->device_pos = pos;
             return pos;
@@ -371,7 +481,7 @@ static void virtio_pci_blk_late_init(void* ctx) {
         .start = (uintptr_t)disk_ctx->cache_virtaddr,
         .end = (uintptr_t)disk_ctx->cache_virtaddr + len_page,
         .type = MEMSPACE_CACHE,
-        .flags = MEMSPACE_FLAG_PERM_KRO,
+        .flags = MEMSPACE_FLAG_PERM_KRW,
         .phy_addr_list = NULL,
         .cacheops_ptr = &s_virtio_blk_memcache_ops,
         .cacheops_ctx = disk_ctx,
