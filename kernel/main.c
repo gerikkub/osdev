@@ -121,8 +121,6 @@ void kernel_init_lower_thread(void* ctx) {
     pl011_init_rx(VIRT_UART_VMEM);
     interrupt_enable();
 
-    console_log(LOG_INFO, "Test");
-
     int64_t open_res;
     open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                                        "home");
@@ -192,6 +190,8 @@ void kernel_init_lower_thread(void* ctx) {
     while (1) {
         gtimer_start_downtimer(freq, true);
         gtimer_wait_for_trigger();
+
+        //console_log(LOG_INFO, "tick");
 
         ticknum++;
 

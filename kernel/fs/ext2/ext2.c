@@ -222,9 +222,6 @@ static int64_t ext2_file_close(void* ctx) {
 
     lock_acquire(&file_data->ref_lock, true);
     file_data->ref_count--;
-    console_log(LOG_DEBUG, "Decreasing ref count for %u to %u",
-                           (uint64_t)ext2_file_ctx->inode_num,
-                           (uint64_t)file_data->ref_count);
     lock_release(&file_data->ref_lock);
 
     mutex_destroy(&ext2_file_ctx->inode_lock);
@@ -354,7 +351,6 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
         ext2_file_ctx->inode = inode;
         file_ctx->file_data = ext2_hash_data->filedata;
     } else {
-        console_log(LOG_INFO, "Creating inode cache for %s", file);
         inode = vmalloc(sizeof(ext2_inode_t));
         ext2_get_inode(fs_ctx, inode_num, inode);
         ext2_file_ctx->inode = inode;
@@ -374,9 +370,6 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
 
     lock_acquire(&file_ctx->file_data->ref_lock, true);
     file_ctx->file_data->ref_count++;
-    console_log(LOG_DEBUG, "Increase ref count for %s to %u (%u)", file,
-                           (uint64_t)file_ctx->file_data->ref_count,
-                           (uint64_t)ext2_file_ctx->inode_num);
     lock_release(&file_ctx->file_data->ref_lock);
 
     *ctx_out = file_ctx;

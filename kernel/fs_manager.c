@@ -46,6 +46,9 @@ int64_t fs_manager_mount_device(const char* device_name,
     int64_t res;
     fd_ops_t disk_ops;
     void* disk_ctx;
+
+    console_log(LOG_INFO, "Mounting %s:%s at %s", device_name, path, mount_name);
+
     res = vfs_open_device(device_name, path, 0, &disk_ops, &disk_ctx);
 
     if (res < 0) {

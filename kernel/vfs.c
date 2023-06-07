@@ -4,6 +4,7 @@
 #include "kernel/assert.h"
 #include "kernel/console.h"
 #include "kernel/vfs.h"
+#include "kernel/panic.h"
 
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
@@ -18,12 +19,19 @@ void vfs_register_device(vfs_device_ops_t* device) {
 
     ASSERT(device->name[MAX_DEVICE_NAME_LEN-1] == 0);
 
-    for (int idx = 0; idx < MAX_NUM_DEVICES; idx++) {
+    console_log(LOG_INFO, "Registering %s FS", device->name);
+
+    int idx;
+    for (idx = 0; idx < MAX_NUM_DEVICES; idx++) {
         if (!s_devices[idx].valid) {
             s_devices[idx] = *device;
             s_devices[idx].valid = true;
             break;
         }
+    }
+
+    if (idx >= MAX_NUM_DEVICES) {
+        PANIC("Unable to register %s FS", device->name);
     }
 }
 
