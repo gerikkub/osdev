@@ -88,7 +88,8 @@ kernel/sys_device.c \
 kernel/fs_manager.c \
 kernel/fd.c \
 kernel/exec.c \
-kernel/interrupt/interrupt.c
+kernel/interrupt/interrupt.c \
+kernel/time.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \

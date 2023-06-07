@@ -93,7 +93,7 @@ static void print_blk_config(pci_device_ctx_t* pci_ctx) {
 
     blk_config = pci_ctx->bar[blk_cfg_cap->bar].vmem + blk_cfg_cap->bar_offset;
 
-    console_printf("Disk Capacity: %u KBs\n", blk_config->capacity * 512 / 1024);
+    console_log(LOG_INFO, "Disk Capacity: %u KBs\n", blk_config->capacity * 512 / 1024);
     console_flush();
 }
 
@@ -142,7 +142,7 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
 
     ASSERT(found);
 
-    console_printf("virtio_pci_blk: Registered IRQ %d\n", queue_intid);
+    console_log(LOG_DEBUG, "virtio_pci_blk: Registered IRQ %d\n", queue_intid);
 
     disk_ctx->virtio_irq_ctx.wait_queue = llist_create();
     disk_ctx->virtio_irq_ctx.intid = queue_intid;
@@ -193,25 +193,13 @@ static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buf
 
     virtio_virtq_notify(pci_ctx, &disk_ctx->virtio_requestq);
 
-    //uint64_t delta = virtio_poll_virtq_block(&disk_ctx->virtio_requestq);
     uint64_t delta = virtio_poll_virtq_irq(&disk_ctx->virtio_requestq, &disk_ctx->virtio_irq_ctx);
-    //virtio_poll_virtq_irq(&disk_ctx->virtio_requestq, &disk_ctx->virtio_irq_ctx);
-    //virtio_poll_virtq(&disk_ctx->virtio_requestq, true);
+    (void)delta;
 
-    // TODO: Necessary delay for some file reads. Not sure what the actual problem is
+    // TODO: Necessary delay for some file reads. Not sure what the underlying problem is
     for (volatile int i = 0; i < 100000; i++);
 
     memcpy(buffer, read_buffers[0].ptr, len);
-
-    if (sector == 1912) {
-        console_printf("pre blk Read[0]: %x %d\n", ((uint8_t*)read_buffers[0].ptr)[0], sector);
-    }
-
-    if (sector == 1912) {
-        console_printf("blk Read[0]: %x %d\n", ((uint8_t*)buffer)[0], sector);
-        console_printf("blk Read[0x800]: %x %d\n", ((uint8_t*)buffer)[0x800], sector);
-        console_printf("blk delta: %d %d\n", delta, sector);
-    }
 
     virtio_return_buffer(&disk_ctx->virtio_requestq, write_buffers[0].ptr);
     virtio_return_buffer(&disk_ctx->virtio_requestq, read_buffers[0].ptr);

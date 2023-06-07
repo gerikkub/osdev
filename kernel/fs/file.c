@@ -201,6 +201,11 @@ int64_t file_close_op(void* ctx) {
 
     file_ctx->file_data->close_op(file_ctx->file_data);
 
+    // TODO: Cleanup file_data cache when appropriate
+    // if (file_ctx->file_data->ref_count == 0) {
+        // vfree(file_ctx->file_data);
+    // }
+
     vfree(file_ctx);
 
     return 0;

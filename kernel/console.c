@@ -5,6 +5,7 @@
 #include "stdlib/bitutils.h"
 #include "drivers/pl011_uart.h"
 #include "kernel/assert.h"
+#include "kernel/time.h"
 
 #include "kernel/console.h"
 
@@ -57,4 +58,33 @@ char console_getchar(void) {
 void console_add_driver(fd_ops_t* driver_ops, void* driver_ctx) {
     s_driver_ops = driver_ops;
     s_driver_ctx = driver_ctx;
+}
+
+
+static console_log_level_t s_max_level = LOG_DEBUG;
+
+void console_set_log_level(console_log_level_t level) {
+    if (level <= LOG_DEBUG) {
+        s_max_level = level;
+    }
+}
+
+void console_log(console_log_level_t level, const char* fmt, ...) {
+    const char* log_strings[] = {
+        "CRIT", "ERROR", "WARNING",
+        "INFO", "DEBUG"
+    };
+    if (level <= s_max_level) {
+        console_printf("[");
+        uint64_t curr_time_us = time_get_bootns() / 1000;
+        console_write_dec_fixed(curr_time_us, 6, 10);
+        console_printf("] %s: ", log_strings[level]);
+        va_list args;
+        va_start(args, fmt);
+        console_printf_helper(fmt, args);
+        va_end(args);
+
+        console_endl();
+        console_flush();
+    }
 }

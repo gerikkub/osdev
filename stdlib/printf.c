@@ -20,6 +20,51 @@ void console_write_unum(uint64_t num) {
         comp /= 10;
     }
 
+    if (comp == 0) {
+        console_putc('0');
+    }
+
+    while (comp > 0) {
+        uint8_t dividend = num / comp;
+        console_putc(num_lookup[dividend]);
+        num = num - (dividend * comp);
+        comp /= 10;
+    }
+}
+
+void console_write_unum_fixed(uint64_t num, uint64_t digits) {
+
+    const char* num_lookup = "0123456789";
+    uint64_t comp = 10000000000000000000ULL;
+
+
+    while (num < comp && comp > 1) {
+        comp /= 10;
+    }
+
+    uint64_t comp_copy = comp;
+    uint64_t num_copy = num;
+    uint64_t req_digits = 0;
+
+    if (comp_copy == 0) {
+        req_digits = 1;
+    }
+
+    while (comp_copy > 0) {
+        req_digits++;
+        num_copy = num_copy - ((num_copy / comp_copy) * comp_copy);
+        comp_copy /= 10;
+    }
+
+    while (digits > req_digits) {
+        console_putc('0');
+        digits--;
+    }
+
+    if (comp == 0) {
+        console_putc('0');
+    }
+
     while (comp > 0) {
         uint8_t dividend = num / comp;
         console_putc(num_lookup[dividend]);
@@ -62,6 +107,81 @@ void console_write_hex_fixed(uint64_t hex, uint8_t digits) {
     console_putc(hex_lookup[hex & 0xF]);
 }
 
+void console_write_dec_fixed(uint64_t num, uint64_t point_log10, uint64_t digits) {
+
+    const char* num_lookup = "0123456789";
+    uint64_t comp = 10000000000000000000ULL;
+    while (num < comp && comp > 1) {
+        comp /= 10;
+    }
+
+    uint64_t comp_copy = comp;
+    uint64_t num_copy = num;
+    uint64_t req_digits = 0;
+
+    if (comp_copy == 0) {
+        req_digits = 1;
+    }
+
+    while (comp_copy > 0) {
+        req_digits++;
+        num_copy = num_copy - ((num_copy / comp_copy) * comp_copy);
+        comp_copy /= 10;
+    }
+
+    if (req_digits > point_log10) {
+        // Print leading zeros
+        while (digits > req_digits) {
+            console_putc('0');
+            digits--;
+        }
+
+        // Print digits before the decimal point
+        while (req_digits > point_log10) {
+            uint8_t dividend = num / comp;
+            console_putc(num_lookup[dividend]);
+            num = num - (dividend * comp);
+            comp /= 10;
+            req_digits--;
+        }
+
+        console_putc('.');
+
+        while (comp > 0) {
+            uint8_t dividend = num / comp;
+            console_putc(num_lookup[dividend]);
+            num = num - (dividend * comp);
+            comp /= 10;
+        }
+    } else {
+        // Print zeros prior to the decimal point
+        if (digits <= point_log10) {
+            console_putc('0');
+        } else {
+            while (digits > point_log10) {
+                console_putc('0');
+                digits--;
+            }
+        }
+
+        console_putc('.');
+
+        // Print zeros after the decimal point
+        while (point_log10 > req_digits) {
+            console_putc('0');
+            point_log10--;
+        }
+
+        while (comp > 0) {
+            uint8_t dividend = num / comp;
+            console_putc(num_lookup[dividend]);
+            num = num - (dividend * comp);
+            comp /= 10;
+        }
+    }
+
+}
+
 void console_printf_helper(const char* fmt, va_list args) {
 
     while (*fmt != '\0') {
@@ -93,7 +213,11 @@ void console_printf_helper(const char* fmt, va_list args) {
                     break;
                 case 'u':
                     u = va_arg(args, uint64_t);
-                    console_write_unum(u);
+                    if (digits != 0) {
+                        console_write_unum_fixed(u, digits);
+                    } else {
+                        console_write_unum(u);
+                    }
                     fmt++;
                     break;
                 case 'x':
@@ -149,30 +273,4 @@ void console_printf(const char* fmt, ...) {
     va_start(args, fmt);
     console_printf_helper(fmt, args);
     va_end(args);
-}
-
-//static console_log_level_t s_max_level = LOG_DEBUG;
-static console_log_level_t s_max_level = LOG_INFO;
-
-void console_set_log_level(console_log_level_t level) {
-    if (level <= LOG_DEBUG) {
-        s_max_level = level;
-    }
-}
-
-void console_log(console_log_level_t level, const char* fmt, ...) {
-    const char* log_strings[] = {
-        "EMERG", "ALERT", "CRIT",
-        "ERROR", "WARNING", "NOTICE",
-        "INFO", "DEBUG"
-    };
-    if (level <= s_max_level) {
-        console_printf("[%s] ", log_strings[level]);
-        va_list args;
-        va_start(args, fmt);
-        console_printf_helper(fmt, args);
-        va_end(args);
-
-        console_flush();
-    }
 }

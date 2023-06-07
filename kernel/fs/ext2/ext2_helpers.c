@@ -21,6 +21,7 @@ void ext2_get_inode_idx(ext2_superblock_t* sb, const uint32_t inode,
                         uint32_t* bg_out, uint32_t* ino_idx_out) {
     ASSERT(bg_out != NULL);
     ASSERT(ino_idx_out != NULL);
+    console_log(LOG_DEBUG, "Inode_idx: %u %u", (uint64_t)inode, (uint64_t)sb->inodes_count);
     ASSERT(inode < sb->inodes_count);
 
     *bg_out = (inode - 1) / sb->inodes_per_group;
@@ -673,7 +674,7 @@ uint32_t ext2_create_inode_at_path(ext2_fs_ctx_t* fs, const char* file) {
     uint32_t new_inode_num = ext2_alloc_inode(fs);
     ASSERT(new_inode_num > 0);
 
-    console_printf("Creating new inode (%d) at (%s)\n", new_inode_num, file);
+    console_log(LOG_INFO, "Creating new inode (%d) at (%s)\n", new_inode_num, file);
 
     ext2_inode_t new_inode = {
         .mode = EXT2_S_IFREG | 0777,

@@ -121,6 +121,8 @@ void kernel_init_lower_thread(void* ctx) {
     pl011_init_rx(VIRT_UART_VMEM);
     interrupt_enable();
 
+    console_log(LOG_INFO, "Test");
+
     int64_t open_res;
     open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                                        "home");
@@ -182,7 +184,7 @@ void kernel_init_lower_thread(void* ctx) {
     (void)echo_tid;
 
 
-    console_printf("Starting Timer\n");
+    console_log(LOG_DEBUG, "Starting Timer\n");
 
     uint64_t freq = gtimer_get_frequency();
     uint64_t ticknum = 0;

@@ -77,7 +77,7 @@ void* kmalloc_phy(uint64_t bytes) {
     bool found_mem = false;
 
     kmalloc_op_num++;
-    console_log(LOG_DEBUG, "kmalloc_phy: %u\n", kmalloc_op_num);
+    //console_log(LOG_DEBUG, "kmalloc_phy: %u", kmalloc_op_num);
 
     while (!found_mem) {
         if (pagebytes <= s_memblocks[idx].size &&
@@ -131,7 +131,7 @@ void kfree_phy(void* ptr) {
 
     kmalloc_op_num++;
 
-    console_log(LOG_DEBUG, "kfree_phy: %u\n", kmalloc_op_num);
+    //console_log(LOG_DEBUG, "kfree_phy: %u", kmalloc_op_num);
 
     uint64_t idx;
     for (idx = 0; idx <= s_last_memblock; idx++) {
@@ -186,12 +186,12 @@ void kfree_phy(void* ptr) {
 }
 
 void print_kmalloc_memblock(memblock_t* memblock) {
-    console_log(LOG_DEBUG, "Ptr: %16x\n", memblock->ptr);
-    console_log(LOG_DEBUG, "Size: %d\n", memblock->size);
-    console_log(LOG_DEBUG, "In Use: %c\n", (memblock->flags & MEMBLOCK_FLAG_ALLOCATED) ? 'Y' : 'N');
+    //console_log(LOG_DEBUG, "Ptr: %16x", memblock->ptr);
+    //console_log(LOG_DEBUG, "Size: %d", memblock->size);
+    //console_log(LOG_DEBUG, "In Use: %c", (memblock->flags & MEMBLOCK_FLAG_ALLOCATED) ? 'Y' : 'N');
 }
 
 void print_kmalloc_debug(uint64_t alloc_size) {
 
-    console_log(LOG_DEBUG, "Alloc: %d\n", alloc_size);
+    //console_log(LOG_DEBUG, "Alloc: %d", alloc_size);
 }

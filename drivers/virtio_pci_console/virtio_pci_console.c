@@ -253,7 +253,7 @@ static void handle_ctrl_message_add(virtio_console_ctx_t* console_ctx, virtio_co
 static void handle_ctrl_message(virtio_console_ctx_t* console_ctx, virtio_console_ctrl_msg_t* msg, uint64_t len) {
     ASSERT(len >= sizeof(virtio_console_ctrl_msg_t));
 
-    console_printf("Got console event %d\n", msg->event);
+    console_log(LOG_DEBUG, "Got console event %d\n", msg->event);
 
     ASSERT(msg->event < VIRTIO_CONSOLE_Max);
 
@@ -434,14 +434,14 @@ static void virtio_console_late_init(void* ctx) {
     console_add_driver(&s_virtio_pci_console_file_ops, dev_ctx);
 
     sys_device_register(&s_virtio_pci_console_file_ops, virtio_pci_console_open_op, dev_ctx, "con0");
-    console_write("Hello from serial driver!\n");
+    console_log(LOG_INFO, "Hello from serial driver!");
 
     vfree(pci_ctx);
 }
 
 static void virtio_pci_console_ctx(void* ctx) {
 
-    console_write("virtio-pci-blk got ctx\n");
+    console_log(LOG_DEBUG, "virtio-pci-blk got ctx");
     console_flush();
 
     discovery_pci_ctx_t* pci_ctx = ctx;

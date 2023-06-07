@@ -6,6 +6,7 @@
 #include "kernel/gtimer.h"
 #include "stdlib/bitutils.h"
 #include "kernel/assert.h"
+#include "kernel/console.h"
 
 #include "kernel/interrupt/interrupt.h"
 
@@ -25,6 +26,8 @@ void gtimer_early_init(void) {
 
 void gtimer_init(void) {
     interrupt_register_irq_handler(GTIMER_EL0_IRQn, gtimer_irq_handler, NULL);
+
+    console_log(LOG_DEBUG, "Arch timer frequency is %d Hz", gtimer_get_frequency());
 }
 
 uint64_t gtimer_get_frequency(void) {

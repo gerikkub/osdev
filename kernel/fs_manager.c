@@ -77,7 +77,7 @@ int64_t fs_manager_mount_device(const char* device_name,
 
     vfs_register_device(&vfs_device);
 
-    console_printf("Mounted FS %d from %s:%s at %s\n",
+    console_log(LOG_INFO, "Mounted FS %d from %s:%s at %s",
                    fs_type, device_name, path, mount_name);
 
     return 0;
