@@ -10,6 +10,7 @@
 #include "kernel/net/ipv4.h"
 #include "kernel/net/ipv4_icmp.h"
 #include "kernel/net/ipv4_route.h"
+#include "kernel/net/udp.h"
 #include "kernel/net/ethernet.h"
 
 #include "stdlib/bitutils.h"
@@ -87,6 +88,25 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
     memcpy(&ipv4_payload[20], payload, payload_len);
 
     uint64_t checksum = 0;
+    switch (protocol) {
+        case NET_IPV4_PROTO_UDP:
+
+
+            // Source and Destination IP
+            for (uint64_t idx = 0; idx < 4; idx++) {
+                uint16_t* ipv4_u16 = (uint16_t*)&ipv4_payload[12 + idx*2];
+                checksum += en_swap_16(*ipv4_u16);
+            }
+
+            checksum += ipv4_header.protocol;
+
+            checksum += (uint16_t)payload_len;
+
+            net_udp_update_checksum(&ipv4_payload[20], checksum);
+            break;
+    }
+
+    checksum = 0;
     for (uint64_t idx = 0; idx < 10; idx++) {
         uint16_t* ipv4_u16 = (uint16_t*)&ipv4_payload[idx*2];
         checksum += *ipv4_u16;
@@ -154,8 +174,13 @@ void net_ipv4_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame
         return;
     }
 
-    if (ipv4_header.protocol == NET_IPV4_PROTO_ICMP) {
-        net_ipv4_handle_icmp(packet, frame, &ipv4_header);
+    switch (ipv4_header.protocol) {
+        case NET_IPV4_PROTO_ICMP:
+            net_ipv4_handle_icmp(packet, frame, &ipv4_header);
+            break;
+        case NET_IPV4_PROTO_UDP:
+            net_udp_handle_packet(packet, frame, &ipv4_header);
+            break;
     }
 }
 

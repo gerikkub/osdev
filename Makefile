@@ -98,7 +98,8 @@ kernel/net/arp.c \
 kernel/net/arp_table.c \
 kernel/net/ipv4.c \
 kernel/net/ipv4_icmp.c \
-kernel/net/ipv4_route.c
+kernel/net/ipv4_route.c \
+kernel/net/udp.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
