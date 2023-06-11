@@ -32,7 +32,7 @@ void hashmap_dealloc(hashmap_ctx_t* ctx);
 void* hashmap_get(hashmap_ctx_t* ctx, void* key);
 bool hashmap_contains(hashmap_ctx_t* ctx, void* key);
 void hashmap_add(hashmap_ctx_t* ctx, void* key, void* dataptr);
-void hashmmap_del(hashmap_ctx_t* ctx, void* key);
+void hashmap_del(hashmap_ctx_t* ctx, void* key);
 
 uint64_t hashmap_len(hashmap_ctx_t* ctx);
 uint64_t hashmap_tablelen(hashmap_ctx_t* ctx);

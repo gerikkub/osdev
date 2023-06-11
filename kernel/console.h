@@ -23,7 +23,7 @@ void console_add_driver(fd_ops_t* driver, void* ctx);
 typedef enum {
     LOG_CRIT = 0,
     LOG_ERROR = 1,
-    LOG_WARNING = 2,
+    LOG_WARN = 2,
     LOG_INFO = 3,
     LOG_DEBUG = 4
 } console_log_level_t;

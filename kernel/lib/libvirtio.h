@@ -109,6 +109,32 @@ enum {
 };
 
 enum {
+    VIRTIO_NET_F_CSUM = 0,
+    VIRTIO_NET_F_GUEST_CSUM = 1,
+    VIRTIO_NET_F_CTRL_GUEST_OFFLOADS = 2,
+    VIRTIO_NET_F_MTU = 3,
+    VIRTIO_NET_F_MAC = 5,
+    VIRTIO_NET_F_GUEST_TSO4 = 7,
+    VIRTIO_NET_F_GUEST_TSO6 = 8,
+    VIRTIO_NET_F_GUEST_ECN = 9,
+    VIRTIO_NET_F_GUEST_UFO = 10,
+    VIRTIO_NET_F_HOST_TSO4 = 11,
+    VIRTIO_NET_F_HOST_TSO6 = 12,
+    VIRTIO_NET_F_HOST_ECN = 13,
+    VIRTIO_NET_F_HOST_UFO = 14,
+    VIRTIO_NET_F_MRG_RXBUF = 15,
+    VIRTIO_NET_F_STATUS = 16,
+    VIRTIO_NET_F_CTRL_VQ = 17,
+    VIRTIO_NET_F_CTRL_RX = 18,
+    VIRTIO_NET_F_CTRL_VLAN = 19,
+    VIRTIO_NET_F_GUEST_ANNOUNCE = 21,
+    VIRTIO_NET_F_MQ = 22,
+    VIRTIO_NET_F_CTRL_MAC_ADDRR = 23,
+    VIRTIO_NET_F_RSC_EXT = 61,
+    VIRTIO_NET_F_STANDBY = 62
+};
+
+enum {
     VIRTIO_STATUS_ACKNOWLEGE = 1,
     VIRTIO_STATUS_DRIVER = 2,
     VIRTIO_STATUS_DRIVER_OK = 4,
@@ -117,6 +143,10 @@ enum {
     VRITIO_STATUS_FAILED = 128
 };
 
+enum {
+    VIRTIO_QUEUE_NET_RECEIVEQ1 = 0,
+    VIRTIO_QUEUE_NET_TRANSMITQ1 = 1
+};
 
 enum {
     VIRTQ_DESC_F_NEXT = 1,
@@ -183,6 +213,29 @@ typedef struct {
     uint64_t len;
 } virtio_virtq_buffer_t;
 
+typedef struct {
+    uint8_t mac[6];
+    uint16_t status;
+    uint16_t max_virtqueue_pairs;
+    uint16_t mtu;
+} virtio_net_config_t;
+
+enum {
+    VIRTIO_NET_HDR_F_NEEDS_CSUM = 1,
+    VIRTIO_NET_HDR_F_DATA_VALID = 2,
+    VIRTIO_NET_HDR_F_RSC_INFO = 3
+};
+
+typedef struct __attribute__((__packed__)) {
+    uint8_t flags;
+    uint8_t gso_type;
+    uint16_t hdr_len;
+    uint16_t gso_size;
+    uint16_t csum_start;
+    uint16_t csum_offset;
+    uint16_t num_buffers;
+} virtio_net_hdr_t;
+
 pci_virtio_capability_t* virtio_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap);
 
 uint64_t virtio_get_features(pci_virtio_common_cfg_t* cfg);
@@ -208,6 +261,7 @@ bool virtio_poll_virtq(virtio_virtq_ctx_t* queue_ctx, bool block);
 uint64_t virtio_poll_virtq_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_t* irq_ctx);
 void virtio_handle_irq(virtio_virtq_shared_irq_ctx_t* irq_ctx);
 int64_t virtio_get_used_elem(virtio_virtq_ctx_t* queue_ctx, int64_t desc_idx);
+int64_t virtio_get_last_used_elem(virtio_virtq_ctx_t* queue_ctx);
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx);
 

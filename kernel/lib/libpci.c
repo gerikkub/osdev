@@ -257,6 +257,11 @@ void print_pci_header(pci_device_ctx_t* device_ctx) {
     console_flush();
 }
 
+void pci_poke_bar_entry(pci_header0_t* header, uint32_t barnum, uint32_t barval) {
+    header->bar[barnum] = barval;
+    header->command = 7;
+}
+
 const char* capability_names[] = {
     "Null",
     "PCI Power Management Inferface",

@@ -305,7 +305,6 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
     common_cfg = GET_CAP_PTR(pci_ctx, cap_ptr);
 
-
     uint64_t features_req = (1UL << VIRTIO_CONSOLE_F_MULTIPORT) |
                             (1UL << VIRTIO_CONSOLE_F_EMERG_WRITE) |
                             (1UL << VIRTIO_F_VERSION_1);

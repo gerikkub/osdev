@@ -60,6 +60,8 @@ drivers/qemu_fw_cfg.c \
 drivers/pcie/pcie.c \
 drivers/virtio_pci_blk/virtio_pci_blk.c \
 drivers/virtio_pci_console/virtio_pci_console.c \
+drivers/virtio_pci_early_console/virtio_pci_early_console.c \
+drivers/virtio_pci_net/virtio_pci_net.c \
 drivers/console/console_dev.c \
 drivers/gicv3/gicv3.c \
 drivers/aarch64/aarch64.c
@@ -89,7 +91,14 @@ kernel/fs_manager.c \
 kernel/fd.c \
 kernel/exec.c \
 kernel/interrupt/interrupt.c \
-kernel/time.c
+kernel/time.c \
+kernel/net/net.c \
+kernel/net/ethernet.c \
+kernel/net/arp.c \
+kernel/net/arp_table.c \
+kernel/net/ipv4.c \
+kernel/net/ipv4_icmp.c \
+kernel/net/ipv4_route.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
@@ -98,6 +107,7 @@ kernel/lib/libvirtio.c \
 kernel/lib/vmalloc.c \
 kernel/lib/llist.c \
 kernel/lib/hashmap.c \
+kernel/lib/intmap.c \
 kernel/lock/lock.c \
 kernel/lock/mutex.c
 
@@ -284,23 +294,27 @@ clean_diskimg:
 #######################################
 -include $(wildcard $(BUILD_DIR)/*.d)
 
+#-netdev user,id=net0,net=10.0.2.0/24 -device virtio-net-pci,netdev=net0,mac=52:54:00:12:34:56 \
 
 run: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
 	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -s -kernel $< \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on \
 	-device virtio-serial-pci,disable-legacy=on -chardev stdio,id=virtiocon0 -device virtconsole,chardev=virtiocon0 \
+	-netdev tap,id=net0 -device virtio-net-pci,netdev=net0,mac=52:54:00:12:34:56 \
 	-monitor none -serial none
 
 debug: $(BUILD_DIR)/$(TARGET).elf $(DISKIMG)
 	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -S -s -kernel $< \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on \
 	-device virtio-serial-pci,disable-legacy=on -chardev stdio,id=virtiocon0 -device virtconsole,chardev=virtiocon0 \
+	-netdev tap,id=net0 -device virtio-net-pci,netdev=net0,mac=52:54:00:12:34:56 \
 	-monitor none -serial none
 
 dts:
 	$(QEMU_BIN) -M virt,gic-version=3 -cpu cortex-a57 -nographic -S -s \
 	-drive file=drive_ext2.img,id=disk0,if=none -device virtio-blk-pci,drive=disk0,disable-legacy=on \
 	-chardev stdio,id=con0 -device virtio-serial-pci \
+	-netdev user,id=net0,net=10.0.2.0/24  -device virtio-net-pci,netdev=net0,mac=52:54:00:12:34:56 \
 	-machine dumpdtb=dtb.dtb
 	dtc -I dtb -O dts -o tools/dts.txt dtb.dtb
 

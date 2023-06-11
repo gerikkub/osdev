@@ -323,6 +323,13 @@ int64_t virtio_get_used_elem(virtio_virtq_ctx_t* queue_ctx, int64_t desc_idx) {
     return -1;
 }
 
+int64_t virtio_get_last_used_elem(virtio_virtq_ctx_t* queue_ctx) {
+
+    uint32_t last_idx = (queue_ctx->used_ptr->idx +  (queue_ctx->queue_size - 1)) % queue_ctx->queue_size;
+
+    return queue_ctx->used_ptr->ring[last_idx].len;
+}
+
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx) {
     void* cap_ptr = virtio_get_capability(ctx, VIRTIO_PCI_CAP_NOTIFY_CFG);
     ASSERT(cap_ptr != NULL);

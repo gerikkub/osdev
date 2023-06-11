@@ -270,12 +270,15 @@ void create_pci_device(volatile pci_header0_t* header, uintptr_t header_phy, uin
 
     bool have_driver = discovery_have_driver(&driver_discovery);
     if (!have_driver) {
-        console_printf("No Driver for PCI %4x %4x at offset %x\n",
+        console_log(LOG_WARN, "No Driver for PCI %4x:%4x at offset %x",
                        header->vendor_id, header->device_id,
                        offset);
-        console_flush();
         return;
     }
+
+    console_log(LOG_INFO, "Found driver for PCI %4x:%4x",
+                          header->vendor_id, header->device_id);
+
 
     discovery_pci_ctx_t device_ctx = {0};
     device_ctx.header_phy = header_phy;
@@ -406,7 +409,7 @@ void create_pci_device(volatile pci_header0_t* header, uintptr_t header_phy, uin
     for (idx = 0; idx < 6; idx++) {
         if (device_ctx.bar[idx].allocated) {
             memspace_map_device_kernel((void*)device_ctx.bar[idx].phy, PHY_TO_KSPACE_PTR(device_ctx.bar[idx].phy),
-                                       device_ctx.bar[idx].len, MEMSPACE_FLAG_PERM_KRW);
+                                       PAGE_CEIL(device_ctx.bar[idx].len), MEMSPACE_FLAG_PERM_KRW);
         }
     }
     memspace_update_kernel_vmem();

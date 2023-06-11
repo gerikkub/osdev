@@ -82,6 +82,7 @@ enum {
     VIRTIO_BLK_T_WRITE_ZEROES = 13
 };
 
+/*
 static void print_blk_config(pci_device_ctx_t* pci_ctx) {
 
     pci_virtio_capability_t* blk_cfg_cap;
@@ -96,6 +97,7 @@ static void print_blk_config(pci_device_ctx_t* pci_ctx) {
     console_log(LOG_INFO, "Disk Capacity: %u KBs\n", blk_config->capacity * 512 / 1024);
     console_flush();
 }
+*/
 
 static void virtio_pci_blk_device_irq_fn(uint32_t intid, void* ctx) {
     blk_disk_ctx_t* disk_ctx = ctx;
@@ -244,6 +246,7 @@ static void write_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* bu
     virtio_return_buffer(&disk_ctx->virtio_requestq, read_buffers[0].ptr);
 }
 
+/*
 static void print_blk_device(pci_device_ctx_t* pci_ctx) {
 
     pci_header0_t* pci_header = pci_ctx->header_vmem;
@@ -255,6 +258,7 @@ static void print_blk_device(pci_device_ctx_t* pci_ctx) {
 
     print_blk_config(pci_ctx);
 }
+*/
 
 static bool virtio_blk_populate_virt_cache(void* ctx, uintptr_t addr, memcache_phy_entry_t* new_entry) {
 
@@ -451,8 +455,6 @@ static void virtio_pci_blk_late_init(void* ctx) {
     pci_alloc_device_from_context(&disk_ctx->pci_device, pci_ctx);
 
     init_blk_device(disk_ctx);
-
-    print_blk_device(&disk_ctx->pci_device);
 
     strncpy(disk_ctx->name, "virtio_disk0", MAX_SYS_DEVICE_NAME_LEN);
     disk_ctx->name[11] = '0' + (s_disk_counter % 10);

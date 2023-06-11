@@ -8,4 +8,10 @@
 // Bulk Ops
 #define BLK_IOCTL_SIZE 32
 
+// Net Ops
+#define NET_IOCTL_SET_IP 64
+#define NET_IOCTL_GET_IP 65
+#define NET_IOCTL_SET_ROUTE 66
+
+
 #endif

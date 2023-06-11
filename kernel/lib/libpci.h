@@ -259,5 +259,6 @@ pci_msix_vector_ctx_t* pci_get_msix_entry(pci_device_ctx_t* device_ctx, uint32_t
 
 void pci_wait_irq(pci_device_ctx_t* device_ctx);
 
+void pci_poke_bar_entry(pci_header0_t* header, uint32_t barnum, uint32_t barval);
 
 #endif
