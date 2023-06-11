@@ -34,5 +34,6 @@ typedef struct {
 
 void net_ipv4_handle_icmp(net_packet_t* packet, ethernet_l2_frame_t* frame, net_ipv4_hdr_t* ipv4_header);
 
+void net_ipv4_icmp_send_packet(ipv4_t* dest_ip, net_ipv4_icmp_hdr_t* icmp_msg);
 
 #endif

@@ -14,7 +14,7 @@
 #include "stdlib/string.h"
 
 
-void net_ipv4_icmp_send_packet(ipv4_t* dest_ip, mac_t* dest_mac, net_ipv4_icmp_hdr_t* icmp_msg) {
+void net_ipv4_icmp_send_packet(ipv4_t* dest_ip, net_ipv4_icmp_hdr_t* icmp_msg) {
 
     const uint64_t icmp_header_len = 4;
     uint64_t icmp_msg_len;
@@ -56,7 +56,7 @@ void net_ipv4_icmp_send_packet(ipv4_t* dest_ip, mac_t* dest_mac, net_ipv4_icmp_h
     uint16_t checksum16 = (uint16_t)~((checksum & 0xFFFF) + (checksum >> 16));
     *(uint16_t*)&icmp_send_buffer[2] = checksum16;
 
-    net_ipv4_send_packet(dest_ip, dest_mac, NET_IPV4_PROTO_ICMP, icmp_send_buffer, icmp_msg_len);
+    net_ipv4_send_packet(dest_ip, NET_IPV4_PROTO_ICMP, icmp_send_buffer, icmp_msg_len);
 
     vfree(icmp_send_buffer);
 }
@@ -86,7 +86,7 @@ static void net_ipv4_handle_icmp_echo_request(net_packet_t* packet, ethernet_l2_
         .payload_len = icmp_header->payload_len
     };
 
-    net_ipv4_icmp_send_packet(&ipv4_header->src_ip, &frame->source, &icmp_response);
+    net_ipv4_icmp_send_packet(&ipv4_header->src_ip, &icmp_response);
 }
 
 void net_ipv4_handle_icmp(net_packet_t* packet, ethernet_l2_frame_t* frame, net_ipv4_hdr_t* ipv4_header) {

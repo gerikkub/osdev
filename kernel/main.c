@@ -35,6 +35,7 @@
 #include "kernel/net/arp.h"
 #include "kernel/net/ipv4.h"
 #include "kernel/net/ipv4_route.h"
+#include "kernel/net/ipv4_icmp.h"
 
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lib/libpci.h"
@@ -249,6 +250,23 @@ void kernel_init_lower_thread(void* ctx) {
         //console_log(LOG_INFO, "tick");
 
         ticknum++;
+
+        net_ipv4_icmp_hdr_t ping_request = {
+            .type = NET_IPV4_ICMP_ECHO_REQUEST,
+            .code = 0,
+            .checksum = 0,
+            .echo.id = 1,
+            .echo.seq = ticknum,
+            .payload = (uint8_t*)"Gerik!",
+            .payload_len = 6
+        };
+
+        ipv4_t dest_ip = {
+            .d = {10, 0, 2, 1}
+        };
+
+        net_ipv4_icmp_send_packet(&dest_ip, &ping_request);
+
 
 
 /*

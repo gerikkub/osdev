@@ -15,7 +15,7 @@
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
 
-void net_ipv4_send_packet(ipv4_t* dest_ip, mac_t* dest_mac_ptr, uint16_t protocol, void* payload, uint64_t payload_len) {
+void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uint64_t payload_len) {
 
     net_dev_t* net_dev = NULL;
     net_route_get_nic_for_ipv4(dest_ip, &net_dev);
@@ -27,9 +27,8 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, mac_t* dest_mac_ptr, uint16_t protoco
     }
 
     bool arp_ok;
-    mac_t dest_mac = *dest_mac_ptr;
-    //arp_ok = net_arp_get_mac_for_ipv4(net_dev, dest_ip, &dest_mac);
-    arp_ok = true;
+    mac_t dest_mac;
+    arp_ok = net_arp_get_mac_for_ipv4(net_dev, dest_ip, &dest_mac);
 
     if (!arp_ok) {
         return;
