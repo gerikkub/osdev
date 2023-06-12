@@ -16,6 +16,7 @@
 #include "kernel/kmalloc.h"
 #include "kernel/exec.h"
 #include "kernel/lib/vmalloc.h"
+#include "kernel/net/net_api.h"
 
 typedef int64_t (*syscall_handler)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
 
@@ -299,6 +300,7 @@ void syscall_init(void) {
     s_syscall_table[SYSCALL_CLOSE] = syscall_close;
     s_syscall_table[SYSCALL_EXIT] = syscall_exit;
     s_syscall_table[SYSCALL_EXEC] = syscall_exec;
+    s_syscall_table[SYSCALL_SOCKET] = syscall_socket;
 
     set_sync_handler(EC_SVC, syscall_sync_handler);
 }

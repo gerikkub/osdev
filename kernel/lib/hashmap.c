@@ -98,20 +98,22 @@ bool hashmap_contains(hashmap_ctx_t* ctx, void* key) {
     return false;
 }
 
-void hashmmap_del(hashmap_ctx_t* ctx, void* key) {
+void* hashmap_del(hashmap_ctx_t* ctx, void* key) {
 
+    void* entry_key;
     uint64_t keyhash = ctx->hash_op(key) & ((1 << ctx->hashtable_log_len) - 1);
 
     llist_head_t keylist = ctx->hashtable[keyhash];
 
     if (keylist == NULL) {
-        return;
+        return NULL;
     }
 
     hashmap_list_entry_t* entry;
     hashmap_list_entry_t* delentry = NULL;
     FOR_LLIST(keylist, entry)
         if (ctx->cmp_op(key, entry->key)) {
+            entry_key = entry->key;
             delentry = entry;
         }
     END_FOR_LLIST()
@@ -121,8 +123,18 @@ void hashmmap_del(hashmap_ctx_t* ctx, void* key) {
             ctx->free_op(ctx->op_ctx, entry->key, entry->dataptr);
         }
         llist_delete_ptr(keylist, delentry);
+
+        if (llist_empty(keylist)) {
+            llist_free_all(keylist);
+            ctx->hashtable[keyhash] = NULL;
+        }
+
         ctx->entries--;
+
+        return entry_key;
     }
+
+    return NULL;
 }
 
 void hashmap_add(hashmap_ctx_t* ctx, void* key, void* dataptr) {

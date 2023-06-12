@@ -32,4 +32,6 @@ int snprintf(char* str, size_t size, const char* format, ...);
  */
 uint64_t hextou64(const char* s1, size_t n, bool* valid);
 
+int64_t strtoi64(const char* str, bool* valid);
+
 #endif

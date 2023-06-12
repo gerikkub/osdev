@@ -176,3 +176,47 @@ uint64_t hextou64(const char* s1, size_t n, bool* valid) {
     }
     return res;
 }
+
+int64_t strtoi64(const char* str, bool* valid) {
+
+    int64_t ret = 0;
+    if (str == NULL) {
+        if (valid != NULL) {
+            *valid = false;
+        }
+        return ret;
+    }
+
+    uint64_t idx = 0;
+    bool should_negate = false;
+    if (str[0] == '-') {
+        should_negate = true;
+        idx++;
+    }
+
+    if (str[idx] > '9' ||
+        str[idx] < '0') {
+        
+        if (valid != NULL) {
+            *valid = false;
+        }
+        return ret;
+    }
+
+    while (str[idx] != '\0') {
+        if (str[idx] > '9' ||
+            str[idx] < '0') {
+            break;
+        }
+
+        ret *= 10;
+        ret += str[idx] - '0';
+
+        idx++;
+    }
+
+    if (valid != NULL) {
+        *valid = true;
+    }
+    return should_negate ? -1*ret : ret;
+}

@@ -11,12 +11,13 @@
 #include "kernel/net/ipv4_icmp.h"
 #include "kernel/net/ipv4_route.h"
 #include "kernel/net/udp.h"
+#include "kernel/net/udp_socket.h"
 #include "kernel/net/ethernet.h"
 
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
 
-void net_udp_send_packet(ipv4_t* dest_ip, uint64_t dest_port, uint64_t source_port, uint8_t* payload, uint64_t payload_len) {
+void net_udp_send_packet(ipv4_t* dest_ip, uint64_t dest_port, uint64_t source_port, const uint8_t* payload, uint64_t payload_len) {
 
     const uint64_t udp_header_len = 8;
 
@@ -52,7 +53,6 @@ void net_udp_send_packet(ipv4_t* dest_ip, uint64_t dest_port, uint64_t source_po
 
     checksum = (checksum & 0xFFFF) + (checksum >> 16);
 
-    console_log(LOG_DEBUG, "Net UDP Prelim Checksum %4x", checksum);
     *(uint16_t*)&udp_buffer[6] = (uint16_t)checksum;
 
     net_ipv4_send_packet(dest_ip, NET_IPV4_PROTO_UDP, udp_buffer, udp_header.len);
@@ -71,9 +71,6 @@ void net_udp_update_checksum(uint8_t* udp_payload, uint64_t pseudo_header_checks
     if (new_checksum == 0) {
         new_checksum = 0xFFFF;
     }
-    console_log(LOG_DEBUG, "Net UDP Old Checksum %4x", old_checksum);
-    console_log(LOG_DEBUG, "Net UDP Pseudo Checksum %4x", pseudo_header_checksum);
-    console_log(LOG_DEBUG, "Net UDP Final Checksum %4x", new_checksum);
 
     *(uint16_t*)&udp_payload[6] = en_swap_16(new_checksum);
 }
@@ -90,11 +87,5 @@ void net_udp_handle_packet(net_packet_t* packet, ethernet_l2_frame_t* frame, net
     udp_header.payload = ipv4_header->payload + 8;
     udp_header.payload_len = ipv4_header->payload_len - 8;
 
-    console_log(LOG_DEBUG, "Net UDP received message from %u.%u.%u.%u (%u %u %u) %s",
-                LOG_IPV4_ADDR(ipv4_header->src_ip),
-                (uint64_t)udp_header.source_port,
-                (uint64_t)udp_header.dest_port,
-                (uint64_t)udp_header.len,
-                udp_header.payload);
-
+    net_udp_socket_recv_packet(packet, ipv4_header, &udp_header);
 }

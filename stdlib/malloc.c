@@ -145,7 +145,7 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
     }
 }
 
-void free_p(void* mem, malloc_state_t* state) {
+void free_p(const void* mem, malloc_state_t* state) {
     SYS_ASSERT(mem != NULL);
     SYS_ASSERT(state->magic == MALLOC_MAGIC);
     state->num_malloc_ops++;

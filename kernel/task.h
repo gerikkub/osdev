@@ -170,6 +170,7 @@ int64_t task_wait_kernel(task_t* task,
                          task_wakeup_f wakeup_fun,
                          task_canwakeup_f canwakeup_f);
 
+int64_t find_open_fd(task_t* task);
 
 #define TASK_SPSR_N BIT(31)
 #define TASK_SPSR_Z BIT(30)

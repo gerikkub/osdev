@@ -12,17 +12,6 @@
 #include "kernel/vfs.h"
 #include "kernel/kernelspace.h"
 
-static int64_t find_open_fd(task_t* task) {
-
-    for (int idx = 0; idx < MAX_TASK_FDS; idx++) {
-        if (!task->fds[idx].valid) {
-            return idx;
-        }
-    }
-
-    return -1;
-}
-
 int64_t syscall_open(uint64_t device, uint64_t path, uint64_t flags, uint64_t dummy) {
 
     task_t* task = get_active_task();

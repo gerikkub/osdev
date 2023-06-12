@@ -93,13 +93,15 @@ kernel/exec.c \
 kernel/interrupt/interrupt.c \
 kernel/time.c \
 kernel/net/net.c \
+kernel/net/net_api.c \
 kernel/net/ethernet.c \
 kernel/net/arp.c \
 kernel/net/arp_table.c \
 kernel/net/ipv4.c \
 kernel/net/ipv4_icmp.c \
 kernel/net/ipv4_route.c \
-kernel/net/udp.c
+kernel/net/udp.c \
+kernel/net/udp_socket.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
@@ -147,7 +149,9 @@ $(SYSTEMS_DIR)/echo \
 $(SYSTEMS_DIR)/gsh \
 $(SYSTEMS_DIR)/time \
 $(SYSTEMS_DIR)/addline \
-$(SYSTEMS_DIR)/touch
+$(SYSTEMS_DIR)/touch \
+$(SYSTEMS_DIR)/udp_test \
+$(SYSTEMS_DIR)/udp_recv
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 
@@ -275,7 +279,7 @@ $(DISKIMG): $(MODULES)
 	mkdir -p diskdata/bin
 	cp $(MODULES) diskdata/bin/
 	cp -r diskextras/* diskdata/
-	$(GENEXT2FS_BIN) -b 1440 -d diskdata/ $@
+	$(GENEXT2FS_BIN) -b 2880 -d diskdata/ $@
 #	rm -rf diskdata
 
 print-% : ; @echo $* = $($*)

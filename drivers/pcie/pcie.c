@@ -627,21 +627,18 @@ void pcie_init_interrupts() {
 void pcie_discovered(void* ctx) {
     dt_block_t* dt_block = ((discovery_dtb_ctx_t*)ctx)->block;
 
-    console_printf("Discovered Pcie\n");
+    console_log(LOG_INFO, "Discovered Pcie\n");
 
-    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
-
-    char* name = (char*)&dt_block->data[dt_node->name_off];
-
-    console_printf("Got name: %s\n", name);
-    console_printf("Address: %16x\n", dt_node->address);
-    console_flush();
 
     pci_range_t dtb_ranges = pcie_parse_ranges(dt_block);
     void* pcie_ptr = pcie_parse_allocate_reg(dt_block);
 
     pci_interrupt_map_t* pcie_int_map = pcie_parse_interrupt_map(dt_block);
 
+    //char* name = (char*)&dt_block->data[dt_node->name_off];
+    //dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+
+    /*
     console_printf("PCIE Interrupt Map:\n");
     for (uint64_t idx = 0; idx < pcie_int_map->num_entries; idx++) {
         pci_interrupt_map_entry_t* entry = &pcie_int_map->entries[idx];
@@ -660,6 +657,7 @@ void pcie_discovered(void* ctx) {
                        entry->int_ctx[2]);
         console_printf("\n");
     }
+    */
 
     s_pci_ranges = dtb_ranges;
     s_dtb_alloc.range_ctx = &s_pci_ranges;

@@ -72,15 +72,12 @@ void llist_delete_ptr(llist_head_t head, void* delitem) {
     llist_t* item = head;
 
     while (item->n != NULL && item->dataptr != delitem) {
+        item = item->n;
     }
 
     if (item->dataptr == delitem) {
-        item->n->p = item->p;
-        if (item->p != NULL) {
-            item->p->n = item->n;
-        }
-
-        vfree(item);
+        // TODO: Actually delete nodes
+        item->dataptr = NULL;
     }
 }
 

@@ -15,8 +15,7 @@ bool uintmap_cmp_op(void* key1, void* key2) {
 }
 
 void uintmap_free_op(void* ctx, void* key, void* dataptr) {
-    vfree(key);
-    vfree(dataptr);
+    return;
 }
 
 

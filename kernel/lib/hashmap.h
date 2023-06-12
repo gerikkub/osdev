@@ -6,6 +6,8 @@
 
 #include "kernel/lib/llist.h"
 
+#define UDP_EPHIMERAL_START 32768
+
 typedef uint64_t (*hashmap_hash_fn)(void* key);
 typedef bool (*hashmap_cmp_fn)(void* key1, void* key2);
 typedef void (*hashmap_free_fn)(void* ctx, void* key, void* dataptr);
@@ -32,7 +34,7 @@ void hashmap_dealloc(hashmap_ctx_t* ctx);
 void* hashmap_get(hashmap_ctx_t* ctx, void* key);
 bool hashmap_contains(hashmap_ctx_t* ctx, void* key);
 void hashmap_add(hashmap_ctx_t* ctx, void* key, void* dataptr);
-void hashmap_del(hashmap_ctx_t* ctx, void* key);
+void* hashmap_del(hashmap_ctx_t* ctx, void* key);
 
 uint64_t hashmap_len(hashmap_ctx_t* ctx);
 uint64_t hashmap_tablelen(hashmap_ctx_t* ctx);

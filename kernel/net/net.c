@@ -16,6 +16,7 @@
 #include "kernel/net/net.h"
 #include "kernel/net/nic_ops.h"
 #include "kernel/net/ethernet.h"
+#include "kernel/net/ipv4.h"
 #include "kernel/net/ipv4_route.h"
 
 #include "stdlib/bitutils.h"
@@ -44,7 +45,9 @@ int64_t net_fd_ioctl_op(void* ctx, const uint64_t ioctl, const uint64_t* args, c
             nic_ctx->ipv4.d[2] = ((*args) >> 8) & 0xFF;
             nic_ctx->ipv4.d[1] = ((*args) >> 16) & 0xFF;
             nic_ctx->ipv4.d[0] = ((*args) >> 24) & 0xFF;
-            console_log(LOG_DEBUG, "Set IP for %s to %8x", nic_ctx->name, *args);
+            console_log(LOG_DEBUG, "Set IP for %s to %d.%d.%d.%d",
+                        nic_ctx->name,
+                        LOG_IPV4_ADDR(nic_ctx->ipv4));
             return 0;
         case NET_IOCTL_GET_IP:
             if (arg_count != 0) {
@@ -96,8 +99,6 @@ void net_recv_packet(net_packet_t* packet) {
     res = ethernet_parse_l2_frame(packet, frame_ptr);
 
     if (res != 0) {
-        console_log(LOG_WARN, "Net unable to process incoming packet from %s (%d)",
-                    packet->dev->name, res);
         packet->dev->ops->return_packet(packet);
         vfree(frame_ptr);
         return;
@@ -105,8 +106,6 @@ void net_recv_packet(net_packet_t* packet) {
 
     if (memcmp(&packet->dev->mac, &frame_ptr->dest, sizeof(mac_t)) != 0 && 
         memcmp("\xff\xff\xff\xff\xff\xff", &frame_ptr->dest, sizeof(mac_t)) != 0) {
-        console_log(LOG_INFO, "Net dropping packet with incorrect mac for %s",
-                    packet->dev->name);
         packet->dev->ops->return_packet(packet);
         vfree(frame_ptr);
         return;
@@ -118,7 +117,6 @@ void net_recv_packet(net_packet_t* packet) {
     net_l2_packet_fn l2_packet_handler = hashmap_get(s_ethertype_handlers, &ethertype);
     
     if (l2_packet_handler == NULL) {
-        console_log(LOG_DEBUG, "Net dropping packet with unknown l2 ethertype %u", ethertype);
         packet->dev->ops->return_packet(packet);
         vfree(frame_ptr);
         return;

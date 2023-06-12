@@ -34,7 +34,7 @@ void* vmalloc(uint64_t size) {
     return mem_virt;
 }
 
-void vfree(void* mem) {
+void vfree(const void* mem) {
     memory_entry_t* entry = memspace_get_entry_at_addr_kernel(mem);
     ASSERT(entry->type == MEMSPACE_PHY);
     uint64_t mem_phy = ((memory_entry_phy_t*)entry)->phy_addr;
@@ -88,7 +88,7 @@ void* vmalloc(uint64_t size) {
     return ret;
 }
 
-void vfree(void* mem) {
+void vfree(const void* mem) {
     free_p(mem, &s_vmalloc_state);
 }
 

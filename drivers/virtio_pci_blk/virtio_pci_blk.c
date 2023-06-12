@@ -487,10 +487,6 @@ static void virtio_pci_blk_late_init(void* ctx) {
 
 static void virtio_pci_blk_ctx(void* ctx) {
 
-    console_write("virtio-pci-blk got ctx\n");
-    console_flush();
-
-
     discovery_pci_ctx_t* pci_ctx = ctx;
     discovery_pci_ctx_t* pci_ctx_copy = vmalloc(sizeof(discovery_pci_ctx_t));
     *pci_ctx_copy = *pci_ctx;

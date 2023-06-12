@@ -183,6 +183,7 @@ void kernel_init_lower_thread(void* ctx) {
         res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_ROUTE, args, 2);
     }
 
+    /*
     uint64_t addline_tid;
     char* addline_argv[] = {
         "home",
@@ -220,24 +221,26 @@ void kernel_init_lower_thread(void* ctx) {
     };
     cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
     (void)cat2_tid;
+    */
 
-/*
+    /*
     uint64_t gsh_tid;
     char* gsh_argv[] = {
         NULL
     };
     gsh_tid = exec_user_task("home", "bin/gsh.elf", "gsh", gsh_argv);
     (void)gsh_tid;
-*/
+    */
 
-    uint64_t echo_tid;
-    char* echo_argv[] = {
-        "This is in echo!\n",
+    uint64_t udp_recv_tid;
+    char* udp_recv_argv[] = {
+        "10.0.2.1",
+        "4455",
         NULL
     };
-    echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
-    (void)echo_tid;
-
+    (void)udp_recv_argv;
+    udp_recv_tid = exec_user_task("home", "bin/udp_recv.elf", "udp_recv", udp_recv_argv);
+    (void)udp_recv_tid;
 
     console_log(LOG_DEBUG, "Starting Timer\n");
 
@@ -255,6 +258,7 @@ void kernel_init_lower_thread(void* ctx) {
         ipv4_t dest_ip = {
             .d = {10, 0, 2, 1}
         };
+        (void)dest_ip;
 
         /*
         net_ipv4_icmp_hdr_t ping_request = {
@@ -270,8 +274,19 @@ void kernel_init_lower_thread(void* ctx) {
         net_ipv4_icmp_send_packet(&dest_ip, &ping_request);
         */
 
-        net_udp_send_packet(&dest_ip, 5555, 2233, (uint8_t*)"Hello!\n", 7);
+        //net_udp_send_packet(&dest_ip, 5555, 2233, (uint8_t*)"Hello!\n", 7);
 
+        uint64_t udp_tid;
+        char* udp_argv[] = {
+            "10.0.2.1",
+            "5555",
+            "test\n",
+            "5",
+            NULL
+        };
+        (void)udp_argv;
+        udp_tid = exec_user_task("home", "bin/udp_test.elf", "udp_test", udp_argv);
+        (void)udp_tid;
 
 /*
         uint64_t time_tid;

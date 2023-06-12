@@ -500,3 +500,14 @@ void schedule(void) {
 
     ASSERT(0);
 }
+
+int64_t find_open_fd(task_t* task) {
+
+    for (int idx = 0; idx < MAX_TASK_FDS; idx++) {
+        if (!task->fds[idx].valid) {
+            return idx;
+        }
+    }
+
+    return -1;
+}
