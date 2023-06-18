@@ -6,11 +6,12 @@
 
 #include "kernel/lib/llist.h"
 
-#define UDP_EPHIMERAL_START 32768
 
 typedef uint64_t (*hashmap_hash_fn)(void* key);
 typedef bool (*hashmap_cmp_fn)(void* key1, void* key2);
 typedef void (*hashmap_free_fn)(void* ctx, void* key, void* dataptr);
+
+typedef void (*hashmap_forall_fn)(void* ctx, void* check_ctx, void* key, void* dataptr);
 
 typedef struct {
     llist_head_t* hashtable;
@@ -40,6 +41,8 @@ uint64_t hashmap_len(hashmap_ctx_t* ctx);
 uint64_t hashmap_tablelen(hashmap_ctx_t* ctx);
 
 void hashmap_rehash(hashmap_ctx_t* ctx, uint64_t newlen);
+
+void hashmap_forall(hashmap_ctx_t* ctx, hashmap_forall_fn fn, void* forall_ctx);
 
 
 #endif

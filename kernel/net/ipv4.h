@@ -6,7 +6,7 @@
 
 #include "kernel/net/net.h"
 
-#define LOG_IPV4_ADDR(x) x.d[0], x.d[1], x.d[2], x.d[3]
+#define LOG_IPV4_ADDR(x) (uint64_t)x.d[0], (uint64_t)x.d[1], (uint64_t)x.d[2], (uint64_t)x.d[3]
 
 enum {
     NET_IPV4_PROTO_ICMP = 1,

@@ -11,6 +11,7 @@
 #include "kernel/net/ipv4_icmp.h"
 #include "kernel/net/ipv4_route.h"
 #include "kernel/net/udp.h"
+#include "kernel/net/tcp.h"
 #include "kernel/net/ethernet.h"
 
 #include "stdlib/bitutils.h"
@@ -32,6 +33,7 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
     arp_ok = net_arp_get_mac_for_ipv4(net_dev, dest_ip, &dest_mac);
 
     if (!arp_ok) {
+        console_log(LOG_WARN, "Net IPv4 Dropping Packet. No MAC addr for address");
         return;
     }
 
@@ -69,6 +71,8 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
     send_buffer = net_dev->ops->get_buffer(net_dev, ipv4_header.total_len + eth_overhead, 0);
 
     if (send_buffer == NULL) {
+        console_log(LOG_WARN, "Net IPv4 Dropping Packet. Unable to allocated %u bytes",
+                    ipv4_header.total_len + eth_overhead);
         return;
     }
 
@@ -85,12 +89,14 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
     memcpy(&ipv4_payload[12], &ipv4_header.src_ip, sizeof(ipv4_t));
     memcpy(&ipv4_payload[16], &ipv4_header.dst_ip, sizeof(ipv4_t));
 
-    memcpy(&ipv4_payload[20], payload, payload_len);
+    if (payload_len > 0) {
+        memcpy(&ipv4_payload[20], payload, payload_len);
+    }
 
     uint64_t checksum = 0;
     switch (protocol) {
         case NET_IPV4_PROTO_UDP:
-
+        case NET_IPV4_PROTO_TCP:
 
             // Source and Destination IP
             for (uint64_t idx = 0; idx < 4; idx++) {
@@ -102,7 +108,11 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
 
             checksum += (uint16_t)payload_len;
 
-            net_udp_update_checksum(&ipv4_payload[20], checksum);
+            if (protocol == NET_IPV4_PROTO_UDP) {
+                net_udp_update_checksum(&ipv4_payload[20], checksum);
+            } else if (protocol == NET_IPV4_PROTO_TCP) {
+                net_tcp_update_checksum(&ipv4_payload[20], checksum);
+            }
             break;
     }
 
@@ -174,12 +184,22 @@ void net_ipv4_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame
         return;
     }
 
+    if (ipv4_header.fragment_offset != 0 ||
+        ipv4_header.total_len != frame->payload_len) {
+
+        console_log(LOG_WARN, "Net IP dropping fragmented packet");
+        return;
+    }
+
     switch (ipv4_header.protocol) {
         case NET_IPV4_PROTO_ICMP:
             net_ipv4_handle_icmp(packet, frame, &ipv4_header);
             break;
         case NET_IPV4_PROTO_UDP:
             net_udp_handle_packet(packet, frame, &ipv4_header);
+            break;
+        case NET_IPV4_PROTO_TCP:
+            net_tcp_handle_packet(packet, frame, &ipv4_header);
             break;
     }
 }

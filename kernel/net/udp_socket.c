@@ -15,6 +15,7 @@
 #include "kernel/net/ipv4_icmp.h"
 #include "kernel/net/ipv4_route.h"
 #include "kernel/net/udp.h"
+#include "kernel/net/udp_socket.h"
 #include "kernel/net/ethernet.h"
 
 #include "include/k_net_api.h"

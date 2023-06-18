@@ -101,7 +101,10 @@ kernel/net/ipv4.c \
 kernel/net/ipv4_icmp.c \
 kernel/net/ipv4_route.c \
 kernel/net/udp.c \
-kernel/net/udp_socket.c
+kernel/net/udp_socket.c \
+kernel/net/tcp.c \
+kernel/net/tcp_conn.c \
+kernel/net/tcp_socket.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
@@ -112,7 +115,8 @@ kernel/lib/llist.c \
 kernel/lib/hashmap.c \
 kernel/lib/intmap.c \
 kernel/lock/lock.c \
-kernel/lock/mutex.c
+kernel/lock/mutex.c \
+kernel/lock/circbuffer.c
 
 C_SRC_KERNEL_FS = \
 kernel/fs/file.c \
@@ -151,7 +155,8 @@ $(SYSTEMS_DIR)/time \
 $(SYSTEMS_DIR)/addline \
 $(SYSTEMS_DIR)/touch \
 $(SYSTEMS_DIR)/udp_test \
-$(SYSTEMS_DIR)/udp_recv
+$(SYSTEMS_DIR)/udp_recv \
+$(SYSTEMS_DIR)/tcp_test
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 

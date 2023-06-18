@@ -100,7 +100,7 @@ bool hashmap_contains(hashmap_ctx_t* ctx, void* key) {
 
 void* hashmap_del(hashmap_ctx_t* ctx, void* key) {
 
-    void* entry_key;
+    void* entry_key = NULL;
     uint64_t keyhash = ctx->hash_op(key) & ((1 << ctx->hashtable_log_len) - 1);
 
     llist_head_t keylist = ctx->hashtable[keyhash];
@@ -165,5 +165,19 @@ uint64_t hashmap_tablelen(hashmap_ctx_t* ctx) {
 }
 
 void hashmap_rehash(hashmap_ctx_t* ctx, uint64_t newlen) {
+
+}
+
+void hashmap_forall(hashmap_ctx_t* ctx, hashmap_forall_fn forall_fn, void* forall_ctx) {
+
+    for (uint64_t idx = 0; idx < (1 << ctx->hashtable_log_len); idx++) {
+        hashmap_list_entry_t* entry;
+
+        if (ctx->hashtable[idx] != NULL) {
+            FOR_LLIST(ctx->hashtable[idx], entry)
+                forall_fn(ctx->op_ctx, forall_ctx, entry->key, entry->dataptr);
+            END_FOR_LLIST()
+        }
+    }
 
 }

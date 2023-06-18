@@ -11,6 +11,19 @@
 
 #include "kernel/lib/llist.h"
 
+// llist structure
+//
+
+// llist_head_t -> 
+//
+// /------------------\   /------------------\  /------------------|
+// | n ------------------>| n ----------------->| n -> NULL        |
+// | NULL <- p        |<--- p                |<--- p               |
+// | dataptr -> NULL  |   | dataptr -> item1 |  | dataptr -> item2 |
+// \------------------/   \------------------/  \------------------/
+
+
+
 llist_head_t llist_create() {
     llist_t* l = vmalloc(sizeof(llist_t));
     l->n = NULL;
@@ -26,7 +39,7 @@ void llist_free(llist_head_t head) {
 
 void llist_free_all(llist_head_t head) {
 
-    llist_t* item = head;
+    llist_t* item = head->n;
     while (item != NULL) {
         llist_t* n = item->n;
         vfree(item);
@@ -41,9 +54,9 @@ void llist_free_all(llist_head_t head) {
 
 llist_t* llist_find_helper(llist_head_t head, void* x, uint64_t len) {
 
-    llist_t* item = head;
+    llist_t* item = head->n;
 
-    while (item->n != NULL) {
+    while (item != NULL) {
         if (memcmp(x, item->dataptr, len) == 0) {
             return item;
         }
@@ -62,7 +75,7 @@ void llist_append_ptr(llist_head_t head, void* newitem) {
     }
 
     item->n = vmalloc(sizeof(llist_t));
-    item->dataptr = newitem;
+    item->n->dataptr = newitem;
     item->n->n = NULL;
     item->n->p = item;
 }
@@ -71,13 +84,22 @@ void llist_delete_ptr(llist_head_t head, void* delitem) {
 
     llist_t* item = head;
 
+    if (item->n == NULL) {
+        return;
+    }
+
     while (item->n != NULL && item->dataptr != delitem) {
         item = item->n;
     }
 
     if (item->dataptr == delitem) {
-        // TODO: Actually delete nodes
+        if (item->n != NULL) {
+            item->n->p = item->p;
+        }
+        item->p->n = item->n;
+
         item->dataptr = NULL;
+        vfree(item);
     }
 }
 

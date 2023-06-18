@@ -37,6 +37,8 @@
 #include "kernel/net/ipv4_route.h"
 #include "kernel/net/ipv4_icmp.h"
 #include "kernel/net/udp.h"
+#include "kernel/net/tcp_conn.h"
+#include "kernel/net/tcp_socket.h"
 
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lib/libpci.h"
@@ -125,6 +127,8 @@ void main() {
     net_arp_table_init();
     net_ipv4_init();
     net_route_init();
+    net_tcp_conn_init();
+    net_tcp_socket_init();
 
     task_init((uint64_t*)exstack_entry.base);
     create_kernel_task(8192, kernel_init_lower_thread, NULL);
@@ -232,6 +236,7 @@ void kernel_init_lower_thread(void* ctx) {
     (void)gsh_tid;
     */
 
+   /*
     uint64_t udp_recv_tid;
     char* udp_recv_argv[] = {
         "10.0.2.1",
@@ -241,15 +246,25 @@ void kernel_init_lower_thread(void* ctx) {
     (void)udp_recv_argv;
     udp_recv_tid = exec_user_task("home", "bin/udp_recv.elf", "udp_recv", udp_recv_argv);
     (void)udp_recv_tid;
+    */
+
+    ipv4_t listen_ip = {
+        .d = {10, 0, 2, 15}
+    };
+    (void)listen_ip;
+    net_tcp_conn_create_listener(&listen_ip, 5555);
 
     console_log(LOG_DEBUG, "Starting Timer\n");
 
     uint64_t freq = gtimer_get_frequency();
     uint64_t ticknum = 0;
     //int64_t lastmem = 0;
+    uint64_t tcp_tid = 0;
     while (1) {
-        gtimer_start_downtimer(freq, true);
+        gtimer_start_downtimer(freq / 100, true);
         gtimer_wait_for_trigger();
+
+        net_tcp_timeout_thread(NULL);
 
         //console_log(LOG_INFO, "tick");
 
@@ -276,17 +291,18 @@ void kernel_init_lower_thread(void* ctx) {
 
         //net_udp_send_packet(&dest_ip, 5555, 2233, (uint8_t*)"Hello!\n", 7);
 
-        uint64_t udp_tid;
-        char* udp_argv[] = {
+        char* tcp_argv[] = {
             "10.0.2.1",
-            "5555",
+            "6666",
             "test\n",
             "5",
             NULL
         };
-        (void)udp_argv;
-        udp_tid = exec_user_task("home", "bin/udp_test.elf", "udp_test", udp_argv);
-        (void)udp_tid;
+        (void)tcp_argv;
+        if ((gtimer_get_count() / freq) > 15 && tcp_tid == 0) {
+            tcp_tid = exec_user_task("home", "bin/tcp_test.elf", "tcp_test", tcp_argv);
+        }
+        (void)tcp_tid;
 
 /*
         uint64_t time_tid;

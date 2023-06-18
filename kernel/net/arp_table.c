@@ -30,8 +30,8 @@ static void net_arp_make_ipv4_request(net_dev_t* net_dev, ipv4_t* ipv4, mac_t* m
     memcpy(&req_packet.ipv4.tha, "\xFF\xFF\xFF\xFF\xFF\xFF", sizeof(mac_t));
     memcpy(&req_packet.ipv4.tpa, ipv4, sizeof(ipv4_t));
 
-    console_log(LOG_DEBUG, "Net arp table sending request for %d.%d.%d.%d",
-                ipv4->d[0], ipv4->d[1], ipv4->d[2], ipv4->d[3]);
+    //console_log(LOG_DEBUG, "Net arp table sending request for %d.%d.%d.%d",
+                //ipv4->d[0], ipv4->d[1], ipv4->d[2], ipv4->d[3]);
 
     net_arp_send_packet(net_dev, &req_packet, &req_packet.ipv4.tha);
 }

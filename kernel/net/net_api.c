@@ -16,6 +16,7 @@
 #include "kernel/lib/vmalloc.h"
 #include "kernel/net/net_api.h"
 #include "kernel/net/udp_socket.h"
+#include "kernel/net/tcp_socket.h"
 
 #include "include/k_net_api.h"
 
@@ -45,6 +46,9 @@ int64_t syscall_socket(uint64_t socket_struct_ptr,
     switch (create_socket_ctx->socket_type) {
         case SYSCALL_SOCKET_UDP4:
             ret = net_udp_create_socket(create_socket_ctx, &task->fds[fd_num].ops, &task->fds[fd_num].ctx);
+            break;
+        case SYSCALL_SOCKET_TCP4:
+            ret = net_tcp_create_socket(create_socket_ctx, &task->fds[fd_num].ops, &task->fds[fd_num].ctx);
             break;
         default:
             ret = -1;

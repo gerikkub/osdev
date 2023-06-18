@@ -24,11 +24,11 @@ void llist_free_all(llist_head_t);
 //       FOR_LLIST
 #define FOR_LLIST(head, x) \
 { \
-llist_t* __for_llist_item = head; \
-while (__for_llist_item->n != NULL) {\
+x = NULL; \
+llist_t* __for_llist_item = head->n; \
+while (__for_llist_item != NULL) {\
 x = __for_llist_item->dataptr; \
 __for_llist_item = __for_llist_item->n; \
-if (x == NULL) continue; \
 do {
 
 #define END_FOR_LLIST() } while(0); } } \
