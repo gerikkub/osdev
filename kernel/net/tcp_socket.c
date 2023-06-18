@@ -26,6 +26,7 @@
 #include "stdlib/string.h"
 
 typedef struct {
+
     task_t* task;
 
     bool should_close;
@@ -53,10 +54,6 @@ int64_t net_tcp_socket_recv(void* ctx, const uint8_t* payload, uint64_t payload_
     circbuffer_add(socket_ctx->recv_buffer, payload, payload_len);
 
     return payload_len;
-}
-
-void* net_tcp_socket_create_from_conn(void* ctx, ipv4_t* their_ip, uint16_t their_port) {
-    return NULL;
 }
 
 void net_tcp_socket_close(void* ctx) {
@@ -105,7 +102,7 @@ static int64_t net_tcp_socket_ioctl_fn(void* ctx, const uint64_t ioctl, const ui
     return -1;
 }
 
-static int64_t net_tcp_socket_close_fn(void* ctx) {
+int64_t net_tcp_socket_close_fn(void* ctx) {
 
     net_tcp_socket_ctx_t* socket_ctx = ctx;
 
@@ -125,6 +122,26 @@ static const fd_ops_t s_net_tcp_socket_ops = {
     .close = net_tcp_socket_close_fn,
 };
 
+void* net_tcp_socket_create_from_conn(task_t* task, net_tcp_conn_ctx_t* tcp_ctx, ipv4_t* our_ip, uint16_t our_port, ipv4_t* their_ip, uint16_t their_port, fd_ops_t* ops) {
+
+    // TODO: How should s_tcp_socket_map be dealt with?
+
+    net_tcp_socket_ctx_t* socket_ctx = vmalloc(sizeof(net_tcp_socket_ctx_t));
+
+    socket_ctx->task = task;
+    socket_ctx->should_close = false;
+    socket_ctx->tcp_conn_ctx = tcp_ctx;
+    socket_ctx->recv_buffer = circbuffer_create(4096);
+    socket_ctx->our_ip = *our_ip;
+    socket_ctx->our_port = our_port;
+    socket_ctx->their_ip = *their_ip;
+    socket_ctx->their_port = their_port;
+
+    *ops = s_net_tcp_socket_ops;
+
+    return socket_ctx;
+}
+
 int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out) {
     
     if (create_socket_ctx->tcp4.dest_port == 0) {
@@ -132,17 +149,15 @@ int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* op
         return -1;
     }
 
-    uint64_t listen_port = create_socket_ctx->tcp4.listen_port;
-    if (listen_port == 0) {
-        for (listen_port = TCP_EPHIMERAL_START; listen_port < TCP_EPHIMERAL_END; listen_port++) {
-            if (!hashmap_contains(s_tcp_socket_map, &listen_port)) {
-                break;
-            }
+    uint64_t listen_port;
+    for (listen_port = TCP_EPHIMERAL_START; listen_port < TCP_EPHIMERAL_END; listen_port++) {
+        if (!hashmap_contains(s_tcp_socket_map, &listen_port)) {
+            break;
         }
+    }
 
-        if (listen_port == TCP_EPHIMERAL_END) {
-            return -1;
-        }
+    if (listen_port == TCP_EPHIMERAL_END) {
+        return -1;
     }
 
     if (hashmap_contains(s_tcp_socket_map, &listen_port)) {

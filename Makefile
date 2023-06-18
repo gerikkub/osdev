@@ -104,7 +104,8 @@ kernel/net/udp.c \
 kernel/net/udp_socket.c \
 kernel/net/tcp.c \
 kernel/net/tcp_conn.c \
-kernel/net/tcp_socket.c
+kernel/net/tcp_socket.c \
+kernel/net/tcp_bind.c
 
 C_SRC_KERNEL_LIBS = \
 kernel/lib/libdtb.c \
@@ -156,7 +157,8 @@ $(SYSTEMS_DIR)/addline \
 $(SYSTEMS_DIR)/touch \
 $(SYSTEMS_DIR)/udp_test \
 $(SYSTEMS_DIR)/udp_recv \
-$(SYSTEMS_DIR)/tcp_test
+$(SYSTEMS_DIR)/tcp_test \
+$(SYSTEMS_DIR)/tcp_listen
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 

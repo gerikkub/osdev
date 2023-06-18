@@ -17,6 +17,7 @@
 #include "kernel/net/net_api.h"
 #include "kernel/net/udp_socket.h"
 #include "kernel/net/tcp_socket.h"
+#include "kernel/net/tcp_bind.h"
 
 #include "include/k_net_api.h"
 
@@ -49,6 +50,46 @@ int64_t syscall_socket(uint64_t socket_struct_ptr,
             break;
         case SYSCALL_SOCKET_TCP4:
             ret = net_tcp_create_socket(create_socket_ctx, &task->fds[fd_num].ops, &task->fds[fd_num].ctx);
+            break;
+        default:
+            ret = -1;
+            break;
+    }
+
+    if (ret >= 0) {
+        task->fds[fd_num].valid = true;
+        return fd_num;
+    } else {
+        return -1;
+    }
+}
+
+int64_t syscall_bind(uint64_t bind_struct_ptr,
+                     uint64_t x1,
+                     uint64_t x2,
+                     uint64_t x3) {
+
+    task_t* task = get_active_task();
+
+    uint64_t bind_struct_phy;
+    bool walk_ok;
+    walk_ok = vmem_walk_table(task->low_vm_table, bind_struct_ptr, &bind_struct_phy);
+    if (!walk_ok) {
+        return SYSCALL_ERROR_BADARG;
+    }
+
+    k_bind_port_t* bind_port_ctx = (k_bind_port_t*)(PHY_TO_KSPACE(bind_struct_phy));
+
+    int64_t fd_num = find_open_fd(task);
+    if (fd_num < 0) {
+        return -1;
+    }
+
+    int64_t ret;
+
+    switch (bind_port_ctx->bind_type) {
+        case SYSCALL_BIND_TCP4:
+            ret = net_tcp_bind_port(bind_port_ctx, &task->fds[fd_num].ops, &task->fds[fd_num].ctx);
             break;
         default:
             ret = -1;

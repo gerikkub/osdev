@@ -23,18 +23,14 @@
 int64_t main(uint64_t tid, char** ctx) {
 
     if (ctx[0] == NULL ||
-        ctx[1] == NULL ||
-        ctx[2] == NULL ||
-        ctx[3] == NULL) {
+        ctx[1] == NULL) {
 
         console_printf("Invalid Arguments\n");
         return -1;
     }
 
     char* ip_str = ctx[0];
-    uint16_t dest_port = strtoi64(ctx[1], NULL);
-    char* msg = ctx[2];
-    int64_t msg_len = strtoi64(ctx[3], NULL);
+    uint16_t listen_port = strtoi64(ctx[1], NULL);
 
     char* ip_str_0 = ip_str;
     char* ip_str_1 = ip_str;
@@ -75,27 +71,47 @@ int64_t main(uint64_t tid, char** ctx) {
     ip.d[2] = strtoi64(ip_str_2, NULL);
     ip.d[3] = strtoi64(ip_str_3, NULL);
 
-    k_create_socket_t socket_setup = {
-        .socket_type = SYSCALL_SOCKET_TCP4,
-        .tcp4.dest_ip = ip,
-        .tcp4.dest_port = dest_port
+    k_bind_port_t bind_setup = {
+        .bind_type = SYSCALL_BIND_TCP4,
+        .tcp4.bind_ip = ip,
+        .tcp4.listen_port = listen_port
     };
 
-    int64_t socket_fd = -1;
-    (void)socket_setup;
-    socket_fd = system_socket(&socket_setup);
+    int64_t bind_fd = -1;
+    bind_fd = system_bind(&bind_setup);
 
-    if (socket_fd < 0) {
-        console_printf("Unable to open socket\n");
+    if (bind_fd < 0) {
+        console_printf("Unable to bind port\n");
         return -1;
     }
 
-    (void)msg;
-    (void)msg_len;
-    system_write(socket_fd, msg, msg_len, 0);
-
     while (true) {
-        system_yield();
+        int64_t socket_fd = system_ioctl(bind_fd, BIND_IOCTL_GET_INCOMING, NULL, 0);
+
+        if (socket_fd < 0) {
+            system_yield();
+            continue;
+        }
+
+        console_printf("New connection\n");
+        console_flush();
+
+        uint8_t buffer[256];
+        int64_t bytes_read;
+        do {
+            memset(buffer, 0, 256);
+            bytes_read = system_read(socket_fd, buffer, 255, K_SOCKET_READ_FLAGS_NONBLOCKING);
+
+            if (bytes_read > 0) {
+                console_printf("Read: %s\n", buffer);
+                console_flush();
+            }
+        } while (bytes_read >= 0);
+
+        system_close(socket_fd);
+
+        console_printf("Connection closed\n");
+        console_flush();
     }
 
     return 0;

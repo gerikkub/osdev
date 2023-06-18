@@ -39,6 +39,7 @@
 #include "kernel/net/udp.h"
 #include "kernel/net/tcp_conn.h"
 #include "kernel/net/tcp_socket.h"
+#include "kernel/net/tcp_bind.h"
 
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lib/libpci.h"
@@ -129,6 +130,7 @@ void main() {
     net_route_init();
     net_tcp_conn_init();
     net_tcp_socket_init();
+    net_tcp_bind_init();
 
     task_init((uint64_t*)exstack_entry.base);
     create_kernel_task(8192, kernel_init_lower_thread, NULL);
@@ -248,11 +250,15 @@ void kernel_init_lower_thread(void* ctx) {
     (void)udp_recv_tid;
     */
 
-    ipv4_t listen_ip = {
-        .d = {10, 0, 2, 15}
+    uint64_t tcp_listen_tid;
+    char* tcp_listen_argv[] = {
+        "10.0.2.15",
+        "4455",
+        NULL
     };
-    (void)listen_ip;
-    net_tcp_conn_create_listener(&listen_ip, 5555);
+    (void)tcp_listen_argv;
+    tcp_listen_tid = exec_user_task("home", "bin/tcp_listen.elf", "tcp_listen", tcp_listen_argv);
+    (void)tcp_listen_tid;
 
     console_log(LOG_DEBUG, "Starting Timer\n");
 
@@ -300,7 +306,7 @@ void kernel_init_lower_thread(void* ctx) {
         };
         (void)tcp_argv;
         if ((gtimer_get_count() / freq) > 15 && tcp_tid == 0) {
-            tcp_tid = exec_user_task("home", "bin/tcp_test.elf", "tcp_test", tcp_argv);
+            //tcp_tid = exec_user_task("home", "bin/tcp_test.elf", "tcp_test", tcp_argv);
         }
         (void)tcp_tid;
 

@@ -60,8 +60,8 @@ void net_tcp_send_packet(ipv4_t* dest_ip, net_tcp_hdr_t* tcp_header) {
     checksum = (checksum & 0xFFFF) + (checksum >> 16);
     *(uint16_t*)&tcp_buffer[16] = checksum;
 
-    console_log(LOG_DEBUG, "Net TCP sending packet");
-    net_tcp_print_packet(NULL, dest_ip, tcp_header);
+    //console_log(LOG_DEBUG, "Net TCP sending packet");
+    //net_tcp_print_packet(NULL, dest_ip, tcp_header);
 
     net_ipv4_send_packet(dest_ip, NET_IPV4_PROTO_TCP, tcp_buffer, tcp_buffer_len);
 

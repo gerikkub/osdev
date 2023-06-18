@@ -301,6 +301,7 @@ void syscall_init(void) {
     s_syscall_table[SYSCALL_EXIT] = syscall_exit;
     s_syscall_table[SYSCALL_EXEC] = syscall_exec;
     s_syscall_table[SYSCALL_SOCKET] = syscall_socket;
+    s_syscall_table[SYSCALL_BIND] = syscall_bind;
 
     set_sync_handler(EC_SVC, syscall_sync_handler);
 }

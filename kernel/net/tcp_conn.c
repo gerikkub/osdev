@@ -13,6 +13,7 @@
 #include "kernel/net/tcp.h"
 #include "kernel/net/tcp_conn.h"
 #include "kernel/net/tcp_socket.h"
+#include "kernel/net/tcp_bind.h"
 
 #include "stdlib/bitutils.h"
 #include "stdlib/string.h"
@@ -164,7 +165,7 @@ void net_tcp_send_std(net_tcp_conn_ctx_t* tcp_ctx, uint8_t* payload, uint64_t pa
     net_tcp_send_packet(&tcp_ctx->their_ip, &resp_header);
 }
 
-net_tcp_conn_ctx_t* net_tcp_conn_create_listener(ipv4_t* listen_addr, uint16_t listen_port) {
+net_tcp_conn_ctx_t* net_tcp_conn_create_listener(ipv4_t* listen_addr, uint16_t listen_port, void* bind_ctx) {
     net_tcp_conn_key_t key = {
         .their_ip.d = {0},
         .their_port = 0,
@@ -183,6 +184,8 @@ net_tcp_conn_ctx_t* net_tcp_conn_create_listener(ipv4_t* listen_addr, uint16_t l
     listener_ctx->conn_state = NET_TCP_CONN_SM_LISTEN;
     listener_ctx->timeout_expire = UINT64_MAX;
     listener_ctx->force_close_timeout_expire = UINT64_MAX;
+
+    listener_ctx->socket_ctx = bind_ctx;
 
     hashmap_add(s_tcp_conn_map, new_key, listener_ctx);
 
@@ -258,7 +261,7 @@ void net_tcp_handle_new_connection(net_ipv4_hdr_t* ipv4_header, net_tcp_hdr_t* t
 
     new_ctx->force_close_timeout_expire = UINT64_MAX;
 
-    new_ctx->socket_ctx = net_tcp_socket_create_from_conn(ctx->socket_ctx, &new_ctx->their_ip, new_ctx->their_port);
+    new_ctx->socket_ctx = net_tcp_bind_new_connection(ctx->socket_ctx, new_ctx, &new_ctx->their_ip, new_ctx->their_port);
 
     net_tcp_reset_timeout(new_ctx, NET_TCP_STD_TIMEOUT);
 
@@ -454,9 +457,9 @@ void net_tcp_conn_close_from_socket(net_tcp_conn_ctx_t* tcp_ctx) {
 
 void net_tcp_conn_cleanup(net_tcp_conn_key_t* conn_key, net_tcp_conn_ctx_t* conn_ctx) {
 
-    console_log(LOG_DEBUG, "Net TCP Closing Connection (%u.%u.%u.%u:%u %u.%u.%u.%u:%u)",
-                LOG_IPV4_ADDR(conn_key->their_ip), conn_key->their_port,
-                LOG_IPV4_ADDR(conn_key->our_ip), conn_key->our_port);
+    //console_log(LOG_DEBUG, "Net TCP Closing Connection (%u.%u.%u.%u:%u %u.%u.%u.%u:%u)",
+                //LOG_IPV4_ADDR(conn_key->their_ip), conn_key->their_port,
+                //LOG_IPV4_ADDR(conn_key->our_ip), conn_key->our_port);
 
     hashmap_del(s_tcp_conn_map, conn_key);
 
@@ -489,8 +492,10 @@ static char* s_tcp_conn_sm_str[] = {
 
 void net_tcp_handle_connection(net_packet_t* packet, net_ipv4_hdr_t* ipv4_header, net_tcp_hdr_t* tcp_header) {
 
-    console_log(LOG_DEBUG, "Net TCP received packet");
-    net_tcp_print_packet(&ipv4_header->src_ip, &ipv4_header->dst_ip, tcp_header);
+    (void)s_tcp_conn_sm_str;
+
+    //console_log(LOG_DEBUG, "Net TCP received packet");
+    //net_tcp_print_packet(&ipv4_header->src_ip, &ipv4_header->dst_ip, tcp_header);
 
     net_tcp_conn_key_t conn_key = {
         .our_ip = ipv4_header->dst_ip,
@@ -525,8 +530,8 @@ void net_tcp_handle_connection(net_packet_t* packet, net_ipv4_hdr_t* ipv4_header
 
     } else {
 
-        console_log(LOG_DEBUG, "Net TCP state at reception %s",
-                    s_tcp_conn_sm_str[conn_ctx->conn_state]);
+        //console_log(LOG_DEBUG, "Net TCP state at reception %s",
+                    //s_tcp_conn_sm_str[conn_ctx->conn_state]);
 
         if (tcp_header->f_rst) {
             console_log(LOG_DEBUG, "Net TCP saw reset");
@@ -570,8 +575,8 @@ void net_tcp_handle_connection(net_packet_t* packet, net_ipv4_hdr_t* ipv4_header
         }
     }
 
-    console_log(LOG_DEBUG, "Net TCP state after processing %s",
-                s_tcp_conn_sm_str[conn_ctx->conn_state]);
+    //console_log(LOG_DEBUG, "Net TCP state after processing %s",
+                //s_tcp_conn_sm_str[conn_ctx->conn_state]);
 
     if (conn_ctx->conn_state == NET_TCP_CONN_SM_CLOSED) {
         net_tcp_conn_cleanup(&conn_key, conn_ctx);

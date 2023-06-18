@@ -13,5 +13,7 @@
 #define NET_IOCTL_GET_IP 65
 #define NET_IOCTL_SET_ROUTE 66
 
+// Bind Ops
+#define BIND_IOCTL_GET_INCOMING 64
 
 #endif

@@ -56,10 +56,11 @@ typedef struct {
 int64_t net_tcp_conn_recv_data(net_tcp_conn_ctx_t* tcp_ctx, const uint8_t* buffer, uint64_t len);
 void net_tcp_conn_init(void);
 
-net_tcp_conn_ctx_t* net_tcp_conn_create_listener(ipv4_t* listen_addr, uint16_t listen_port);
+net_tcp_conn_ctx_t* net_tcp_conn_create_listener(ipv4_t* listen_addr, uint16_t listen_port, void* bind_ctx);
 net_tcp_conn_ctx_t* net_tcp_conn_create_client(ipv4_t* our_addr, ipv4_t* their_addr, uint16_t our_port, uint16_t their_port, void* socket_ctx);
 
 void net_tcp_conn_close_from_socket(net_tcp_conn_ctx_t* tcp_ctx);
+void net_tcp_conn_close_listener(net_tcp_conn_ctx_t* tcp_ctx);
 
 void net_tcp_handle_connection(net_packet_t* packet, net_ipv4_hdr_t* ipv4_header, net_tcp_hdr_t* tcp_header);
 void net_tcp_timeout_thread(void* ctx);

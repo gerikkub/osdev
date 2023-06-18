@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "kernel/net/ipv4.h"
+#include "kernel/net/tcp_conn.h"
 
 #include "include/k_net_api.h"
 
@@ -14,8 +15,10 @@
 int64_t net_tcp_socket_recv(void* ctx, const uint8_t* payload, uint64_t payload_len);
 
 int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out);
-void* net_tcp_socket_create_from_conn(void* ctx, ipv4_t* their_ip, uint16_t their_port);
+void* net_tcp_socket_create_from_conn(task_t* task, net_tcp_conn_ctx_t* tcp_ctx, ipv4_t* our_ip, uint16_t our_port, ipv4_t* their_ip, uint16_t their_port, fd_ops_t* ops);
+
 void net_tcp_socket_close(void* ctx);
+int64_t net_tcp_socket_close_fn(void* ctx);
 
 void net_tcp_socket_init(void);
 

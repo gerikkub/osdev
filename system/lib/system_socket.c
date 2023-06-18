@@ -10,3 +10,9 @@ int64_t system_socket(k_create_socket_t* socket_ptr) {
     SYSCALL_CALL_RET(SYSCALL_SOCKET, (uintptr_t)socket_ptr, 0, 0, 0, ret);
     return ret;
 }
+
+int64_t system_bind(k_bind_port_t* bind_ptr) {
+    int64_t ret;
+    SYSCALL_CALL_RET(SYSCALL_BIND, (uintptr_t)bind_ptr, 0, 0, 0, ret);
+    return ret;
+}
