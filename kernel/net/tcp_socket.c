@@ -66,10 +66,6 @@ static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t 
 
     net_tcp_socket_ctx_t* socket_ctx = ctx;
 
-    if (socket_ctx->should_close) {
-        return -1;
-    }
-
     int64_t bytes_avail = circbuffer_len(socket_ctx->recv_buffer);
     int64_t bytes_read = (bytes_avail < size) ? bytes_avail : size;
 
@@ -77,6 +73,11 @@ static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t 
         circbuffer_get(socket_ctx->recv_buffer, buffer, bytes_read);
         return bytes_read;
     } else {
+
+        if (socket_ctx->should_close) {
+            return -1;
+        }
+
         if (flags & K_SOCKET_READ_FLAGS_NONBLOCKING) {
             return 0;
         } else {
@@ -122,7 +123,7 @@ static const fd_ops_t s_net_tcp_socket_ops = {
     .close = net_tcp_socket_close_fn,
 };
 
-void* net_tcp_socket_create_from_conn(task_t* task, net_tcp_conn_ctx_t* tcp_ctx, ipv4_t* our_ip, uint16_t our_port, ipv4_t* their_ip, uint16_t their_port, fd_ops_t* ops) {
+void* net_tcp_socket_create_from_conn(task_t* task, void* tcp_ctx, ipv4_t* our_ip, uint16_t our_port, ipv4_t* their_ip, uint16_t their_port, fd_ops_t* ops) {
 
     // TODO: How should s_tcp_socket_map be dealt with?
 

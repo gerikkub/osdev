@@ -30,7 +30,7 @@ typedef struct {
 
     task_t* task;
 
-    net_tcp_conn_ctx_t* tcp_conn_ctx;
+    void* tcp_listener_ctx;
 
     ipv4_t our_addr;
     uint16_t our_port;
@@ -41,11 +41,12 @@ typedef struct {
 typedef struct {
     fd_ops_t socket_ops;
     void* socket_ctx;
+    void* tcp_ctx;
 } net_tcp_bind_incoming_t;
 
 hashmap_ctx_t* s_tcp_listen_map = NULL;
 
-void* net_tcp_bind_new_connection(void* ctx, net_tcp_conn_ctx_t* tcp_ctx, ipv4_t* their_addr, uint16_t their_port) {
+void* net_tcp_bind_new_connection(void* ctx, void* tcp_ctx, ipv4_t* their_addr, uint16_t their_port) {
 
     net_tcp_bind_ctx_t* bind_ctx = ctx;
 
@@ -57,6 +58,7 @@ void* net_tcp_bind_new_connection(void* ctx, net_tcp_conn_ctx_t* tcp_ctx, ipv4_t
                                                              their_addr,
                                                              their_port,
                                                              &new_socket->socket_ops);
+    new_socket->tcp_ctx = tcp_ctx;
 
     llist_append_ptr(bind_ctx->incoming_connections, new_socket);
 
@@ -81,6 +83,8 @@ static int64_t net_tcp_bind_get_incoming(net_tcp_bind_ctx_t* bind_ctx) {
     bind_ctx->task->fds[fd_num].ctx = new_socket->socket_ctx;
     bind_ctx->task->fds[fd_num].valid = true;
 
+    net_tcp_conn_activate_connection(new_socket->tcp_ctx);
+
     vfree(new_socket);
 
     return fd_num;
@@ -103,7 +107,7 @@ static int64_t net_tcp_bind_close_fn(void* ctx) {
     net_tcp_bind_ctx_t* bind_ctx = ctx;
 
     // TODO: Free listener resources
-    //net_tcp_conn_close_listener(bind_ctx->tcp_conn_ctx);
+    //net_tcp_conn_close_listener(bind_ctx->tcp_listener_ctx);
 
     net_tcp_bind_incoming_t* entry;
     FOR_LLIST(bind_ctx->incoming_connections, entry)
@@ -139,7 +143,7 @@ int64_t net_tcp_bind_port(k_bind_port_t* bind_port_ctx, fd_ops_t* ops, void** ct
     bind_ctx->our_port = bind_port_ctx->tcp4.listen_port;
     bind_ctx->incoming_connections = llist_create();
 
-    bind_ctx->tcp_conn_ctx = net_tcp_conn_create_listener(&bind_ctx->our_addr,
+    bind_ctx->tcp_listener_ctx = net_tcp_conn_create_listener(&bind_ctx->our_addr,
                                                           bind_ctx->our_port,
                                                           bind_ctx);
 
