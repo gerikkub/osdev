@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include <kernel/assert.h>
 #include <kernel/fs/sysfs/sysfs.h>
@@ -8,8 +9,8 @@
 #include <kernel/lib/vmalloc.h>
 #include <kernel/gtimer.h>
 
-#include <stdlib/string.h>
 #include <stdlib/bitutils.h>
+#include <stdlib/printf.h>
 #include <stdlib/malloc.h>
 
 void* sysfs_vmalloc_stat_open(void) {

@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
@@ -22,7 +23,6 @@
 #include "include/k_ioctl_common.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 typedef struct {
     pci_device_ctx_t* pci_ctx;
@@ -96,8 +96,6 @@ void virtio_pci_net_nic_return_packet(struct net_packet* packet) {
     virtio_virtq_buffer_t* virtq_buffer = packet->nic_pkt_ctx;
     net_dev_t* net_dev = packet->dev;
     virtio_pci_net_ctx_t* nic_ctx = net_dev->nic_ctx;
-
-    console_log(LOG_DEBUG, "Returning packet %16x", packet);
 
     virtio_return_buffer(&nic_ctx->receiveq1, virtq_buffer->ptr);
     (void)net_dev;

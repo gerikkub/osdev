@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
@@ -7,7 +8,6 @@
 #include "kernel/panic.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 #define MAX_NUM_DEVICES 64
 

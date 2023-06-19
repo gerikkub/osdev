@@ -48,8 +48,8 @@
 #define vsnprintf my_vsnprintf
 #endif /* SNPRINTF_TEST */
 
-int snprintf(char* str, size_t size, const char* format, ...);
-int vsnprintf(char* str, size_t size, const char* format, va_list arg);
+int snprintf(char* str, uint64_t size, const char* format, ...);
+int vsnprintf(char* str, uint64_t size, const char* format, va_list arg);
 
 /**
  * Very portable snprintf implementation, limited in functionality,
@@ -61,7 +61,7 @@ int vsnprintf(char* str, size_t size, const char* format, va_list arg);
  * %f, %g, %m, %p have reduced support, support for wid,prec,flags,*, but
  *   less floating point range, no %e formatting for %g.
  */
-int snprintf(char* str, size_t size, const char* format, ...)
+int snprintf(char* str, uint64_t size, const char* format, ...)
 {
 	int r;
 	va_list args;
@@ -73,7 +73,7 @@ int snprintf(char* str, size_t size, const char* format, ...)
 
 /** add padding to string */
 static void
-print_pad(char** at, size_t* left, int* ret, char p, int num)
+print_pad(char** at, uint64_t* left, int* ret, char p, int num)
 {
 	while(num--) {
 		if(*left > 1) {
@@ -205,7 +205,7 @@ print_hex_ll(char* buf, int max, unsigned long long value)
 
 /** copy string into result, reversed */
 static void
-spool_str_rev(char** at, size_t* left, int* ret, const char* buf, int len)
+spool_str_rev(char** at, uint64_t* left, int* ret, const char* buf, int len)
 {
 	int i = len;
 	while(i) {
@@ -219,7 +219,7 @@ spool_str_rev(char** at, size_t* left, int* ret, const char* buf, int len)
 
 /** copy string into result */
 static void
-spool_str(char** at, size_t* left, int* ret, const char* buf, int len)
+spool_str(char** at, uint64_t* left, int* ret, const char* buf, int len)
 {
 	int i;
 	for(i=0; i<len; i++) {
@@ -233,7 +233,7 @@ spool_str(char** at, size_t* left, int* ret, const char* buf, int len)
 
 /** print number formatted */
 static void
-print_num(char** at, size_t* left, int* ret, int minw, int precision,
+print_num(char** at, uint64_t* left, int* ret, int minw, int precision,
 	int prgiven, int zeropad, int minus, int plus, int space,
 	int zero, int negative, char* buf, int len)
 {
@@ -290,7 +290,7 @@ print_num(char** at, size_t* left, int* ret, int minw, int precision,
 
 /** print %d and %i */
 static void
-print_num_d(char** at, size_t* left, int* ret, int value,
+print_num_d(char** at, uint64_t* left, int* ret, int value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -305,7 +305,7 @@ print_num_d(char** at, size_t* left, int* ret, int value,
 
 /** print %ld and %li */
 static void
-print_num_ld(char** at, size_t* left, int* ret, long value,
+print_num_ld(char** at, uint64_t* left, int* ret, long value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -320,7 +320,7 @@ print_num_ld(char** at, size_t* left, int* ret, long value,
 
 /** print %lld and %lli */
 static void
-print_num_lld(char** at, size_t* left, int* ret, long long value,
+print_num_lld(char** at, uint64_t* left, int* ret, long long value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -335,7 +335,7 @@ print_num_lld(char** at, size_t* left, int* ret, long long value,
 
 /** print %u */
 static void
-print_num_u(char** at, size_t* left, int* ret, unsigned int value,
+print_num_u(char** at, uint64_t* left, int* ret, unsigned int value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -349,7 +349,7 @@ print_num_u(char** at, size_t* left, int* ret, unsigned int value,
 
 /** print %lu */
 static void
-print_num_lu(char** at, size_t* left, int* ret, unsigned long value,
+print_num_lu(char** at, uint64_t* left, int* ret, unsigned long value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -363,7 +363,7 @@ print_num_lu(char** at, size_t* left, int* ret, unsigned long value,
 
 /** print %llu */
 static void
-print_num_llu(char** at, size_t* left, int* ret, unsigned long long value,
+print_num_llu(char** at, uint64_t* left, int* ret, unsigned long long value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -377,7 +377,7 @@ print_num_llu(char** at, size_t* left, int* ret, unsigned long long value,
 
 /** print %x */
 static void
-print_num_x(char** at, size_t* left, int* ret, unsigned int value,
+print_num_x(char** at, uint64_t* left, int* ret, unsigned int value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -391,7 +391,7 @@ print_num_x(char** at, size_t* left, int* ret, unsigned int value,
 
 /** print %lx */
 static void
-print_num_lx(char** at, size_t* left, int* ret, unsigned long value,
+print_num_lx(char** at, uint64_t* left, int* ret, unsigned long value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -405,7 +405,7 @@ print_num_lx(char** at, size_t* left, int* ret, unsigned long value,
 
 /** print %llx */
 static void
-print_num_llx(char** at, size_t* left, int* ret, unsigned long long value,
+print_num_llx(char** at, uint64_t* left, int* ret, unsigned long long value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -419,7 +419,7 @@ print_num_llx(char** at, size_t* left, int* ret, unsigned long long value,
 
 /** print %llp */
 static void
-print_num_llp(char** at, size_t* left, int* ret, void* value,
+print_num_llp(char** at, uint64_t* left, int* ret, void* value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -504,7 +504,7 @@ print_num_llp(char** at, size_t* left, int* ret, void* value,
 /** print %f */
 /*
 static void
-print_num_f(char** at, size_t* left, int* ret, double value,
+print_num_f(char** at, uint64_t* left, int* ret, double value,
 	int minw, int precision, int prgiven, int zeropad, int minus,
 	int plus, int space)
 {
@@ -550,7 +550,7 @@ print_num_f(char** at, size_t* left, int* ret, double value,
 
 // /** print %g */
 // static void
-// print_num_g(char** at, size_t* left, int* ret, double value,
+// print_num_g(char** at, uint64_t* left, int* ret, double value,
 // 	int minw, int precision, int prgiven, int zeropad, int minus,
 // 	int plus, int space)
 // {
@@ -580,7 +580,7 @@ my_strnlen(const char* s, int max)
 
 /** print %s */
 static void
-print_str(char** at, size_t* left, int* ret, char* s,
+print_str(char** at, uint64_t* left, int* ret, char* s,
 	int minw, int precision, int prgiven, int minus)
 {
 	int w;
@@ -597,7 +597,7 @@ print_str(char** at, size_t* left, int* ret, char* s,
 
 /** print %c */
 static void
-print_char(char** at, size_t* left, int* ret, int c,
+print_char(char** at, uint64_t* left, int* ret, int c,
 	int minw, int minus)
 {
 	if(1 < minw && !minus)
@@ -626,10 +626,10 @@ print_char(char** at, size_t* left, int* ret, int c,
  * 		%20s, '.*s'
  * 	and %%.
  */
-int vsnprintf(char* str, size_t size, const char* format, va_list arg)
+int vsnprintf(char* str, uint64_t size, const char* format, va_list arg)
 {
 	char* at = str;
-	size_t left = size;
+	uint64_t left = size;
 	int ret = 0;
 	const char* fmt = format;
 	int conv, minw, precision, prgiven, zeropad, minus, plus, space, length;

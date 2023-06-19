@@ -10,6 +10,8 @@
 #include "kernel/kernelspace.h"
 #include "kernel/lib/vmalloc.h"
 
+#include "stdlib/printf.h"
+
 void pagefault_print_backtrace(task_t* task) {
 
     struct stackframe_t {

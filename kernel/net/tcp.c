@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -14,7 +15,6 @@
 #include "kernel/net/ethernet.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 static uint64_t net_tcp_get_header_len(net_tcp_hdr_t* tcp_header) {
     return tcp_header->doff * 4;

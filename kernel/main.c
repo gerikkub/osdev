@@ -260,6 +260,16 @@ void kernel_init_lower_thread(void* ctx) {
     (void)udp_recv_tid;
     */
 
+   /*
+   uint64_t echo_tid;
+   char* echo_argv[] = {
+        "Hello"
+   };
+   (void)echo_argv;
+   echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
+   (void)echo_tid;
+   */
+
     uint64_t tcp_listen_tid;
     char* tcp_listen_argv[] = {
         "10.0.2.15",
@@ -277,7 +287,7 @@ void kernel_init_lower_thread(void* ctx) {
         NULL
     };
     (void)http_server_argv;
-    http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
+    //http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
     (void)http_server_tid;
 
     console_log(LOG_DEBUG, "Starting Timer\n");

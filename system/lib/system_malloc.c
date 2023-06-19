@@ -14,15 +14,21 @@
 static malloc_state_t s_malloc_state;
 
 static int64_t malloc_add_mem(bool initialize, uint64_t len, void* ctx, malloc_state_t* state) {
+    SYS_ASSERT(state != NULL);
 
     if (initialize) {
         uintptr_t base;
         uintptr_t limit;
         SYSCALL_CALL_RET(SYSCALL_SBRK, 0, 0, 0, 0, base);
         SYS_ASSERT(base > 0);
+        SYS_ASSERT(state != NULL);
 
         SYSCALL_CALL_RET(SYSCALL_SBRK, MIN_MALLOC_SBRK_SIZE, 0, 0, 0, limit);
         SYS_ASSERT(limit > 0);
+        //SYS_ASSERT(state != NULL);
+        if (state == 0) {
+            while(1);
+        }
 
         state->base = base;
         state->limit = limit;
@@ -32,6 +38,7 @@ static int64_t malloc_add_mem(bool initialize, uint64_t len, void* ctx, malloc_s
 
         SYSCALL_CALL_RET(SYSCALL_SBRK, len, 0, 0, 0, limit);
         SYS_ASSERT(limit > 0);
+        SYS_ASSERT(state != NULL);
 
         state->limit = limit;
         return len;

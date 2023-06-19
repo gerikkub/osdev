@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
@@ -18,7 +19,6 @@
 #include "include/k_ioctl_common.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 typedef struct __attribute__((__packed__)) {
     uint64_t capacity;

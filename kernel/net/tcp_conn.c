@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -16,7 +17,6 @@
 #include "kernel/net/tcp_bind.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 typedef struct {
     ipv4_t our_ip;

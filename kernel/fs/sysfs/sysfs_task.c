@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include <kernel/assert.h>
 #include <kernel/fs/sysfs/sysfs.h>
@@ -8,8 +9,8 @@
 #include <kernel/task.h>
 #include <kernel/lib/vmalloc.h>
 
-#include <stdlib/string.h>
 #include <stdlib/bitutils.h>
+#include <stdlib/printf.h>
 
 typedef struct {
     llist_head_t data_list;

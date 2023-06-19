@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #ifdef KERNEL_BUILD
 #include "kernel/assert.h"
@@ -12,7 +13,6 @@
 
 #include "stdlib/bitutils.h"
 #include "stdlib/bitalloc.h"
-#include "stdlib/string.h"
 
 void bitalloc_init(bitalloc_t* state, uint64_t base, uint64_t limit, bitalloc_alloc_fn alloc_func) {
 

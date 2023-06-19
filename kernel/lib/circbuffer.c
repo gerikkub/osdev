@@ -1,12 +1,12 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lib/circbuffer.h"
 
-#include "stdlib/string.h"
 #include "stdlib/bitutils.h"
 
 circbuffer_t* circbuffer_create(uint64_t len) {

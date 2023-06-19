@@ -18,7 +18,6 @@
 #include "include/k_net_api.h"
 
 #include "stdlib/printf.h"
-#include "stdlib/string.h"
 
 int64_t main(uint64_t tid, char** ctx) {
 
@@ -32,9 +31,9 @@ int64_t main(uint64_t tid, char** ctx) {
     }
 
     char* ip_str = ctx[0];
-    uint16_t dest_port = strtoi64(ctx[1], NULL);
+    uint16_t dest_port = strtoll(ctx[1], NULL, 10);
     char* msg = ctx[2];
-    int64_t msg_len = strtoi64(ctx[3], NULL);
+    int64_t msg_len = strtoll(ctx[3], NULL, 10);
 
     char* ip_str_0 = ip_str;
     char* ip_str_1 = ip_str;
@@ -70,10 +69,10 @@ int64_t main(uint64_t tid, char** ctx) {
     ip_str_3++;
 
     k_ipv4_t ip;
-    ip.d[0] = strtoi64(ip_str_0, NULL);
-    ip.d[1] = strtoi64(ip_str_1, NULL);
-    ip.d[2] = strtoi64(ip_str_2, NULL);
-    ip.d[3] = strtoi64(ip_str_3, NULL);
+    ip.d[0] = strtol(ip_str_0, NULL, 10);
+    ip.d[1] = strtol(ip_str_1, NULL, 10);
+    ip.d[2] = strtol(ip_str_2, NULL, 10);
+    ip.d[3] = strtol(ip_str_3, NULL, 10);
 
     k_create_socket_t socket_setup = {
         .socket_type = SYSCALL_SOCKET_UDP4,

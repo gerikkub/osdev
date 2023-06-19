@@ -1,12 +1,11 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "kernel/lib/vmalloc.h"
 #include "kernel/assert.h"
 #include "kernel/lib/llist.h"
-
-#include "stdlib/string.h"
 
 #include "kernel/lib/hashmap.h"
 

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/fd.h"
@@ -14,7 +15,6 @@
 #include "include/k_ioctl_common.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 
 void ext2_get_inode_idx(ext2_superblock_t* sb, const uint32_t inode,

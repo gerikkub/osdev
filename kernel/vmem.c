@@ -575,10 +575,9 @@ void vmem_print_l0_table(_vmem_table* table_ptr) {
 
                                 if (VMEM_ENTRY_IS_PAGE(page)) {
 
-                                    console_write_hex_fixed(VMEM_GET_VIRT_ADDR(l0_idx, l1_idx, l2_idx, l3_idx), 12);
-                                    console_write(" >> ");
-                                    console_write_hex_fixed(vmem_get_page_addr(page), 12);
-                                    console_endl();
+                                    console_log(LOG_DEBUG, "%12x >> %12x",
+                                                VMEM_GET_VIRT_ADDR(l0_idx, l1_idx, l2_idx, l3_idx),
+                                                vmem_get_page_addr(page));
                                 }
                             }
                         }

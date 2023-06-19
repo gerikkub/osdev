@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "stdlib/bitutils.h"
+#include "stdlib/printf.h"
 #include "drivers/pl011_uart.h"
 #include "kernel/assert.h"
 #include "kernel/time.h"

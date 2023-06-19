@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -11,7 +12,6 @@
 #include "kernel/net/ethernet.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 
 void net_ipv4_icmp_send_packet(ipv4_t* dest_ip, net_ipv4_icmp_hdr_t* icmp_msg) {

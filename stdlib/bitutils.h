@@ -3,6 +3,7 @@
 #define __UTIL_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef NULL
 #define NULL 0
@@ -42,6 +43,20 @@
 uint16_t en_swap_16(uint16_t a);
 uint32_t en_swap_32(uint32_t a);
 uint64_t en_swap_64(uint64_t a);
+
+/**
+ * hextoi64
+ * Transfrom a hex string to a 64-bit integer
+ * 
+ * s1: Character string (0-9a-fA-F)
+ * n: Max number of characters to read
+ * valid: Option boolean pointer to signal an invalid conversion
+ * 
+ * return: integer result of conversion
+ */
+uint64_t hextou64(const char* s1, uint64_t n, bool* valid);
+
+int64_t strtoi64(const char* str, bool* valid);
 
 #endif
 

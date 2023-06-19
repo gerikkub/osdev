@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
@@ -17,7 +18,6 @@
 #include "include/k_syscall.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 #include "kernel/fs/ext2/ext2_helpers.h"
 #include "kernel/fs/ext2/ext2_structures.h"

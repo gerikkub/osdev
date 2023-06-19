@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
@@ -20,7 +21,6 @@
 #include "kernel/net/ipv4_route.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 #include "include/k_ioctl_common.h"
 
@@ -100,8 +100,6 @@ fd_ops_t s_net_fd_ops = {
 hashmap_ctx_t* s_ethertype_handlers = NULL;
 
 void net_recv_packet(net_packet_t* packet) {
-
-    console_log(LOG_DEBUG, "Net recevied packet of size %u %16x", packet->len, packet);
 
     int64_t res;
     ethernet_l2_frame_t* frame_ptr = vmalloc(sizeof(ethernet_l2_frame_t));

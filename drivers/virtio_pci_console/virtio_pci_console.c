@@ -16,7 +16,6 @@
 #include "include/k_ioctl_common.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 #include "drivers/virtio_pci_console/virtio_pci_console.h"
 

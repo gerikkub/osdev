@@ -10,7 +10,7 @@
 #include "kernel/net/tcp.h"
 
 enum {
-    NET_TCP_CONN_SM_LISTEN = 1,
+    NET_TCP_CONN_SM_LISTEN = 0,
     NET_TCP_CONN_SM_SYN_SENT,
     NET_TCP_CONN_SM_SYN_RECEIVED,
     NET_TCP_CONN_SM_ESTABLISHED,

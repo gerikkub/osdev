@@ -1,9 +1,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 #include "kernel/assert.h"
 #include "kernel/lib/vmalloc.h"

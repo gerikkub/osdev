@@ -9,7 +9,7 @@
 #include "kernel/lib/vmalloc.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
+#include <string.h>
 
 #define MAX_NUM_SYS_DEVICES 64
 

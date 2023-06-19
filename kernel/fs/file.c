@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include <kernel/assert.h>
 #include <kernel/fd.h>
@@ -9,7 +10,6 @@
 
 #include <include/k_ioctl_common.h>
 
-#include <stdlib/string.h>
 #include <stdlib/bitutils.h>
 
 void* file_create_ctx(file_ctx_t* file_ctx) {

@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include <kernel/assert.h>
 #include <kernel/fs/sysfs/sysfs.h>
@@ -10,8 +11,8 @@
 
 #include <include/k_sysfs_struct.h>
 
-#include <stdlib/string.h>
 #include <stdlib/bitutils.h>
+#include <stdlib/printf.h>
 
 void* sysfs_time_open(void) {
 

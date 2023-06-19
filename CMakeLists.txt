@@ -1,54 +1,80 @@
 
 cmake_minimum_required (VERSION 3.0.0)
 
-include (CMakeForceCompiler)
-
-#set (CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/aarch64_toolchain.cmake")
-
 set (CMAKE_SYSTEM_NAME Generic)
 set (CMAKE_SYSTEM_PROCESSOR aarch64)
 
-set (COMPILER_PATH "${CMAKE_SOURCE_DIR}/../tools/aarch64-none-elf/bin")
+project (osdev_kernel C ASM)
 
-#CMAKE_FORCE_C_COMPILER(${COMPILER_PATH}/aarch64-none-elf-gcc GNU)
-#set (CMAKE_C_COMPILER ${COMPILER_PATH}/aarch64-none-elf-gcc)
-#set (CMAKE_ASM_COMPILER ${COMPILER_PATH}/aarch64-none-elf-gcc)
-#set (CMAKE_C_LINK_EXECUTABLE ${COMPILER_PATH}/aarch64-none-elf-ld)
+set (KERNEL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}
+                         ${CMAKE_SOURCE_DIR}/include
+                         ${CMAKE_SOURCE_DIR}/stdlib
+                         ${CMAKE_SOURCE_DIR}/stdlib/minimal/include)
 
-set (CMAKE_C_COMPILER aarch64-linux-gnu-gcc-10)
-set (CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc-10)
-set (CMAKE_C_LINK_EXECUTABLE aarch64-linux-gnu-ld)
+#set (CMAKE_ASM_FLAGS "-x assembler-with-cpp -Wall -fdata-sections -ffunction-sections")
+set (CMAKE_ASM_FLAGS "-x assembler-with-cpp")
+set (CMAKE_C_FLAGS "-ffreestanding -Wall -Werror -mno-pc-relative-literal-loads")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mgeneral-regs-only -march=armv8.2-a")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -g -gdwarf-2 -Og")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
-#set (CMAKE_CROSSCOMPILER 1)
+set (KERNEL_LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/kernel.ld")
+set (CMAKE_EXE_LINKER_FLAGS "-ffreestanding -nostdlib -Wl,-z -Wl,max-page-size=4096")
 
-project (kernel C ASM)
-
-add_subdirectory (multiboot)
 add_subdirectory (drivers)
+add_subdirectory (kernel)
+add_subdirectory (stdlib)
+add_subdirectory (bootstrap)
 
-set (CMAKE_C_FLAGS "-nostdinc -fno-builtin -fno-stack-protector -DPRINTF_INCLUDE_CONFIG_H -g")
-set (CMAKE_EXE_LINKER_FLAGS "--script=${CMAKE_SOURCE_DIR}/multiboot/multiboot.ld -static --no-dynamic-linker --spec=nosys.specs")
+add_subdirectory (system)
 
-add_executable(kernel
-               multiboot/start.s
-               kernel/main.c
-               kernel/console.c
-               kernel/kmalloc.c
-               kernel/panic.c
-               kernel/exception.s
-               kernel/exception.c
-               drivers/pl011_uart.c
-              )
+add_executable(kernel)
+
+set_target_properties(kernel PROPERTIES OUTPUT_NAME "kernel.elf"
+                                        LINK_FLAGS "-Wl,-T${KERNEL_LINKER_SCRIPT} -Wl,-Map=kernel.map")
+target_include_directories(kernel PRIVATE ${KERNEL_INCLUDE_DIRS})
+target_compile_options(kernel PRIVATE "-DKERNEL_BUILD")
+
+get_target_property(KERNEL_BIN kernel OUTPUT_NAME)
+
+
+target_link_libraries(kernel
+                      kernel_drivers
+                      kernel_src
+                      kernel_stdlib
+                      kernel_bootstrap)
 
 include_directories(${CMAKE_SOURCE_DIR})
 
-set_target_properties(kernel PROPERTIES
-    LINK_DEPENDS ${CMAKE_SOURCE_DIR}/multiboot/multiboot.ld
-    )
+set (GENEXT2FS_BIN /home/gerik/projects/osdev-monolithic/tools/genext2fs/bin/genext2fs)
+
+add_custom_target (disk_image
+    COMMAND rm -rf diskdata
+    COMMAND mkdir -p diskdata/bin
+    COMMAND cp ${APP_BINARIES} diskdata/bin
+    COMMAND cp -r ${CMAKE_SOURCE_DIR}/diskextras/* diskdata/
+    COMMAND ${GENEXT2FS_BIN} -b 2880 -d diskdata/ ${CMAKE_BINARY_DIR}/disk_image.img
+    DEPENDS kernel ${APP_TARGETS})
+set_target_properties(disk_image PROPERTIES OUTPUT_NUM "disk_image.img")
+
+set (QEMU_VM_FLAGS -M virt,gic-version=3 -cpu cortex-a57 -nographic -s -kernel ${PROJECT_BINARY_DIR}/kernel.elf)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -drive file=${CMAKE_BINARY_DIR}/disk_image.img,id=disk0,if=none)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -device virtio-blk-pci,drive=disk0,disable-legacy=on)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -device virtio-serial-pci,disable-legacy=on)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -chardev stdio,id=virtiocon0 -device virtconsole,chardev=virtiocon0)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -netdev tap,id=net0)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -device virtio-net-pci,netdev=net0,mac=52:54:00:12:34:56)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -monitor none -serial none)
+
+set (QEMU_VM_DEBUG_FLAGS ${QEMU_VM_FLAGS} "-S")
 
 add_custom_target (run
-    COMMAND qemu-system-aarch64 -M virt -cpu cortex-a72 -kernel ${kernel_BINARY_DIR}/kernel
-                   DEPENDS kernel)
+    COMMAND /usr/local/share/qemu/bin/qemu-system-aarch64 ${QEMU_VM_FLAGS}
+                   DEPENDS disk_image)
+
+add_custom_target (debug
+    COMMAND /usr/local/share/qemu/bin/qemu-system-aarch64 ${QEMU_VM_DEBUG_FLAGS}
+                   DEPENDS disk_image)
 
 
 set_target_properties(kernel

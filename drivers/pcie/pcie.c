@@ -1,6 +1,6 @@
 
 #include <stdint.h>
-#include <stdlib/string.h>
+#include <string.h>
 
 #include "kernel/drivers.h"
 

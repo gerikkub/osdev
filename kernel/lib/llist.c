@@ -1,13 +1,12 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/lib/vmalloc.h"
 #include "kernel/kmalloc.h"
 #include "kernel/kernelspace.h"
 #include "kernel/assert.h"
 #include "kernel/lib/vmalloc.h"
-
-#include "stdlib/string.h"
 
 #include "kernel/lib/llist.h"
 

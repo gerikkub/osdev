@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -15,7 +16,6 @@
 #include "kernel/net/ethernet.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 void net_udp_send_packet(ipv4_t* dest_ip, uint64_t dest_port, uint64_t source_port, const uint8_t* payload, uint64_t payload_len) {
 

@@ -6,8 +6,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "stdlib/printf.h"
-
 #include "kernel/fd.h"
 
 void console_putc(const char c);

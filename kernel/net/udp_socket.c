@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -21,7 +22,6 @@
 #include "include/k_net_api.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 typedef struct {
     net_udp_hdr_t udp_msg;

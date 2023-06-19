@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -10,7 +11,6 @@
 #include "kernel/net/ethernet.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 void net_arp_send_packet(net_dev_t* net_dev, net_arp_packet_t* arp_packet, mac_t* dest_mac) {
 

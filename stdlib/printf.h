@@ -23,5 +23,6 @@ void console_write_dec_fixed(uint64_t num, uint64_t point_log10, uint64_t digits
 void console_printf_helper(const char* fmt, va_list args);
 void console_printf(const char* fmt, ...);
 
+int snprintf(char* str, uint64_t size, const char* format, ...);
 
 #endif

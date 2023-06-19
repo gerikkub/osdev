@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
@@ -9,7 +10,6 @@
 #include "kernel/lib/llist.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
 
 
 typedef struct {

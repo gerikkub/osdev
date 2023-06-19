@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include <kernel/lib/llist.h>
 #include <kernel/lib/vmalloc.h>
@@ -8,7 +9,6 @@
 
 #include <kernel/fs/sysfs/sysfs.h>
 
-#include <stdlib/string.h>
 #include <stdlib/bitutils.h>
 
 #define SYSFS_FILENAME_MAX 128

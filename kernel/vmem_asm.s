@@ -17,8 +17,8 @@ vmem_set_l0_table_asm:
 
     ret
 
-vmem_check_address:
-    at S1E1R, x0
-    mrs, x0, PAR_EL1
-    ret
+#vmem_check_address:
+    #at S1E1R, x0
+    #mrs x0, PAR_EL1
+    #ret
 

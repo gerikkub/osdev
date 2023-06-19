@@ -30,7 +30,8 @@
                    mov %[ret], x0" \
                    : [ret] "=r" (_ret) : \
                    [arg1] "r" (_x0), [arg2] "r" (_x1), \
-                   [arg3] "r" (_x2), [arg4] "r" (_x3)); \
+                   [arg3] "r" (_x2), [arg4] "r" (_x3) \
+                   : "x0","x1","x2","x3"); \
  \
     ret_arg = _ret; \
     }

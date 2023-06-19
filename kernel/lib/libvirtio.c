@@ -11,6 +11,7 @@
 #include "kernel/kernelspace.h"
 
 #include "stdlib/bitutils.h"
+#include "stdlib/printf.h"
 
 pci_virtio_capability_t* virtio_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap) {
 

@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
@@ -10,7 +11,7 @@
 #include "kernel/sys_device.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/string.h"
+#include "stdlib/printf.h"
 
 static int64_t console_dev_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
     *ctx_out = NULL;

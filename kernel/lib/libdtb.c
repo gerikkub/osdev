@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -7,7 +8,6 @@
 #include "kernel/lib/libdtb.h"
 #include "kernel/lib/vmalloc.h"
 
-#include "stdlib/string.h"
 #include "stdlib/bitutils.h"
 
 
