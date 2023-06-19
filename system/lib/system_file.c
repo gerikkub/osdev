@@ -11,13 +11,13 @@ int64_t system_open(const char* device, const char* path, const uint64_t flags) 
     return ret;
 }
 
-int64_t system_read(const int64_t fd, const void* buffer, const uint64_t len, const uint64_t flags) {
+int64_t system_read(const int64_t fd, void* buffer, const uint64_t len, const uint64_t flags) {
     int64_t ret;
     SYSCALL_CALL_RET(SYSCALL_READ, fd, (uintptr_t)buffer, len, flags, ret);
     return ret;
 }
 
-int64_t system_write(const int64_t fd, void* buffer, const uint64_t len, const uint64_t flags) {
+int64_t system_write(const int64_t fd, const void* buffer, const uint64_t len, const uint64_t flags) {
     int64_t ret;
     SYSCALL_CALL_RET(SYSCALL_WRITE, fd, (uintptr_t)buffer, len, flags, ret);
     return ret;

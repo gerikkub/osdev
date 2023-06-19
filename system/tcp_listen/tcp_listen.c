@@ -106,6 +106,8 @@ int64_t main(uint64_t tid, char** ctx) {
                 console_printf("Read: %s\n", buffer);
                 console_flush();
             }
+            system_write(socket_fd, buffer, bytes_read, 0);
+
         } while (bytes_read >= 0);
 
         system_close(socket_fd);

@@ -158,7 +158,8 @@ $(SYSTEMS_DIR)/touch \
 $(SYSTEMS_DIR)/udp_test \
 $(SYSTEMS_DIR)/udp_recv \
 $(SYSTEMS_DIR)/tcp_test \
-$(SYSTEMS_DIR)/tcp_listen
+$(SYSTEMS_DIR)/tcp_listen \
+$(SYSTEMS_DIR)/http_server
 
 MODULES = $(foreach MOD,$(notdir $(SYS_MODS)),$(SYSTEMS_DIR)/$(BUILD_DIR)/$(MOD)/$(MOD).elf)
 

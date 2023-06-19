@@ -21,7 +21,9 @@ typedef struct {
     net_dev_t* dev;
 } net_ipv4_route_entry_t;
 
-llist_head_t s_ipv4_route_table;
+static llist_head_t s_ipv4_route_table;
+
+static net_ipv4_route_entry_t* s_default_route = NULL;
 
 static bool net_route_ipv4_in_subnet(ipv4_t* ip, ipv4_t* ip_net, uint64_t subnet) {
     ipv4_t ip_masked = *ip;
@@ -36,17 +38,24 @@ static bool net_route_ipv4_in_subnet(ipv4_t* ip, ipv4_t* ip_net, uint64_t subnet
     return memcmp(&ip_masked, ip_net, sizeof(ipv4_t)) == 0;
 }
 
-void net_route_get_nic_for_ipv4(ipv4_t* dest_ip, net_dev_t** net_dev) {
+void net_route_get_nic_for_ipv4(ipv4_t* dest_ip, net_dev_t** net_dev, ipv4_t* via_ip) {
 
     net_ipv4_route_entry_t* entry;
     FOR_LLIST(s_ipv4_route_table, entry)
 
         if (net_route_ipv4_in_subnet(dest_ip, &entry->ip_net, entry->subnet)) {
             *net_dev = entry->dev;
+            *via_ip = *dest_ip;
             return;
         }
 
     END_FOR_LLIST()
+
+    if (s_default_route != NULL) {
+        *net_dev = s_default_route->dev;
+        *via_ip = s_default_route->ip_net;
+        return;
+    }
 
     console_log(LOG_WARN, "Net route no to %d.%d.%d.%d",
                 dest_ip->d[0], dest_ip->d[1], dest_ip->d[2], dest_ip->d[3]);
@@ -64,6 +73,18 @@ void net_route_update_entry(ipv4_t* ip_net, uint64_t subnet, net_dev_t* dev) {
     new_entry->dev = dev;
 
     llist_append_ptr(s_ipv4_route_table, new_entry);
+}
+
+void net_route_update_default_entry(ipv4_t* ip_net, uint64_t subnet, net_dev_t* dev) {
+    if (s_default_route != NULL) {
+        vfree(s_default_route);
+    }
+
+    s_default_route = vmalloc(sizeof(net_ipv4_route_entry_t));
+    memcpy(&s_default_route->ip_net, ip_net, sizeof(ipv4_t));
+    s_default_route->subnet = subnet;
+    s_default_route->dev = dev;
+
 }
 
 void net_route_init(void) {

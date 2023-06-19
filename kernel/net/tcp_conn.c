@@ -294,6 +294,7 @@ void net_tcp_conn_send_segment(net_tcp_conn_ctx_t* tcp_ctx) {
         return;
     }
 
+    ASSERT(tcp_ctx->send_buffer != NULL);
     uint64_t send_buffer_len = circbuffer_len(tcp_ctx->send_buffer);
     if (send_buffer_len == 0) {
         return;
@@ -304,14 +305,21 @@ void net_tcp_conn_send_segment(net_tcp_conn_ctx_t* tcp_ctx) {
     uint32_t window_room = net_tcp_32wrap_diff(window_right, tcp_ctx->sent_index);
 
     if (window_room > 0) {
-        uint64_t send_size = send_buffer_len > window_room ? window_room : send_buffer_len;
+        uint64_t max_send_size = send_buffer_len > window_room ? window_room : send_buffer_len;
         uint64_t send_offset = net_tcp_32wrap_diff(tcp_ctx->sent_index, tcp_ctx->seq_index);
-        uint8_t* buffer = vmalloc(send_size);
-        circbuffer_peek_idx(tcp_ctx->send_buffer, buffer, send_size, send_offset);
 
-        tcp_ctx->sent_index += send_size;
+        ASSERT(tcp_ctx->send_buffer != NULL);
+        uint8_t* buffer = vmalloc(max_send_size);
 
-        net_tcp_send_std(tcp_ctx, buffer, send_size);
+        ASSERT(tcp_ctx->send_buffer != NULL);
+        uint64_t send_size = circbuffer_peek_idx(tcp_ctx->send_buffer, buffer, max_send_size, send_offset);
+
+        if (send_size > 0) {
+            tcp_ctx->sent_index += send_size;
+            net_tcp_send_std(tcp_ctx, buffer, send_size);
+        }
+
+        vfree(buffer);
 
         net_tcp_reset_timeout(tcp_ctx, 1*1000*1000);
     }
@@ -454,17 +462,21 @@ void net_tcp_handle_conn_established(net_tcp_hdr_t* tcp_header, net_tcp_conn_ctx
         tcp_ctx->conn_state = NET_TCP_CONN_SM_CLOSE_WAIT;
         tcp_ctx->ack_index = tcp_header->seq_num + 1;
         
-        net_tcp_socket_close(tcp_ctx->socket_ctx);
+        net_tcp_socket_close(tcp_ctx->socket_ctx, false);
         tcp_ctx->socket_ctx = NULL;
         return;
     }
 
+    ASSERT(tcp_ctx->conn_state == NET_TCP_CONN_SM_ESTABLISHED);
+    ASSERT(tcp_ctx->send_buffer != NULL);
     net_tcp_conn_send_segment(tcp_ctx);
 }
 
 void net_tcp_conn_close_from_socket(net_tcp_conn_ctx_t* tcp_ctx) {
     tcp_ctx->conn_state = NET_TCP_CONN_SM_LAST_ACK;
     net_tcp_send_fin(tcp_ctx);
+
+    tcp_ctx->socket_ctx = NULL;
 }
 
 void net_tcp_conn_cleanup(net_tcp_conn_key_t* conn_key, net_tcp_conn_ctx_t* conn_ctx) {
@@ -476,12 +488,13 @@ void net_tcp_conn_cleanup(net_tcp_conn_key_t* conn_key, net_tcp_conn_ctx_t* conn
     hashmap_del(s_tcp_conn_map, conn_key);
 
     if (conn_ctx->socket_ctx != NULL) {
-        net_tcp_socket_close(conn_ctx->socket_ctx);
+        net_tcp_socket_close(conn_ctx->socket_ctx, true);
         conn_ctx->socket_ctx = NULL;
     }
 
     if (conn_ctx->send_buffer != NULL) {
         circbuffer_destroy(conn_ctx->send_buffer);
+        conn_ctx->send_buffer = NULL;
     }
 
     vfree(conn_ctx);
@@ -547,47 +560,49 @@ void net_tcp_handle_connection(net_packet_t* packet, net_ipv4_hdr_t* ipv4_header
         if (tcp_header->f_rst) {
             console_log(LOG_DEBUG, "Net TCP saw reset");
             net_tcp_conn_cleanup(&conn_key, conn_ctx);
+        } else {
+            net_tcp_reset_timeout(conn_ctx, NET_TCP_STD_TIMEOUT);
+            switch (conn_ctx->conn_state) {
+                case NET_TCP_CONN_SM_SYN_SENT:
+                    net_tcp_handle_conn_syn_sent(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_SYN_RECEIVED:
+                    net_tcp_handle_conn_syn_received(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_ESTABLISHED:
+                    net_tcp_handle_conn_established(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_FIN_WAIT_1:
+                    net_tcp_handle_conn_fin_wait_1(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_FIN_WAIT_2:
+                    net_tcp_handle_conn_fin_wait_2(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_CLOSE_WAIT:
+                    net_tcp_handle_conn_close_wait(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_CLOSING:
+                    net_tcp_handle_conn_closing(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_LAST_ACK:
+                    net_tcp_handle_conn_last_ack(tcp_header, conn_ctx);
+                    break;
+                case NET_TCP_CONN_SM_TIME_WAIT:
+                    net_tcp_handle_conn_time_wait(tcp_header, conn_ctx);
+                    break;
+
+                case NET_TCP_CONN_SM_LISTEN:
+                case NET_TCP_CONN_SM_CLOSED:
+                default:
+                    ASSERT(0);
+                    break;
+            }
+
+            if (conn_ctx->conn_state == NET_TCP_CONN_SM_CLOSED) {
+                net_tcp_conn_cleanup(&conn_key, conn_ctx);
+            }
         }
 
-        net_tcp_reset_timeout(conn_ctx, NET_TCP_STD_TIMEOUT);
-        switch (conn_ctx->conn_state) {
-            case NET_TCP_CONN_SM_SYN_SENT:
-                net_tcp_handle_conn_syn_sent(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_SYN_RECEIVED:
-                net_tcp_handle_conn_syn_received(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_ESTABLISHED:
-                net_tcp_handle_conn_established(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_FIN_WAIT_1:
-                net_tcp_handle_conn_fin_wait_1(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_FIN_WAIT_2:
-                net_tcp_handle_conn_fin_wait_2(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_CLOSE_WAIT:
-                net_tcp_handle_conn_close_wait(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_CLOSING:
-                net_tcp_handle_conn_closing(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_LAST_ACK:
-                net_tcp_handle_conn_last_ack(tcp_header, conn_ctx);
-                break;
-            case NET_TCP_CONN_SM_TIME_WAIT:
-                net_tcp_handle_conn_time_wait(tcp_header, conn_ctx);
-                break;
-
-            case NET_TCP_CONN_SM_LISTEN:
-            case NET_TCP_CONN_SM_CLOSED:
-                ASSERT(0);
-                break;
-        }
-
-        if (conn_ctx->conn_state == NET_TCP_CONN_SM_CLOSED) {
-            net_tcp_conn_cleanup(&conn_key, conn_ctx);
-        }
 
     }
 

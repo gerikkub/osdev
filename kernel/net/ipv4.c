@@ -20,7 +20,8 @@
 void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uint64_t payload_len) {
 
     net_dev_t* net_dev = NULL;
-    net_route_get_nic_for_ipv4(dest_ip, &net_dev);
+    ipv4_t via_ip;
+    net_route_get_nic_for_ipv4(dest_ip, &net_dev, &via_ip);
 
     if (net_dev == NULL) {
         console_log(LOG_WARN, "Net IPv4 No Known Route to %d.%d.%d.%d",
@@ -30,7 +31,7 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
 
     bool arp_ok;
     mac_t dest_mac;
-    arp_ok = net_arp_get_mac_for_ipv4(net_dev, dest_ip, &dest_mac);
+    arp_ok = net_arp_get_mac_for_ipv4(net_dev, &via_ip, &dest_mac);
 
     if (!arp_ok) {
         console_log(LOG_WARN, "Net IPv4 Dropping Packet. No MAC addr for address");

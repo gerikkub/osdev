@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "kernel/assert.h"
+
 struct llist_struct;
 
 typedef struct llist_struct {
@@ -27,6 +29,7 @@ void llist_free_all(llist_head_t);
 x = NULL; \
 llist_t* __for_llist_item = head->n; \
 while (__for_llist_item != NULL) {\
+ASSERT((uintptr_t)__for_llist_item > 64); \
 x = __for_llist_item->dataptr; \
 __for_llist_item = __for_llist_item->n; \
 do {

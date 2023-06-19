@@ -2,10 +2,12 @@
 #include <stdint.h>
 
 #include "kernel/assert.h"
+#include "kernel/console.h"
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lib/circbuffer.h"
 
 #include "stdlib/string.h"
+#include "stdlib/bitutils.h"
 
 circbuffer_t* circbuffer_create(uint64_t len) {
 
@@ -21,11 +23,14 @@ circbuffer_t* circbuffer_create(uint64_t len) {
 }
 
 void circbuffer_destroy(circbuffer_t* circbuffer) {
+    ASSERT(circbuffer != NULL);
+
     vfree(circbuffer->buffer);
     vfree(circbuffer);
 }
 
 uint64_t circbuffer_len(circbuffer_t* circbuffer) {
+    ASSERT(circbuffer != NULL);
 
     if (circbuffer->write_idx >= circbuffer->read_idx) {
         return circbuffer->write_idx - circbuffer->read_idx;
@@ -35,11 +40,13 @@ uint64_t circbuffer_len(circbuffer_t* circbuffer) {
 }
 
 uint64_t circbuffer_space(circbuffer_t* circbuffer) {
+    ASSERT(circbuffer != NULL);
     return circbuffer->len - circbuffer_len(circbuffer) - 1;
 }
 
 uint64_t circbuffer_add(circbuffer_t* circbuffer, const uint8_t* buffer, uint64_t len) {
 
+    ASSERT(circbuffer != NULL);
     uint64_t space = circbuffer_space(circbuffer);
 
     uint64_t write_len = (space < len) ? space : len;
@@ -65,6 +72,7 @@ uint64_t circbuffer_add(circbuffer_t* circbuffer, const uint8_t* buffer, uint64_
 
 uint64_t circbuffer_get(circbuffer_t* circbuffer, uint8_t* buffer, uint64_t len) {
 
+    ASSERT(circbuffer != NULL);
     uint64_t items = circbuffer_len(circbuffer);
 
     uint64_t read_len = (items < len) ? items : len;
@@ -90,7 +98,13 @@ uint64_t circbuffer_get(circbuffer_t* circbuffer, uint8_t* buffer, uint64_t len)
 
 uint64_t circbuffer_peek_idx(circbuffer_t* circbuffer, uint8_t* buffer, uint64_t len, uint64_t peek_idx) {
 
+    ASSERT(circbuffer != NULL);
     uint64_t items = circbuffer_len(circbuffer);
+
+    //console_log(LOG_DEBUG, "Circbuffer peek: (%16x %u %u %u %u) %u %u",
+                //circbuffer->buffer, circbuffer->len,
+                //circbuffer->read_idx, circbuffer->write_idx, items,
+                //len, peek_idx);
 
     uint64_t read_len;
     if (items >= (len + peek_idx)) {
@@ -99,7 +113,7 @@ uint64_t circbuffer_peek_idx(circbuffer_t* circbuffer, uint8_t* buffer, uint64_t
         if (items <= peek_idx) {
             return 0;
         } else {
-            read_len = peek_idx - items;
+            read_len = items - peek_idx;
         }
     }
 
@@ -124,6 +138,7 @@ uint64_t circbuffer_peek_idx(circbuffer_t* circbuffer, uint8_t* buffer, uint64_t
 
 uint64_t circbuffer_del(circbuffer_t* circbuffer, uint64_t len) {
 
+    ASSERT(circbuffer != NULL);
     uint64_t have_len = circbuffer_len(circbuffer);
     uint64_t del_len;
 

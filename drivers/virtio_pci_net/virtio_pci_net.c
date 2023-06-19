@@ -97,6 +97,8 @@ void virtio_pci_net_nic_return_packet(struct net_packet* packet) {
     net_dev_t* net_dev = packet->dev;
     virtio_pci_net_ctx_t* nic_ctx = net_dev->nic_ctx;
 
+    console_log(LOG_DEBUG, "Returning packet %16x", packet);
+
     virtio_return_buffer(&nic_ctx->receiveq1, virtq_buffer->ptr);
     (void)net_dev;
 }
@@ -206,7 +208,8 @@ static void virtio_pci_net_late_init(void* ctx) {
 
     virtio_alloc_queue(common_cfg,
                        VIRTIO_QUEUE_NET_RECEIVEQ1,
-                       32, 32 * 16384,
+                       //32, 32 * 16384,
+                       4, 4 * 8000,
                        &nic_ctx->receiveq1,
                        receiveq_msix_item->entry_idx);
 

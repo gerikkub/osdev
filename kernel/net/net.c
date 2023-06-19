@@ -34,6 +34,7 @@ int64_t net_fd_write_op(void* ctx, const uint8_t* vuffer, const int64_t size, co
 
 int64_t net_fd_ioctl_op(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
     net_dev_t* nic_ctx = ctx;
+    uint32_t temp32;
     
     switch (ioctl) {
         case NET_IOCTL_SET_IP:
@@ -64,8 +65,16 @@ int64_t net_fd_ioctl_op(void* ctx, const uint64_t ioctl, const uint64_t* args, c
                 return -1;
             }
 
-            uint32_t temp32 = en_swap_32(args[0]);
+            temp32 = en_swap_32(args[0]);
             net_route_update_entry((ipv4_t*)&temp32, args[1], nic_ctx);
+            return 0;
+        case NET_IOCTL_SET_DEFAULT_ROUTE:
+            if (arg_count != 2) {
+                return -1;
+            }
+
+            temp32 = en_swap_32(args[0]);
+            net_route_update_default_entry((ipv4_t*)&temp32, args[1], nic_ctx);
             return 0;
     }
 
@@ -92,7 +101,7 @@ hashmap_ctx_t* s_ethertype_handlers = NULL;
 
 void net_recv_packet(net_packet_t* packet) {
 
-    //console_log(LOG_DEBUG, "Net recevied packet of size %u", packet->len);
+    console_log(LOG_DEBUG, "Net recevied packet of size %u %16x", packet->len, packet);
 
     int64_t res;
     ethernet_l2_frame_t* frame_ptr = vmalloc(sizeof(ethernet_l2_frame_t));
@@ -123,6 +132,9 @@ void net_recv_packet(net_packet_t* packet) {
     }
 
     l2_packet_handler(packet, frame_ptr);
+
+    vfree(frame_ptr);
+    packet->dev->ops->return_packet(packet);
 }
 
 void net_device_register(net_dev_t* dev) {

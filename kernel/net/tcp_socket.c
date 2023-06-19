@@ -30,7 +30,7 @@ typedef struct {
     task_t* task;
 
     bool should_close;
-    net_tcp_conn_ctx_t* tcp_conn_ctx;
+    void* tcp_conn_ctx;
     circbuffer_t* recv_buffer;
 
     ipv4_t our_ip;
@@ -56,10 +56,13 @@ int64_t net_tcp_socket_recv(void* ctx, const uint8_t* payload, uint64_t payload_
     return payload_len;
 }
 
-void net_tcp_socket_close(void* ctx) {
+void net_tcp_socket_close(void* ctx, bool dontreply) {
     net_tcp_socket_ctx_t* socket_ctx = ctx;
 
     socket_ctx->should_close = true;
+    if (dontreply) {
+        socket_ctx->tcp_conn_ctx = NULL;
+    }
 }
 
 static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
@@ -107,7 +110,10 @@ int64_t net_tcp_socket_close_fn(void* ctx) {
 
     net_tcp_socket_ctx_t* socket_ctx = ctx;
 
-    net_tcp_conn_close_from_socket(socket_ctx->tcp_conn_ctx);
+    if (socket_ctx->tcp_conn_ctx != NULL) {
+        net_tcp_conn_close_from_socket(socket_ctx->tcp_conn_ctx);
+    }
+
 
     circbuffer_destroy(socket_ctx->recv_buffer);
 
@@ -174,7 +180,8 @@ int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* op
     socket_ctx->our_port = listen_port;
 
     net_dev_t* net_dev = NULL;
-    net_route_get_nic_for_ipv4(&socket_ctx->their_ip, &net_dev);
+    ipv4_t via_ip;
+    net_route_get_nic_for_ipv4(&socket_ctx->their_ip, &net_dev, &via_ip);
     if (net_dev == NULL) {
         console_log(LOG_WARN, "Net TCP cannot create socket. No network device for ip");
         vfree(socket_ctx);

@@ -308,7 +308,7 @@ void virtio_handle_irq(virtio_virtq_shared_irq_ctx_t* irq_ctx) {
         queue_ctx->should_wakeup = true;
     END_FOR_LLIST()
 
-    llist_empty(irq_ctx->wait_queue);
+    llist_free_all(irq_ctx->wait_queue);
 }
 
 

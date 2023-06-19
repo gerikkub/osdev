@@ -187,6 +187,16 @@ void kernel_init_lower_thread(void* ctx) {
         };
 
         res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_ROUTE, args, 2);
+
+        uint64_t ip_route = 10 << 24 |
+                            0 << 16 |
+                            2 << 8 |
+                            1;
+
+        uint64_t args_default[2] = {
+            ip_route, 24
+        };
+        res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_DEFAULT_ROUTE, args_default, 2);
     }
 
     /*
@@ -259,6 +269,16 @@ void kernel_init_lower_thread(void* ctx) {
     (void)tcp_listen_argv;
     tcp_listen_tid = exec_user_task("home", "bin/tcp_listen.elf", "tcp_listen", tcp_listen_argv);
     (void)tcp_listen_tid;
+
+    uint64_t http_server_tid;
+    char* http_server_argv[] = {
+        "10.0.2.15",
+        "8088",
+        NULL
+    };
+    (void)http_server_argv;
+    http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
+    (void)http_server_tid;
 
     console_log(LOG_DEBUG, "Starting Timer\n");
 

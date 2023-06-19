@@ -151,8 +151,6 @@ void net_arp_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame)
 
     if (packet->len < sizeof(net_arp_packet_t)) {
         console_log(LOG_WARN, "Net Arp invalid packet length %d", packet->len);
-        vfree(frame);
-        packet->dev->ops->return_packet(packet);
         return;
     }
 
@@ -160,15 +158,10 @@ void net_arp_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame)
     int64_t parse_ok;
     parse_ok = net_arp_parse_packet(packet, frame, &arp_packet);
     if (parse_ok != 0) {
-        vfree(frame);
-        packet->dev->ops->return_packet(packet);
         return;
     }
 
     net_arp_handle_packet(packet, frame, &arp_packet);
-
-    vfree(frame);
-    packet->dev->ops->return_packet(packet);
 }
 
 void net_arp_init() {
