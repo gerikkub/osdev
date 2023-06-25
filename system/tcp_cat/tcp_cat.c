@@ -62,27 +62,39 @@ int64_t main(uint64_t tid, char** ctx) {
             continue;
         }
 
-        //console_printf("New connection\n");
-        //console_flush();
-
-        uint8_t buffer[256];
+        char buffer[256];
         int64_t bytes_read;
-        do {
-            memset(buffer, 0, 256);
-            bytes_read = system_read(socket_fd, buffer, 255, 0);
+        memset(buffer, 0, 256);
 
-            if (bytes_read > 0) {
-                //console_printf("Read: %s\n", buffer);
-                //console_flush();
+        bytes_read = system_read(socket_fd, buffer, 255, 0);
+
+        char* strtok_ctx;
+        char* devname = strtok_r(buffer, " ", &strtok_ctx);
+        char* fname = strtok_r(NULL, " ", &strtok_ctx);
+
+        if (bytes_read > 0 && fname != NULL && devname != NULL) {
+
+            int64_t file_fd = system_open(devname, fname, 0);
+
+            if (file_fd >= 0) {
+                char* fbuffer = malloc(256);
+                int64_t fread_len;
+                do {
+                    fread_len = system_read(file_fd, fbuffer, 256, 0);
+                    if (fread_len > 0) {
+                        system_write(socket_fd, fbuffer, fread_len, 0);
+                    }
+                } while (fread_len > 0);
+
+                system_close(file_fd);
+            } else {
+                console_printf("TCP Cat File not found: %s:%s", devname, fname);
+                console_flush();
             }
-            system_write(socket_fd, buffer, bytes_read, 0);
-
-        } while (bytes_read >= 0);
+        }
 
         system_close(socket_fd);
 
-        //console_printf("Connection closed\n");
-        //console_flush();
     }
 
     return 0;

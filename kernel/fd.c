@@ -139,5 +139,7 @@ int64_t syscall_close(uint64_t fd, uint64_t arg1, uint64_t arg2, uint64_t arg3) 
         return -1;
     }
 
-    return task->fds[fd].ops.close(task->fds[fd].ctx);
+    int64_t ret = task->fds[fd].ops.close(task->fds[fd].ctx);
+    task->fds[fd].valid = false;
+    return ret;
 }

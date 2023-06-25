@@ -8,6 +8,7 @@
 #include "kernel/task.h"
 #include "kernel/console.h"
 #include "kernel/lib/vmalloc.h"
+#include "kernel/lib/elapsedtimer.h"
 
 #include "kernel/interrupt/interrupt.h"
 
@@ -16,6 +17,8 @@ typedef struct {
     void* ctx;
     uint64_t awaiter_tid;
     bool awaited;
+    uint64_t intid;
+    elapsedtimer_t profile_time;
 } intc_irq_handler_ctx_t;
 
 typedef struct {
@@ -45,6 +48,7 @@ void interrupt_register_controller(intc_funcs_t* funcs, void* ctx, uint64_t num_
         s_interrupt_ctx.handlers[idx].fn = NULL;
         s_interrupt_ctx.handlers[idx].awaiter_tid = 0;
         s_interrupt_ctx.handlers[idx].awaited = false;
+        elapsedtimer_clear(&s_interrupt_ctx.handlers[idx].profile_time);
     }
 }
 
@@ -102,6 +106,7 @@ void interrupt_register_irq_handler(uint64_t irq, irq_handler fn, void* ctx) {
     BEGIN_CRITICAL(irq_state);
     s_interrupt_ctx.handlers[irq].fn = fn;
     s_interrupt_ctx.handlers[irq].ctx = ctx;
+    s_interrupt_ctx.handlers[irq].intid = irq;
     END_CRITICAL(irq_state);
 }
 
@@ -168,12 +173,23 @@ void interrupt_notify_awaiters(uint64_t irq) {
  */
 void interrupt_handle_irq(uint64_t irq) {
 
+
     if (s_interrupt_ctx.handlers[irq].fn != NULL) {
+        elapsedtimer_start(&s_interrupt_ctx.handlers[irq].profile_time);
         s_interrupt_ctx.handlers[irq].fn(irq, s_interrupt_ctx.handlers[irq].ctx);
+        elapsedtimer_stop(&s_interrupt_ctx.handlers[irq].profile_time);
     }
 
     if (s_interrupt_ctx.handlers[irq].awaiter_tid != 0) {
         interrupt_notify_awaiters(irq);
     }
+}
 
+uint64_t interrupt_get_profile_time(uint64_t idx, uint64_t* intid_out) {
+    if (s_interrupt_ctx.registered) {
+        *intid_out = s_interrupt_ctx.handlers[idx].intid;
+        return elapsedtimer_get_us(&s_interrupt_ctx.handlers[idx].profile_time);
+    } else {
+        return 0;
+    }
 }

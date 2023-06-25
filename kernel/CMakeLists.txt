@@ -38,6 +38,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/sysfs/sysfs_task.c
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/sysfs/sysfs_time.c
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/sysfs/sysfs_vmalloc.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/fs/sysfs/sysfs_profile.c
 
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/circbuffer.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/hashmap.c
@@ -47,6 +48,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/libvirtio.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/llist.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/vmalloc.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/lib/elapsedtimer.c
 
             ${CMAKE_CURRENT_SOURCE_DIR}/lock/lock.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lock/mutex.c

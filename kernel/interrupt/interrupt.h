@@ -76,4 +76,6 @@ bool interrupt_await(uint64_t irq);
 
 void interrupt_handle_irq(uint64_t irq);
 
+uint64_t interrupt_get_profile_time(uint64_t idx, uint64_t* intid_out);
+
 #endif

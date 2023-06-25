@@ -20,6 +20,7 @@ void sysfs_ro_file_helper(void* data_str, uint64_t data_str_len, file_ctx_t* fil
 void sysfs_task_init(void);
 void sysfs_time_init(void);
 void sysfs_vmalloc_init(void);
+void sysfs_profile_init(void);
 
 void sysfs_register(void);
 

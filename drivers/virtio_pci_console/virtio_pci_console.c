@@ -411,7 +411,7 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
     send_control_message(console_ctx, 0, VIRTIO_CONSOLE_PORT_OPEN, 1);
 
     // Setup a kernel thread to monitor for receiveq messages
-    create_kernel_task(8192, virtio_pci_control_monitor_thread, console_ctx);
+    create_kernel_task(8192, virtio_pci_control_monitor_thread, console_ctx, "virtio-con-ctrlq");
 
 }
 

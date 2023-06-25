@@ -234,7 +234,7 @@ static void virtio_pci_net_late_init(void* ctx) {
 
     net_device_register(&nic_ctx->net_dev);
 
-    create_kernel_task(8192, virtio_net_recv_thread, nic_ctx);
+    create_kernel_task(8192, virtio_net_recv_thread, nic_ctx, "virtio-net-recvq");
 
     vfree(pci_ctx);
 }

@@ -3,6 +3,7 @@
 #define __GTIMER_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define GTIMER_FREQ (1000 * 1000)
 

@@ -12,6 +12,7 @@
 #include "kernel/messages.h"
 #include "kernel/fd.h"
 #include "kernel/lock/lock.h"
+#include "kernel/lib/elapsedtimer.h"
 
 #define MAX_NUM_TASKS 8
 
@@ -58,6 +59,7 @@ typedef enum {
     WAIT_GETMSGS = 2,
     WAIT_IRQNOTIFY = 3,
     WAIT_VIRTIOIRQ = 4,
+    WAIT_SIGNAL = 5,
 } wait_reason_t;
 
 typedef struct {
@@ -80,16 +82,22 @@ typedef struct {
     void* ctx;
 } wait_virtioirq_t;
 
+typedef struct {
+    bool* trywake;
+} wait_signal_t;
+
 typedef union {
     wait_lock_t lock;
     wait_getmsgs_t getmsgs;
     wait_irqnotify_t irqnotify;
     wait_initthread_t init_thread;
     wait_virtioirq_t virtioirq;
+    wait_signal_t signal;
 } wait_ctx_t;
 
 typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);
 typedef int64_t (*task_wakeup_f)(struct task_t_*);
+
 
 typedef struct task_t_ {
 
@@ -118,12 +126,15 @@ typedef struct task_t_ {
     _vmem_table* low_vm_table;
 
     msg_queue msgs;
+
+    elapsedtimer_t profile_time;
 } task_t;
 
 void task_init(uint64_t* exstack);
 task_t* get_active_task(void);
 task_t* get_task_at_idx(int64_t idx);
 task_t* get_task_for_tid(uint64_t tid);
+uint64_t get_schedule_profile_time(void);
 void restore_context(uint64_t tid);
 void restore_context_kernel(uint64_t tid, uint64_t x0, void* sp);
 void restore_context_kernel_asm(uint64_t x0, void* sp);
@@ -136,7 +147,7 @@ uint64_t create_task(uint64_t* user_stack_base,
                      memory_space_t* vm_table,
                      bool kernel_task,
                      const char* name);
-uint64_t create_kernel_task(uint64_t stack_size, task_f task_entry, void* ctx);
+uint64_t create_kernel_task(uint64_t stack_size, task_f task_entry, void* ctx, const char* name);
 uint64_t create_system_task(uint64_t kernel_stack_size,
                             uintptr_t user_stack_base,
                             uint64_t user_stack_size,
@@ -171,6 +182,8 @@ int64_t task_wait_kernel(task_t* task,
                          task_canwakeup_f canwakeup_f);
 
 int64_t find_open_fd(task_t* task);
+
+bool signal_canwakeup_fn(wait_ctx_t* wait_ctx);
 
 #define TASK_SPSR_N BIT(31)
 #define TASK_SPSR_Z BIT(30)

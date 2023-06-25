@@ -37,6 +37,8 @@ typedef struct {
     uint16_t our_port;
     ipv4_t their_ip;
     uint16_t their_port;
+
+    bool canwake;
 } net_tcp_socket_ctx_t;
 
 hashmap_ctx_t* s_tcp_socket_map = NULL;
@@ -53,6 +55,8 @@ int64_t net_tcp_socket_recv(void* ctx, const uint8_t* payload, uint64_t payload_
 
     circbuffer_add(socket_ctx->recv_buffer, payload, payload_len);
 
+    socket_ctx->canwake = true;
+
     return payload_len;
 }
 
@@ -60,6 +64,7 @@ void net_tcp_socket_close(void* ctx, bool dontreply) {
     net_tcp_socket_ctx_t* socket_ctx = ctx;
 
     socket_ctx->should_close = true;
+    socket_ctx->canwake = true;
     if (dontreply) {
         socket_ctx->tcp_conn_ctx = NULL;
     }
@@ -84,8 +89,24 @@ static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t 
         if (flags & K_SOCKET_READ_FLAGS_NONBLOCKING) {
             return 0;
         } else {
-            ASSERT(0);
-            return 0;
+
+            wait_ctx_t wake_ctx = {
+                .signal.trywake = &socket_ctx->canwake
+            };
+
+            do {
+                if (socket_ctx->should_close) {
+                    return -1;
+                }
+
+                socket_ctx->canwake = false;
+                task_wait_kernel(get_active_task(), WAIT_SIGNAL, &wake_ctx, NULL, signal_canwakeup_fn);
+                bytes_avail = circbuffer_len(socket_ctx->recv_buffer);
+                bytes_read = (bytes_avail < size) ? bytes_avail : size;
+            } while (bytes_read == 0);
+
+            circbuffer_get(socket_ctx->recv_buffer, buffer, bytes_read);
+            return bytes_read;
         }
     }
 }

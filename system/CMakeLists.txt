@@ -19,6 +19,7 @@ endfunction()
 
 set (APP_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../stdlib
                       ${CMAKE_CURRENT_SOURCE_DIR}/../
+                      ${CMAKE_CURRENT_SOURCE_DIR}/../include
                       ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 set (APP_LINKER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/system.ld")
 
@@ -37,6 +38,7 @@ create_system_target(time "time/time.c")
 create_system_target(touch "touch/touch.c")
 create_system_target(udp_recv "udp_recv/udp_recv.c")
 create_system_target(udp_test "udp_test/udp_test.c")
+create_system_target(tcp_cat "tcp_cat/tcp_cat.c")
 
 
 set(APP_TARGETS "${APP_TARGETS}" PARENT_SCOPE)

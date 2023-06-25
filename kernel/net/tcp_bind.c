@@ -36,6 +36,8 @@ typedef struct {
     uint16_t our_port;
 
     llist_head_t incoming_connections;
+
+    bool canwake;
 } net_tcp_bind_ctx_t;
 
 typedef struct {
@@ -62,13 +64,20 @@ void* net_tcp_bind_new_connection(void* ctx, void* tcp_ctx, ipv4_t* their_addr, 
 
     llist_append_ptr(bind_ctx->incoming_connections, new_socket);
 
+    bind_ctx->canwake = true;
+
     return new_socket->socket_ctx;
 }
 
 static int64_t net_tcp_bind_get_incoming(net_tcp_bind_ctx_t* bind_ctx) {
 
-    if (llist_empty(bind_ctx->incoming_connections)) {
-        return -1;
+    while (llist_empty(bind_ctx->incoming_connections)) {
+        wait_ctx_t wake_ctx = {
+            .signal.trywake = &bind_ctx->canwake
+        };
+        bind_ctx->canwake = false;
+
+        task_wait_kernel(get_active_task(), WAIT_SIGNAL, &wake_ctx, NULL, signal_canwakeup_fn);
     }
 
     int64_t fd_num = find_open_fd(bind_ctx->task);

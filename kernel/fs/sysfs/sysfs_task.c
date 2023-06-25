@@ -34,6 +34,7 @@ void* sysfs_task_open(void) {
                 "%d %s:\n"
                 "  name: %s\n"
                 "  state: %s\n"
+                "  profile time (us): %u\n"
                 ,
                 task->tid & (~TASK_TID_KERNEL),
                 IS_USER_TASK(task->tid) ? "user" : "kernel",
@@ -41,7 +42,8 @@ void* sysfs_task_open(void) {
                 task->run_state == TASK_RUNABLE ? "RUNABLE" :
                 task->run_state == TASK_RUNABLE_KERNEL ? "RUNABLE_KERNEL" :
                 task->run_state == TASK_WAIT ? "WAIT" :
-                task->run_state == TASK_AWAKE ? "AWAKE" : "INVALID"
+                task->run_state == TASK_AWAKE ? "AWAKE" : "INVALID",
+                elapsedtimer_get_us(&task->profile_time)
             );
             ASSERT(written < 4096);
             file_data_entry_t* data_entry = vmalloc(sizeof(file_data_entry_t));

@@ -24,6 +24,8 @@ static uint64_t s_max_tid;
 
 static _vmem_table* s_dummy_user_table;
 
+static elapsedtimer_t s_idletime;
+
 static uint64_t* s_exstack;
 
 extern uint8_t _stack_base;
@@ -40,6 +42,8 @@ void task_init(uint64_t* exstack) {
     s_max_tid = 1;
     s_dummy_user_table = vmem_allocate_empty_table();
     s_exstack = exstack;
+
+    elapsedtimer_clear(&s_idletime);
 }
 
 task_t* get_active_task(void) {
@@ -58,6 +62,10 @@ task_t* get_task_at_idx(int64_t idx) {
     }
 
     return &s_task_list[idx];
+}
+
+uint64_t get_schedule_profile_time(void) {
+    return elapsedtimer_get_us(&s_idletime);
 }
 
 void bad_task_return(void) {
@@ -206,6 +214,7 @@ uint64_t create_task(uint64_t* user_stack_base,
 
     task->tid = tid;
     task->asid = 0;
+    elapsedtimer_clear(&task->profile_time);
 
     task->user_stack_base = user_stack_base;
     task->user_stack_size = user_stack_size;
@@ -272,7 +281,8 @@ uint64_t create_task(uint64_t* user_stack_base,
 
 uint64_t create_kernel_task(uint64_t stack_size,
                             task_f task_entry,
-                             void* ctx) {
+                            void* ctx,
+                            const char* name) {
 
     void* stack_ptr_phy = kmalloc_phy(stack_size);
     ASSERT(stack_ptr_phy != NULL);
@@ -283,7 +293,7 @@ uint64_t create_kernel_task(uint64_t stack_size,
     reg.spsr = TASK_SPSR_M(4); // EL1t SP
     reg.elr = (uint64_t)task_entry;
 
-    return create_task(NULL, 0, ((void*)stack_ptr)+stack_size, stack_size, &reg, NULL, true, "kernel");
+    return create_task(NULL, 0, ((void*)stack_ptr)+stack_size, stack_size, &reg, NULL, true, name);
 }
 
 uint64_t create_system_task(uint64_t kernel_stack_size,
@@ -448,6 +458,9 @@ void schedule(void) {
     uint64_t task_count;
     uint64_t task_idx;
 
+    elapsedtimer_stop(&s_task_list[s_active_task_idx].profile_time);
+    elapsedtimer_start(&s_idletime);
+
     // Enable interrupts
     ENABLE_IRQ();
 
@@ -481,6 +494,9 @@ void schedule(void) {
 
     s_active_task_idx = task_idx;
 
+    elapsedtimer_stop(&s_idletime);
+    elapsedtimer_start(&s_task_list[s_active_task_idx].profile_time);
+
     int64_t reg_x0 = 0;
     switch (s_task_list[task_idx].run_state) {
         case TASK_RUNABLE:
@@ -510,4 +526,8 @@ int64_t find_open_fd(task_t* task) {
     }
 
     return -1;
+}
+
+bool signal_canwakeup_fn(wait_ctx_t* wait_ctx) {
+    return *wait_ctx->signal.trywake;
 }

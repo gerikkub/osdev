@@ -47,10 +47,6 @@ int64_t main(uint64_t tid, char** ctx) {
     int64_t read_len;
     do {
         read_len = system_read(fd, buffer, 4096, 0);
-        console_printf("Read %d bytes\n", read_len);
-        if (read_len > 0) {
-            console_printf("First: %x\n", buffer[0]);
-        }
         console_write_len(buffer, read_len);
         console_flush();
     } while (read_len > 0);

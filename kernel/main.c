@@ -133,7 +133,7 @@ void main() {
     net_tcp_bind_init();
 
     task_init((uint64_t*)exstack_entry.base);
-    create_kernel_task(8192, kernel_init_lower_thread, NULL);
+    create_kernel_task(8192, kernel_init_lower_thread, NULL, "kernel");
 
     schedule();
 
@@ -287,8 +287,18 @@ void kernel_init_lower_thread(void* ctx) {
         NULL
     };
     (void)http_server_argv;
-    //http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
+    http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
     (void)http_server_tid;
+
+    uint64_t tcp_cat_tid;
+    char* tcp_cat_argv[] = {
+        "10.0.2.15",
+        "5555",
+        NULL
+    };
+    (void)tcp_cat_argv;
+    tcp_cat_tid = exec_user_task("home", "bin/tcp_cat.elf", "tcp_cat", tcp_cat_argv);
+    (void)tcp_cat_tid;
 
     console_log(LOG_DEBUG, "Starting Timer\n");
 
@@ -346,16 +356,16 @@ void kernel_init_lower_thread(void* ctx) {
         (void)time_tid;
         */
 
-/*
         uint64_t cat2_tid;
         char* cat2_argv[] = {
-            "home",
-            "hello.txt",
+            "sysfs",
+            "profile",
             NULL
         };
-        cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+        if (ticknum % 100 == 0) {
+            cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+        }
         (void)cat2_tid;
-        */
 /*
         uint64_t cat2_tid;
         char* cat2_argv[] = {

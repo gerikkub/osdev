@@ -169,4 +169,5 @@ void sysfs_register() {
     sysfs_task_init();
     sysfs_time_init();
     sysfs_vmalloc_init();
+    sysfs_profile_init();
 }
