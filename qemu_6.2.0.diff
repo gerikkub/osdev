@@ -1,0 +1,68 @@
+diff --git a/hw/intc/arm_gicv3_dist.c b/hw/intc/arm_gicv3_dist.c
+index 4164500ea9..d808faea3b 100644
+--- a/hw/intc/arm_gicv3_dist.c
++++ b/hw/intc/arm_gicv3_dist.c
+@@ -262,6 +262,19 @@ static void gicd_write_irouter(GICv3State *s, MemTxAttrs attrs, int irq,
+     gicv3_update(s, irq, 1);
+ }
+ 
++static void gicd_write_setspi_nsr(GICv3State *s, MemTxAttrs attr, uint32_t data) {
++    gicv3_gicd_pending_set(s, data);
++    gicd_write_set_bitmap_reg(s, attr, s->pending, NULL,
++                              data / 32, data % 32);
++    gicv3_update(s, data, 1);
++}
++
++static void gicd_write_clrspi_nsr(GICv3State *s, MemTxAttrs attr, uint32_t data) {
++    gicd_write_clear_bitmap_reg(s, attr, s->pending, NULL,
++                                data / 32, data % 32);
++    gicv3_update(s, data, 1);
++}
++
+ /**
+  * gicd_readb
+  * gicd_readw
+@@ -332,6 +345,7 @@ static bool gicd_readw(GICv3State *s, hwaddr offset,
+      * implement (ie for us GICD_TYPER.MBIS == 0), so for us they are
+      * reserved.
+      */
++
+     return false;
+ }
+ 
+@@ -344,6 +358,14 @@ static bool gicd_writew(GICv3State *s, hwaddr offset,
+      * implement (ie for us GICD_TYPER.MBIS == 0), so for us they are
+      * reserved.
+      */
++    switch (offset) {
++    case GICD_SETSPI_NSR:
++        gicd_write_setspi_nsr(s, attrs, value);
++        return true;
++    case GICD_CLRSPI_NSR:
++        gicd_write_clrspi_nsr(s, attrs, value);
++        return true;
++    }
+     return false;
+ }
+ 
+@@ -402,6 +424,7 @@ static bool gicd_readl(GICv3State *s, hwaddr offset,
+ 
+         *data = (1 << 25) | (1 << 24) | (sec_extn << 10) |
+             (s->lpi_enable << GICD_TYPER_LPIS_SHIFT) |
++            (1 << 16) |
+             (0xf << 19) | itlinesnumber;
+         return true;
+     }
+@@ -774,6 +797,12 @@ static bool gicd_writel(GICv3State *s, hwaddr offset,
+                       "%s: invalid guest write to RO register at offset "
+                       TARGET_FMT_plx "\n", __func__, offset);
+         return true;
++    case GICD_SETSPI_NSR:
++        gicd_write_setspi_nsr(s, attrs, value);
++        return true;
++    case GICD_CLRSPI_NSR:
++        gicd_write_clrspi_nsr(s, attrs, value);
++        return true;
+     default:
+         return false;
+     }
