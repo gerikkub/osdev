@@ -44,6 +44,7 @@ void gicv3_enable(void* ctx) {
 
     uint64_t icc_bpr1 = 0;
     WRITE_SYS_REG(ICC_REG_BPR1_EL1, icc_bpr1);
+
 }
 
 void gicv3_disable(void* ctx) {
@@ -60,10 +61,10 @@ void gicv3_enable_intid(void* ctx, uint64_t intid) {
     uint32_t intid_bit = intid % 32;
 
     if (intid_word == 0) {
-        s_gicv3_ctx.gicrppi->igroupr0 = BIT(intid_bit);
+        s_gicv3_ctx.gicrppi->igroupr0 |= BIT(intid_bit);
         s_gicv3_ctx.gicrppi->isenabler0 = BIT(intid_bit);
     } else {
-        s_gicv3_ctx.gicd->igroupr[intid_word] = BIT(intid_bit);
+        s_gicv3_ctx.gicd->igroupr[intid_word] |= BIT(intid_bit);
         s_gicv3_ctx.gicd->isenabler[intid_word] = BIT(intid_bit);
     }
 }
@@ -84,23 +85,21 @@ void gicv3_disable_intid(void* ctx, uint64_t intid) {
 }
 
 void gicv3_get_spi_msi_intid(void* ctx, uint64_t* intid_out, uint64_t* data_out, uintptr_t* addr_out) {
+
     uint64_t intid;
     bool ok;
     ok = bitalloc_alloc_any(&s_gicv3_ctx.intid_alloc, &intid);
     ASSERT(ok);
 
-    /*
+    // GICD emulated MSI
     *intid_out = intid;
     *data_out = intid;
     *addr_out = KSPACE_TO_PHY(&s_gicv3_ctx.gicd->setspi_nsr);
-    */
 
-    ASSERT(intid - (GIC_INTID_SPI_BASE + 500) < NUM_FAKE_MSI_PORTS);
+    s_gicv3_ctx.gicd->icfgr[intid / 16] = (0x2 << ((intid % 16) * 2));
+    // Set Indit to edge triggered
 
-    *intid_out = intid;
-    *data_out = intid;
-    *addr_out = KSPACE_TO_PHY(&s_gicv3_msi_words[intid - (GIC_INTID_SPI_BASE + 500)]);
-
+    console_log(LOG_DEBUG, "GICv3: Allocated SPI %d", intid);
 }
 
 void gicv3_set_spi_trigger(void* ctx, uint64_t intid, interrupt_trigger_type_t type) {
@@ -163,8 +162,14 @@ void gicv3_discover(void* ctx) {
                                MEMSPACE_FLAG_PERM_KRW);
     memspace_update_kernel_vmem();
 
-    //bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE, GIC_INTID_SPI_LIMIT, vmalloc);
-    bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE + 500, GIC_INTID_SPI_LIMIT, vmalloc);
+    console_log(LOG_DEBUG, "Discovered GIC");
+    console_log(LOG_DEBUG, " GICD_CTLR: %8x", s_gicv3_ctx.gicd->ctlr);
+    console_log(LOG_DEBUG, " GICD_TYPER: %8x", s_gicv3_ctx.gicd->typer);
+    console_log(LOG_DEBUG, " GICD_CTLR: %8x", s_gicv3_ctx.gicr->ctlr);
+    console_log(LOG_DEBUG, " GICD_TYPER: %8x", s_gicv3_ctx.gicr->typer);
+
+    bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE, GIC_INTID_SPI_LIMIT, vmalloc);
+    //bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE + 500, GIC_INTID_SPI_LIMIT, vmalloc);
 
     for (uint64_t idx = 0; idx < NUM_FAKE_MSI_PORTS; idx++) {
         s_gicv3_msi_words[idx] = 0;
@@ -184,6 +189,10 @@ void gicv3_poll_msi(void) {
     }
 }
 
+void gicv3_register_its(void* its_ctx) {
+    s_gicv3_ctx.its_ctx = its_ctx;
+}
+
 void gicv3_register(void) {
     discovery_register_t reg = {
         .type = DRIVER_DISCOVERY_DTB,
@@ -193,6 +202,7 @@ void gicv3_register(void) {
         .ctxfunc = gicv3_discover
     };
     register_driver(&reg);
+
 }
 
 REGISTER_DRIVER(gicv3)

@@ -4,6 +4,7 @@ add_library(kernel_drivers OBJECT
             aarch64/aarch64.c
             console/console_dev.c
             gicv3/gicv3.c
+            #gicv3/gicv3_its.c
             pcie/pcie.c
             virtio_pci_blk/virtio_pci_blk.c
             virtio_pci_console/virtio_pci_console.c

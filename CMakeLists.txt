@@ -65,15 +65,22 @@ set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -chardev stdio,id=virtiocon0 -device virtcon
 set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -netdev tap,id=net0)
 set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -device virtio-net-pci,netdev=net0,mac=52:54:00:12:34:56)
 set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -monitor none -serial none)
+#set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} --trace "gicv3_dist_set_irq")
+#set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} --trace "gicv3_cpuif_update")
+#set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} --trace "gicv3_cpuif_set_irqs")
+#set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} --trace "gicv3_*")
 
-set (QEMU_VM_DEBUG_FLAGS ${QEMU_VM_FLAGS} "-S")
+set (QEMU_VM_DEBUG_FLAGS ${QEMU_VM_FLAGS} -S)
+
+set (QEMU_PATH /home/gerik/Downloads/qemu/build/)
+#set (QEMU_PATH /usr/local/share/qemu/bin)
 
 add_custom_target (run
-    COMMAND /usr/local/share/qemu/bin/qemu-system-aarch64 ${QEMU_VM_FLAGS}
+    COMMAND ${QEMU_PATH}/qemu-system-aarch64 ${QEMU_VM_FLAGS}
                    DEPENDS disk_image)
 
 add_custom_target (debug
-    COMMAND /usr/local/share/qemu/bin/qemu-system-aarch64 ${QEMU_VM_DEBUG_FLAGS}
+    COMMAND ${QEMU_PATH}/qemu-system-aarch64 ${QEMU_VM_DEBUG_FLAGS}
                    DEPENDS disk_image)
 
 

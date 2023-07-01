@@ -19,6 +19,8 @@ void gic_irq_handler(uint32_t vector);
 
 void gicv3_poll_msi(void);
 
+void gicv3_register_its(void* its_ctx);
+
 #define GIC_MAX_IRQS (1024)
 
 #define GIC_MAX_IRQ_WORDS (0x80/4)

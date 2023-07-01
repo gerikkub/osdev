@@ -466,7 +466,7 @@ void schedule(void) {
 
     do { // TODO: Poor man's idle task
         // Check for MSI manually. "Poor man's interrupts"
-        gicv3_poll_msi();
+        //gicv3_poll_msi();
         // Round Robin
         for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
             task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
@@ -484,6 +484,11 @@ void schedule(void) {
                     }
                 }
             }
+        }
+        if (task_count == MAX_NUM_TASKS) {
+            elapsedtimer_stop(&s_idletime);
+            asm volatile ("wfi");
+            elapsedtimer_start(&s_idletime);
         }
 
     } while (task_count == MAX_NUM_TASKS);
