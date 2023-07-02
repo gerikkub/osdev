@@ -132,6 +132,16 @@ void main() {
     net_tcp_socket_init();
     net_tcp_bind_init();
 
+    ext2_register();
+    sysfs_register();
+
+    dtb_init();
+
+    gtimer_init();
+
+    DISABLE_IRQ();
+    interrupt_enable();
+
     task_init((uint64_t*)exstack_entry.base);
     create_kernel_task(8192, kernel_init_lower_thread, NULL, "kernel");
 
@@ -143,16 +153,10 @@ void main() {
 
 void kernel_init_lower_thread(void* ctx) {
 
-    ext2_register();
-    sysfs_register();
-
-    dtb_init();
-
     driver_run_late_init();
 
-    gtimer_init();
     pl011_init_rx(VIRT_UART_VMEM);
-    interrupt_enable();
+    net_tcp_conn_start_timeout_thread();
 
     int64_t open_res;
     open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
@@ -307,12 +311,9 @@ void kernel_init_lower_thread(void* ctx) {
     //int64_t lastmem = 0;
     uint64_t tcp_tid = 0;
     while (1) {
-        gtimer_start_downtimer(freq / 100, true);
-        gtimer_wait_for_trigger();
+        task_wait_timer_in(1000*1000);
 
-        net_tcp_timeout_thread(NULL);
-
-        //console_log(LOG_INFO, "tick");
+        console_log(LOG_DEBUG, "Tick");
 
         ticknum++;
 
@@ -362,9 +363,7 @@ void kernel_init_lower_thread(void* ctx) {
             "profile",
             NULL
         };
-        if (ticknum % 100 == 0) {
-            cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
-        }
+        cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
         (void)cat2_tid;
 /*
         uint64_t cat2_tid;

@@ -40,6 +40,8 @@
 #define MEM_DMB() asm volatile ("dmb SY")
 #define MEM_DSB() asm volatile ("dsb SY")
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 uint16_t en_swap_16(uint16_t a);
 uint32_t en_swap_32(uint32_t a);
 uint64_t en_swap_64(uint64_t a);

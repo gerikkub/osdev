@@ -122,6 +122,26 @@ static intc_funcs_t intc_funcs = {
     .get_msi = gicv3_get_spi_msi_intid
 };
 
+bool gic_try_irq_handler(void) {
+    uint32_t intid = 0;
+    READ_SYS_REG(ICC_REG_IAR1_EL1, intid);
+
+    if (intid == 1023) {
+        return false;
+    }
+
+    uint32_t intid_word = intid / 32;
+    uint32_t intid_bit = intid % 32;
+
+    s_gicv3_ctx.gicd->icpendr[intid_word] = BIT(intid_bit);
+
+    interrupt_handle_irq(intid);
+
+    WRITE_SYS_REG(ICC_REG_EOIR1_EL1, intid);
+
+    return true;
+}
+
 void gic_irq_handler(uint32_t vector) {
 
     uint32_t intid = 0;
@@ -187,10 +207,6 @@ void gicv3_poll_msi(void) {
             *msi_word = 0;
         }
     }
-}
-
-void gicv3_register_its(void* its_ctx) {
-    s_gicv3_ctx.its_ctx = its_ctx;
 }
 
 void gicv3_register(void) {

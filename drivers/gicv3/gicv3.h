@@ -15,6 +15,7 @@ void gic_set_irq_handler(irq_handler handler, uint32_t intid);
 void gic_enable_intid(uint32_t intid);
 void gic_disable_intid(uint32_t intid);
 
+bool gic_try_irq_handler(void);
 void gic_irq_handler(uint32_t vector);
 
 void gicv3_poll_msi(void);

@@ -14,6 +14,8 @@ void gtimer_irq_handler(uint32_t intid, void* ctx) {
 
     uint32_t cntp_ctl = 0;
     WRITE_SYS_REG(CNTP_CTL_EL0, cntp_ctl);
+
+    //console_log(LOG_DEBUG, "Timer fired");
 }
 
 void gtimer_early_init(void) {
@@ -54,9 +56,19 @@ void gtimer_start_downtimer(int32_t downcount, bool enable_interrupt) {
         interrupt_await_reset(GTIMER_EL0_IRQn);
     }
 
+    if (enable_interrupt) {
+        //int32_t ticks_per_us = gtimer_get_frequency() / (1000 * 1000);
+        //console_log(LOG_DEBUG, "Timer irq in %d us", downcount / ticks_per_us);
+    }
+
     // Set the downcount and enable the timer
     WRITE_SYS_REG(CNTP_TVAL_EL0, downcount);
     WRITE_SYS_REG(CNTP_CTL_EL0, cntp_ctl);
+}
+
+void gtimer_start_downtimer_us(int32_t downcount, bool enable_interrupt) {
+    int32_t ticks_per_us = gtimer_get_frequency() / (1000 * 1000);
+    gtimer_start_downtimer(downcount * ticks_per_us, enable_interrupt);
 }
 
 bool gtimer_downtimer_triggered(void) {
@@ -65,6 +77,14 @@ bool gtimer_downtimer_triggered(void) {
     READ_SYS_REG(CNTP_TVAL_EL0, tval);
 
     return tval <= 0;
+}
+
+uint64_t gtimer_downtimer_get_count(void) {
+    int32_t tval;
+
+    READ_SYS_REG(CNTP_TVAL_EL0, tval);
+
+    return tval;
 }
 
 void gtimer_wait_for_trigger(void) {
@@ -77,5 +97,10 @@ uint64_t gtimer_get_count(void) {
     READ_SYS_REG(CNTPCT_EL0, cnt);
 
     return cnt;
+}
+
+uint64_t gtimer_get_count_us(void) {
+    uint64_t ticks_per_us = gtimer_get_frequency() / (1000 * 1000);
+    return gtimer_get_count() / ticks_per_us;
 }
 

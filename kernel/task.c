@@ -11,10 +11,12 @@
 #include "kernel/exception.h"
 #include "kernel/memoryspace.h"
 #include "kernel/kernelspace.h"
+#include "kernel/console.h"
+#include "kernel/gtimer.h"
 
 #include "kernel/interrupt/interrupt.h"
 
-void gicv3_poll_msi(void);
+bool gic_try_irq_handler();
 
 static task_t s_task_list[MAX_NUM_TASKS] = {0};
 
@@ -290,7 +292,9 @@ uint64_t create_kernel_task(uint64_t stack_size,
 
     task_reg_t reg;
     reg.gp[TASK_REG(1)] = (uint64_t)ctx;
-    reg.spsr = TASK_SPSR_M(4); // EL1t SP
+    reg.spsr = TASK_SPSR_M(4) | // EL1t SP
+               TASK_SPSR_I | // Mask IRQs for kernel tasks
+               TASK_SPSR_F;
     reg.elr = (uint64_t)task_entry;
 
     return create_task(NULL, 0, ((void*)stack_ptr)+stack_size, stack_size, &reg, NULL, true, name);
@@ -452,6 +456,53 @@ void task_cleanup(task_t* task, uint64_t ret_val) {
     task->tid = 0;
 }
 
+void wait_timer_setup(uint64_t now_us, uint64_t max_sleep_time) {
+
+
+    uint64_t timer_fire_time = now_us + max_sleep_time;
+    task_t* timer_task = NULL;
+
+    for (uint64_t idx = 0; idx < MAX_NUM_TASKS; idx++) {
+        task_t* task = &s_task_list[idx];
+        if (task->run_state == TASK_WAIT &&
+            task->wait_reason == WAIT_TIMER) {
+
+            if (task->wait_ctx.timer.wake_time_us <= now_us) {
+                continue;
+            }
+            if (timer_fire_time == 0) {
+                timer_fire_time = task->wait_ctx.timer.wake_time_us;
+                timer_task = task;
+            } else if (timer_fire_time > task->wait_ctx.timer.wake_time_us) {
+                timer_fire_time = task->wait_ctx.timer.wake_time_us;
+                timer_task = task;
+            }
+        }
+    }
+
+
+    uint64_t downcount;
+    READ_SYS_REG(CNTP_TVAL_EL0, downcount);
+    if (downcount > 0) {
+        //uint64_t ticks_per_us = gtimer_get_frequency() / 1000000;
+        //console_log(LOG_DEBUG, "Cancel timer with %d us left", downcount / ticks_per_us);
+    }
+
+    if (now_us >= timer_fire_time) {
+        //console_log(LOG_DEBUG, "Timer expired in the past");
+        timer_fire_time = now_us + 1;
+    }
+
+    (void)timer_task;
+    /*
+    console_log(LOG_DEBUG, "Timer set for %s in %d us (%d %d)",
+                timer_task != NULL ? timer_task->name : "Preemept",
+                timer_fire_time - now_us,
+                timer_fire_time, now_us);
+                */
+    gtimer_start_downtimer_us(timer_fire_time - now_us, true);
+}
+
 void schedule(void) {
 
     ASSERT(s_active_task_idx < MAX_NUM_TASKS);
@@ -459,14 +510,15 @@ void schedule(void) {
     uint64_t task_idx;
 
     elapsedtimer_stop(&s_task_list[s_active_task_idx].profile_time);
+
+
+    while (gic_try_irq_handler());
+
     elapsedtimer_start(&s_idletime);
 
-    // Enable interrupts
-    ENABLE_IRQ();
+    uint64_t now_us = gtimer_get_count_us();
 
     do { // TODO: Poor man's idle task
-        // Check for MSI manually. "Poor man's interrupts"
-        //gicv3_poll_msi();
         // Round Robin
         for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
             task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
@@ -487,17 +539,24 @@ void schedule(void) {
         }
         if (task_count == MAX_NUM_TASKS) {
             elapsedtimer_stop(&s_idletime);
+            wait_timer_setup(now_us, TASK_MAX_WFI_TIME_US);
+            ENABLE_IRQ();
             asm volatile ("wfi");
+            //asm volatile ("nop");
+            DISABLE_IRQ();
+            now_us = gtimer_get_count_us();
             elapsedtimer_start(&s_idletime);
         }
 
     } while (task_count == MAX_NUM_TASKS);
-    // Disable interrupts
-    DISABLE_IRQ();
 
     ASSERT(task_count < MAX_NUM_TASKS);
 
+    wait_timer_setup(now_us, TASK_MAX_PROC_TIME_US);
+
     s_active_task_idx = task_idx;
+
+    //console_log(LOG_DEBUG, "Scheduling %d (%s)", s_task_list[s_active_task_idx].tid, s_task_list[s_active_task_idx].name);
 
     elapsedtimer_stop(&s_idletime);
     elapsedtimer_start(&s_task_list[s_active_task_idx].profile_time);
@@ -535,4 +594,30 @@ int64_t find_open_fd(task_t* task) {
 
 bool signal_canwakeup_fn(wait_ctx_t* wait_ctx) {
     return *wait_ctx->signal.trywake;
+}
+
+bool timer_canwakeup_fn(wait_ctx_t* wait_ctx) {
+    //console_log(LOG_DEBUG, "Check timer %d >= %d", gtimer_get_count_us(), wait_ctx->timer.wake_time_us);
+    return gtimer_get_count_us() >= wait_ctx->timer.wake_time_us;
+}
+
+void task_wait_timer_at(uint64_t wake_time_us) {
+
+    task_t* task = get_active_task();
+
+    wait_ctx_t timer_ctx = {
+        .timer = {
+            .wake_time_us = wake_time_us
+        }
+    };
+
+    task_wait_kernel(task,
+                     WAIT_TIMER,
+                     &timer_ctx,
+                     NULL,
+                     timer_canwakeup_fn);
+}
+
+void task_wait_timer_in(uint64_t delay_us) {
+    task_wait_timer_at(gtimer_get_count_us() + delay_us);
 }

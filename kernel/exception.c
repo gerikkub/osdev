@@ -57,6 +57,8 @@ void gic_irq_handler(uint32_t vector);
 uint64_t exception_handler_irq(uint64_t vector, irq_stackframe_t* frame) {
     gic_irq_handler(vector);
 
+    schedule();
+
     return 0;
 }
 

@@ -754,10 +754,11 @@ void net_tcp_timeout_check(void* ctx, void* check_ctx, void* key, void* dataptr)
 
 void net_tcp_timeout_thread(void* ctx) {
 
-    //while (true) {
+    while (true) {
+        task_wait_timer_in(10000);
         uint64_t curr_time = gtimer_get_count();
         hashmap_forall(s_tcp_conn_map, net_tcp_timeout_check, &curr_time);
-    //}
+    }
 }
 
 uint64_t net_tcp_conn_map_hash_op(void* key) {
@@ -807,5 +808,8 @@ void net_tcp_conn_init(void) {
                                        256,
                                        NULL);
                                 
-    //create_kernel_task(256*1024, net_tcp_timeout_thread, NULL);
+    create_kernel_task(256*1024, net_tcp_timeout_thread, NULL, "tcpconn");
+}
+
+void net_tcp_conn_start_timeout_thread(void) {
 }

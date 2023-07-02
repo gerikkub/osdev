@@ -73,5 +73,6 @@ void net_tcp_conn_close_listener(net_tcp_conn_ctx_t* tcp_ctx);
 
 void net_tcp_handle_connection(net_packet_t* packet, net_ipv4_hdr_t* ipv4_header, net_tcp_hdr_t* tcp_header);
 void net_tcp_timeout_thread(void* ctx);
+void net_tcp_conn_start_timeout_thread(void);
 
 #endif

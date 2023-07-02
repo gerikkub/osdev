@@ -35,6 +35,8 @@
 #define IS_KERNEL_TASK(tid) ((tid) & TASK_TID_KERNEL)
 #define IS_USER_TASK(tid) (!((tid) & TASK_TID_KERNEL))
 
+#define TASK_MAX_PROC_TIME_US 5000
+#define TASK_MAX_WFI_TIME_US 1000000
 
 struct task_t_;
 
@@ -60,6 +62,7 @@ typedef enum {
     WAIT_IRQNOTIFY = 3,
     WAIT_VIRTIOIRQ = 4,
     WAIT_SIGNAL = 5,
+    WAIT_TIMER = 6
 } wait_reason_t;
 
 typedef struct {
@@ -86,6 +89,10 @@ typedef struct {
     bool* trywake;
 } wait_signal_t;
 
+typedef struct {
+    uint64_t wake_time_us;
+} wait_timer_t;
+
 typedef union {
     wait_lock_t lock;
     wait_getmsgs_t getmsgs;
@@ -93,6 +100,7 @@ typedef union {
     wait_initthread_t init_thread;
     wait_virtioirq_t virtioirq;
     wait_signal_t signal;
+    wait_timer_t timer;
 } wait_ctx_t;
 
 typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);
@@ -184,6 +192,9 @@ int64_t task_wait_kernel(task_t* task,
 int64_t find_open_fd(task_t* task);
 
 bool signal_canwakeup_fn(wait_ctx_t* wait_ctx);
+
+void task_wait_timer_at(uint64_t wake_time_us);
+void task_wait_timer_in(uint64_t delay_us);
 
 #define TASK_SPSR_N BIT(31)
 #define TASK_SPSR_Z BIT(30)

@@ -57,10 +57,10 @@ void interrupt_enable(void) {
 
     s_interrupt_ctx.intc_fn.enable(s_interrupt_ctx.intc_ctx);
 
-    uint64_t daif;
-    READ_SYS_REG(DAIF, daif);
-    daif &= ~(BIT(7));
-    WRITE_SYS_REG(DAIF, daif);
+    //uint64_t daif;
+    //READ_SYS_REG(DAIF, daif);
+    //daif &= ~(BIT(7));
+    //WRITE_SYS_REG(DAIF, daif);
 }
 
 void interrupt_disable(void) {

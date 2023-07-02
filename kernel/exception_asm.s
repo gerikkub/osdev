@@ -416,12 +416,13 @@ panic_exception_asm curr_el_sp_0_serror 3 panic_exception_handler
 # Exception while processing in EL1h (in kernel or irq)
 save_context_asm_task_kern_irq curr_el_sp_X_sync SP_EL1 4 exception_handler_sync
 save_context_asm_task_kern_irq curr_el_sp_X_irq SP_EL1 5 exception_handler_irq
+//panic_exception_asm curr_el_sp_x_irq 1 panic_exception_handler
 dummy_exception curr_el_sp_X_fiq 6
 panic_exception_asm curr_el_sp_X_serror 7 panic_exception_handler
 
 # Exception while in EL0t
 save_context_asm_user lower_el_sp_64_sync SP_EL0 8 exception_handler_sync
-save_context_asm_user_irq lower_el_sp_64_irq SP_EL0 9 exception_handler_irq
+save_context_asm_user lower_el_sp_64_irq SP_EL0 9 exception_handler_irq
 dummy_exception lower_el_64_fiq 10
 panic_exception_asm lower_el_64_serror 11 panic_exception_handler
 
