@@ -113,6 +113,23 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
         increase = state->add_mem_func(false, size_align, state->add_mem_ctx, state);
         SYS_ASSERT(increase > 0);
 
+        malloc_entry_t* last_entry = state->first_entry;
+        while (last_entry->next != NULL) {
+            last_entry = last_entry->next;
+        }
+
+        if (last_entry->inuse) {
+            malloc_entry_t* new_entry = (malloc_entry_t*)(last_entry->chunk_start + last_entry->size);
+            new_entry->magic = MALLOC_MAGIC;
+            new_entry->next = NULL;
+            new_entry->size = increase - sizeof(malloc_entry_t);
+            new_entry->inuse = false;
+            new_entry->chunk_start = new_entry + 1;
+            last_entry->next = new_entry;
+        } else {
+            last_entry->size += increase;
+        }
+
         // Re-run malloc. This should return valid memory
         return malloc_p(size_align, state);
     } else {

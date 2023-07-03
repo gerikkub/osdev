@@ -114,6 +114,8 @@ static int64_t syscall_sbrk(uint64_t amount_unsigned,
     memory_space_t* memspace = &this_task->memory;
     memory_entry_phy_t* entry;
 
+    int64_t new_end = 0;
+
     // Look for a heap entry
     entry = (memory_entry_phy_t*)memspace_get_entry_at_addr(memspace, (void*)USER_ADDRSPACE_HEAP);
     if (entry == NULL) {
@@ -141,7 +143,7 @@ static int64_t syscall_sbrk(uint64_t amount_unsigned,
             add_ok = memspace_add_entry_to_memory(memspace, (memory_entry_t*)&heap_entry);
             ASSERT(add_ok);
 
-            entry = &heap_entry;
+            new_end = heap_entry.end;
         }
     } else {
         ASSERT(entry->type == MEMSPACE_PHY);
@@ -167,11 +169,18 @@ static int64_t syscall_sbrk(uint64_t amount_unsigned,
 
             // new_phy has been realloc'd. Now update entry with
             // the new size and address
-            entry->end = entry->start + new_amount;
-            entry->phy_addr = (uintptr_t)new_phy;
-            entry->kmem_addr = PHY_TO_KSPACE(new_phy);
+            memory_entry_phy_t new_entry = {
+                .start = entry->start,
+                .end = entry->start + new_amount,
+                .type = MEMSPACE_PHY,
+                .flags = MEMSPACE_FLAG_PERM_URW,
+                .phy_addr = (uintptr_t)new_phy,
+                .kmem_addr = PHY_TO_KSPACE(new_phy)
+            };
 
-            memspace_add_entry_to_memory(memspace, (memory_entry_t*)entry);
+            memspace_add_entry_to_memory(memspace, (memory_entry_t*)&new_entry);
+
+            new_end = new_entry.end;
         }
     }
 
@@ -180,7 +189,7 @@ static int64_t syscall_sbrk(uint64_t amount_unsigned,
     vmem_flush_tlb();
 
     // Return the new heap limit
-    return entry->end;
+    return new_end;
 }
 
 

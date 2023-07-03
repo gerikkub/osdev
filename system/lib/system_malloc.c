@@ -40,8 +40,9 @@ static int64_t malloc_add_mem(bool initialize, uint64_t len, void* ctx, malloc_s
         SYS_ASSERT(limit > 0);
         SYS_ASSERT(state != NULL);
 
+        uint64_t increase = limit - state->limit;
         state->limit = limit;
-        return len;
+        return increase;
     }
 }
 

@@ -54,6 +54,7 @@ int64_t main(uint64_t tid, char** ctx) {
         return -1;
     }
 
+    char *fbuffer = malloc(256);
     while (true) {
         int64_t socket_fd = system_ioctl(bind_fd, BIND_IOCTL_GET_INCOMING, NULL, 0);
 
@@ -77,7 +78,6 @@ int64_t main(uint64_t tid, char** ctx) {
             int64_t file_fd = system_open(devname, fname, 0);
 
             if (file_fd >= 0) {
-                char* fbuffer = malloc(256);
                 int64_t fread_len;
                 do {
                     fread_len = system_read(file_fd, fbuffer, 256, 0);
