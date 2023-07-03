@@ -39,6 +39,8 @@ typedef struct {
     uint16_t their_port;
 
     bool canwake;
+
+    fd_ctx_t* fd_ctx;
 } net_tcp_socket_ctx_t;
 
 hashmap_ctx_t* s_tcp_socket_map = NULL;
@@ -57,7 +59,21 @@ int64_t net_tcp_socket_recv(void* ctx, const uint8_t* payload, uint64_t payload_
 
     socket_ctx->canwake = true;
 
+    if (socket_ctx->fd_ctx != NULL) {
+        socket_ctx->fd_ctx->ready |= FD_READY_GEN_READ;
+    }
+
     return payload_len;
+}
+
+void net_tcp_socket_pass_fd_ctx(void* ctx, fd_ctx_t* fd_ctx) {
+    net_tcp_socket_ctx_t* socket_ctx = ctx;
+
+    socket_ctx->fd_ctx = fd_ctx;
+
+    if (fd_ctx != NULL) {
+        fd_ctx->ready = circbuffer_len(socket_ctx->recv_buffer) > 0 ? FD_READY_GEN_READ : 0;
+    }
 }
 
 void net_tcp_socket_close(void* ctx, bool dontreply) {
@@ -65,6 +81,11 @@ void net_tcp_socket_close(void* ctx, bool dontreply) {
 
     socket_ctx->should_close = true;
     socket_ctx->canwake = true;
+
+    if (socket_ctx->fd_ctx) {
+        socket_ctx->fd_ctx->ready |= FD_READY_GEN_CLOSE;
+    }
+
     if (dontreply) {
         socket_ctx->tcp_conn_ctx = NULL;
     }
@@ -79,6 +100,12 @@ static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t 
 
     if (bytes_read > 0) {
         circbuffer_get(socket_ctx->recv_buffer, buffer, bytes_read);
+
+        if (socket_ctx->fd_ctx != NULL &&
+            circbuffer_len(socket_ctx->recv_buffer) == 0) {
+            socket_ctx->fd_ctx->ready &= ~FD_READY_GEN_READ;
+        }
+
         return bytes_read;
     } else {
 
@@ -106,6 +133,12 @@ static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t 
             } while (bytes_read == 0);
 
             circbuffer_get(socket_ctx->recv_buffer, buffer, bytes_read);
+
+            if (socket_ctx->fd_ctx != NULL &&
+                circbuffer_len(socket_ctx->recv_buffer) == 0) {
+                socket_ctx->fd_ctx->ready &= ~FD_READY_GEN_READ;
+            }
+
             return bytes_read;
         }
     }
@@ -170,7 +203,7 @@ void* net_tcp_socket_create_from_conn(task_t* task, void* tcp_ctx, ipv4_t* our_i
     return socket_ctx;
 }
 
-int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out) {
+int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out, fd_ctx_t* fd_ctx) {
     
     if (create_socket_ctx->tcp4.dest_port == 0) {
         console_log(LOG_WARN, "Net TCP cannot create socket. Invalid dest port");
@@ -211,6 +244,11 @@ int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* op
 
     socket_ctx->our_ip = net_dev->ipv4;
     socket_ctx->recv_buffer = circbuffer_create(4096);
+    socket_ctx->fd_ctx = fd_ctx;
+
+    if (fd_ctx != NULL) {
+        fd_ctx->ready = 0;
+    }
 
     socket_ctx->should_close = false;
     socket_ctx->tcp_conn_ctx = net_tcp_conn_create_client(&socket_ctx->our_ip,

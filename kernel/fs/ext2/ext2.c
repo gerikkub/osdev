@@ -313,7 +313,7 @@ static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
     return file_data;
 }
 
-static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void** ctx_out) {
+static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
 
     ext2_fs_ctx_t* fs_ctx = ctx;
 
@@ -366,7 +366,12 @@ static int64_t ext2_open(void* ctx, const char* file, const uint64_t flags, void
 
     file_ctx->seek_idx = 0;
     file_ctx->can_write = 1;
+    file_ctx->fd_ctx = fd_ctx;
     file_ctx->file_data->op_ctx = ext2_file_ctx;
+
+    if (fd_ctx != NULL) {
+        fd_ctx->ready = FD_READY_ALL;
+    }
 
     lock_acquire(&file_ctx->file_data->ref_lock, true);
     file_ctx->file_data->ref_count++;

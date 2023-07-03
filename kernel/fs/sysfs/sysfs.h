@@ -10,6 +10,7 @@
 typedef struct {
     fd_ops_t ops;
     void* ctx;
+    fd_ctx_t* fd_ctx;
 } sysfs_file_fd_ctx_t;
 
 typedef void* (*sysfs_open_op)(void);

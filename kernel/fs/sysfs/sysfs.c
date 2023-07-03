@@ -72,7 +72,7 @@ void sysfs_ro_file_helper(void* data_str, uint64_t data_str_len, file_ctx_t* fil
     *file_ctx_out = file_ctx;
 }
 
-int64_t sysfs_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
+int64_t sysfs_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
 
     sysfs_file_t* file_item = NULL;
     sysfs_file_t* file = NULL;
@@ -89,16 +89,21 @@ int64_t sysfs_open(void* ctx, const char* path, const uint64_t flags, void** ctx
         return -1;
     }
 
-    sysfs_file_fd_ctx_t* fd_ctx = vmalloc(sizeof(sysfs_file_fd_ctx_t));
-    fd_ctx->ops = file->ops;
+    sysfs_file_fd_ctx_t* sysfs_fd_ctx = vmalloc(sizeof(sysfs_file_fd_ctx_t));
+    sysfs_fd_ctx->ops = file->ops;
+    sysfs_fd_ctx->fd_ctx = fd_ctx;
 
-    if(file->open != NULL) {
-        fd_ctx->ctx = file->open();
-    } else {
-        fd_ctx->ctx = NULL;
+    if (fd_ctx != NULL) {
+        fd_ctx->ready = FD_READY_ALL;
     }
 
-    *ctx_out = fd_ctx;
+    if(file->open != NULL) {
+        sysfs_fd_ctx->ctx = file->open();
+    } else {
+        sysfs_fd_ctx->ctx = NULL;
+    }
+
+    *ctx_out = sysfs_fd_ctx;
 
     return 0;
 }

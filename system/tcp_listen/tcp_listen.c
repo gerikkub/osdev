@@ -6,6 +6,7 @@
 #include <string_utils.h>
 
 #include "system/lib/system_lib.h"
+#include "system/lib/system_assert.h"
 #include "system/lib/system_msg.h"
 #include "system/lib/system_console.h"
 #include "system/lib/system_assert.h"
@@ -14,6 +15,7 @@
 #include "system/lib/system_socket.h"
 
 #include "include/k_syscall.h"
+#include "include/k_select.h"
 #include "include/k_messages.h"
 #include "include/k_modules.h"
 #include "include/k_ioctl_common.h"
@@ -54,35 +56,58 @@ int64_t main(uint64_t tid, char** ctx) {
         return -1;
     }
 
+    syscall_select_ctx_t* select_arr = malloc(sizeof(syscall_select_ctx_t) * 33);
+
+    for (uint64_t idx = 0; idx < 33; idx++) {
+        select_arr[idx].fd = -1;
+        select_arr[idx].ready_mask = 0;
+    }
+
+    select_arr[0].fd = bind_fd;
+    select_arr[0].ready_mask = FD_READY_BIND_NEWCONN;
+
     while (true) {
-        int64_t socket_fd = system_ioctl(bind_fd, BIND_IOCTL_GET_INCOMING, NULL, 0);
+        uint64_t ready_op;
 
-        if (socket_fd < 0) {
-            system_yield();
-            continue;
-        }
+        int64_t ready_fd = system_select(select_arr, 33, UINT64_MAX, &ready_op);
 
-        //console_printf("New connection\n");
-        //console_flush();
+        console_printf("Ready FD: %d (%d)\n", ready_fd, ready_op);
+        console_flush();
 
-        uint8_t buffer[256];
-        int64_t bytes_read;
-        do {
-            memset(buffer, 0, 256);
-            bytes_read = system_read(socket_fd, buffer, 255, 0);
+        if (ready_fd == bind_fd) {
+            int64_t socket_fd = system_ioctl(bind_fd, BIND_IOCTL_GET_INCOMING, NULL, 0);
 
-            if (bytes_read > 0) {
-                //console_printf("Read: %s\n", buffer);
-                //console_flush();
+            uint64_t idx;
+            for (idx = 0; idx < 33; idx++) {
+                if (select_arr[idx].fd == -1) {
+                    break;
+                }
             }
-            system_write(socket_fd, buffer, bytes_read, 0);
+            SYS_ASSERT(idx < 33);
 
-        } while (bytes_read >= 0);
+            select_arr[idx].fd = socket_fd;
+            select_arr[idx].ready_mask = FD_READY_GEN_READ | FD_READY_GEN_CLOSE;
+        } else {
+            if (ready_op & FD_READY_GEN_READ) {
+                uint8_t buffer[256];
+                int64_t bytes_read;
 
-        system_close(socket_fd);
+                memset(buffer, 0, 256);
+                bytes_read = system_read(ready_fd, buffer, 255, 0);
 
-        //console_printf("Connection closed\n");
-        //console_flush();
+                system_write(ready_fd, buffer, bytes_read, 0);
+            }
+            if (ready_op & FD_READY_GEN_CLOSE) {
+                system_close(ready_fd);
+
+                for (uint64_t idx = 0; idx < 33; idx++) {
+                    if (select_arr[idx].fd == ready_fd) {
+                        select_arr[idx].fd = -1;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     return 0;

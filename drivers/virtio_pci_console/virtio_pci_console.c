@@ -45,6 +45,11 @@ typedef struct {
     int64_t recv_buf_len;
 } virtio_console_dev_ctx_t;
 
+typedef struct {
+    virtio_console_dev_ctx_t* dev_ctx;
+    fd_ctx_t* fd_ctx;
+} virtio_console_open_ctx_t;
+
 static void virtio_pci_console_device_irq_fn(uint32_t intid, void* ctx) {
     virtio_console_ctx_t* console_ctx = ctx;
     pci_interrupt_clear_pending(&console_ctx->pci_device, intid);
@@ -95,14 +100,18 @@ static void send_control_message(virtio_console_ctx_t* console_ctx, uint32_t por
     virtio_return_buffer(transmitq, send_buffer.ptr);
 }
 
-static int64_t virtio_pci_console_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
-    *ctx_out = ctx;
+static int64_t virtio_pci_console_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
     virtio_console_dev_ctx_t* dev_ctx = ctx;
 
-    /*
-    if (dev_ctx->open) {
-        return -1;
-    }*/
+    virtio_console_open_ctx_t* open_ctx = vmalloc(sizeof(virtio_console_open_ctx_t));
+    open_ctx->dev_ctx = dev_ctx;
+    open_ctx->fd_ctx = fd_ctx;
+
+    *ctx_out = open_ctx;
+
+    if (fd_ctx != NULL) {
+        fd_ctx->ready = FD_READY_ALL;
+    }
 
     dev_ctx->open = true;
 
@@ -116,7 +125,7 @@ static int64_t virtio_pci_console_open_op(void* ctx, const char* path, const uin
 }
 
 static int64_t virtio_pci_console_read_op(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
-    virtio_console_dev_ctx_t* dev_ctx = ctx;
+    virtio_console_dev_ctx_t* dev_ctx = ((virtio_console_open_ctx_t*)ctx)->dev_ctx;
 
     // Copy out of the temporary buffer if possible
     if (dev_ctx->recv_buf != NULL) {
@@ -181,7 +190,7 @@ static int64_t virtio_pci_console_write_op(void* ctx, const uint8_t* buffer, con
     if (size == 0) {
         return 0;
     }
-    virtio_console_dev_ctx_t* dev_ctx = ctx;
+    virtio_console_dev_ctx_t* dev_ctx = ((virtio_console_open_ctx_t*)ctx)->dev_ctx;
 
     virtio_console_ctx_t* console_ctx = dev_ctx->console_ctx;
     lock_acquire(&console_ctx->console_lock, true);
@@ -213,7 +222,7 @@ static int64_t virtio_pci_console_ioctl_op(void* ctx, const uint64_t ioctl, cons
 }
 
 static int64_t virtio_pci_console_close_op(void* ctx) {
-    virtio_console_dev_ctx_t* dev_ctx = ctx;
+    virtio_console_dev_ctx_t* dev_ctx = ((virtio_console_open_ctx_t*)ctx)->dev_ctx;
     dev_ctx->open = false;
 
     if (dev_ctx->port > 0) {
@@ -221,6 +230,8 @@ static int64_t virtio_pci_console_close_op(void* ctx) {
         send_control_message(dev_ctx->console_ctx, dev_ctx->port, VIRTIO_CONSOLE_PORT_OPEN, 0);
         lock_release(&dev_ctx->console_ctx->console_lock);
     }
+
+    vfree(ctx);
 
     return 0;
 }
@@ -425,11 +436,14 @@ static void virtio_console_late_init(void* ctx) {
     init_console_device(console_ctx);
 
     virtio_console_dev_ctx_t* dev_ctx = vmalloc(sizeof(virtio_console_dev_ctx_t));
+    virtio_console_open_ctx_t* open_ctx = vmalloc(sizeof(virtio_console_open_ctx_t));
     dev_ctx->port = 0;
     dev_ctx->open = false;
     dev_ctx->console_ctx = console_ctx;
     dev_ctx->recv_buf = NULL;
-    console_add_driver(&s_virtio_pci_console_file_ops, dev_ctx);
+    open_ctx->dev_ctx = dev_ctx;
+    open_ctx->fd_ctx = NULL;
+    console_add_driver(&s_virtio_pci_console_file_ops, open_ctx);
 
     sys_device_register(&s_virtio_pci_console_file_ops, virtio_pci_console_open_op, dev_ctx, "con0");
     console_log(LOG_INFO, "Hello from serial driver!");

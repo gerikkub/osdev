@@ -464,17 +464,33 @@ void wait_timer_setup(uint64_t now_us, uint64_t max_sleep_time) {
 
     for (uint64_t idx = 0; idx < MAX_NUM_TASKS; idx++) {
         task_t* task = &s_task_list[idx];
-        if (task->run_state == TASK_WAIT &&
-            task->wait_reason == WAIT_TIMER) {
+        if (task->run_state == TASK_WAIT) {
 
-            if (task->wait_ctx.timer.wake_time_us <= now_us) {
+            uint64_t wake_time_us;
+
+            switch (task->wait_reason) {
+            case WAIT_TIMER:
+                wake_time_us = task->wait_ctx.timer.wake_time_us;
+                break;
+            case WAIT_SELECT:
+                if (!task->wait_ctx.select.timeout_valid) {
+                    continue;
+                }
+                wake_time_us = task->wait_ctx.select.timeout_end_us;
+                break;
+            default:
                 continue;
             }
+
+            if (wake_time_us <= now_us) {
+                continue;
+            }
+
             if (timer_fire_time == 0) {
-                timer_fire_time = task->wait_ctx.timer.wake_time_us;
+                timer_fire_time = wake_time_us;
                 timer_task = task;
-            } else if (timer_fire_time > task->wait_ctx.timer.wake_time_us) {
-                timer_fire_time = task->wait_ctx.timer.wake_time_us;
+            } else if (timer_fire_time > wake_time_us) {
+                timer_fire_time = wake_time_us;
                 timer_task = task;
             }
         }

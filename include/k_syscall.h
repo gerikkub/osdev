@@ -20,6 +20,7 @@
 #define SYSCALL_SOCKET 13
 #define SYSCALL_BIND 14
 #define SYSCALL_CONNECT 15
+#define SYSCALL_SELECT 16
 
 
 #define EXEC_ARGV_ARG_MAXLEN 256
@@ -43,5 +44,10 @@ typedef struct {
 enum {
     SYSCALL_OPEN_CREATE = 1
 };
+
+typedef struct {
+    int64_t fd;
+    uint64_t ready_mask;
+} syscall_select_ctx_t;
 
 #endif

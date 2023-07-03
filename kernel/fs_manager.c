@@ -30,12 +30,12 @@ void fs_manager_init(void) {
     }
 }
 
-int64_t fs_manager_file_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
+int64_t fs_manager_file_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
     fs_mount_ctx_t* mount_ctx = ctx;
 
     ASSERT(s_fs_ops[mount_ctx->fs_type].open != NULL);
 
-    return s_fs_ops[mount_ctx->fs_type].open(mount_ctx->fs_ctx, path, flags, ctx_out);
+    return s_fs_ops[mount_ctx->fs_type].open(mount_ctx->fs_ctx, path, flags, ctx_out, fd_ctx);
 }
 
 int64_t fs_manager_mount_device(const char* device_name,
@@ -49,7 +49,7 @@ int64_t fs_manager_mount_device(const char* device_name,
 
     console_log(LOG_INFO, "Mounting %s:%s at %s", device_name, path, mount_name);
 
-    res = vfs_open_device(device_name, path, 0, &disk_ops, &disk_ctx);
+    res = vfs_open_device(device_name, path, 0, &disk_ops, &disk_ctx, NULL);
 
     if (res < 0) {
         return res;

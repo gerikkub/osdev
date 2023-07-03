@@ -85,7 +85,7 @@ int64_t net_fd_close_op(void* ctx) {
     return 0;
 }
 
-int64_t net_fd_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
+int64_t net_fd_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
     *ctx_out = ctx;
     return 0;
 }

@@ -755,7 +755,7 @@ void net_tcp_timeout_check(void* ctx, void* check_ctx, void* key, void* dataptr)
 void net_tcp_timeout_thread(void* ctx) {
 
     while (true) {
-        task_wait_timer_in(10000);
+        task_wait_timer_in(10 * 1000);
         uint64_t curr_time = gtimer_get_count();
         hashmap_forall(s_tcp_conn_map, net_tcp_timeout_check, &curr_time);
     }

@@ -20,6 +20,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/modules.c
             ${CMAKE_CURRENT_SOURCE_DIR}/pagefault.c
             ${CMAKE_CURRENT_SOURCE_DIR}/panic.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/select.c
             ${CMAKE_CURRENT_SOURCE_DIR}/syscall.c
             ${CMAKE_CURRENT_SOURCE_DIR}/sys_device.c
             ${CMAKE_CURRENT_SOURCE_DIR}/task.c

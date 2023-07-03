@@ -39,6 +39,7 @@ create_system_target(touch "touch/touch.c")
 create_system_target(udp_recv "udp_recv/udp_recv.c")
 create_system_target(udp_test "udp_test/udp_test.c")
 create_system_target(tcp_cat "tcp_cat/tcp_cat.c")
+create_system_target(count "count/count.c")
 
 
 set(APP_TARGETS "${APP_TARGETS}" PARENT_SCOPE)

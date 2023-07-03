@@ -56,3 +56,9 @@ int64_t system_exec(const char* device, const char* path, const char* name, char
     SYSCALL_CALL_RET(SYSCALL_EXEC, (uintptr_t)device, (uintptr_t)path, (uintptr_t)name, (uintptr_t)argv, ret);
     return ret;
 }
+
+int64_t system_select(syscall_select_ctx_t* select_arr, uint64_t select_len, uint64_t timeout_us, uint64_t* ready_mask_out) {
+    int64_t ret;
+    SYSCALL_CALL_RET(SYSCALL_SELECT, (uintptr_t)select_arr, select_len, timeout_us, (uintptr_t)ready_mask_out, ret);
+    return ret;
+}

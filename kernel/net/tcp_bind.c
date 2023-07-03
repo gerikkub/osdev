@@ -38,6 +38,8 @@ typedef struct {
     llist_head_t incoming_connections;
 
     bool canwake;
+
+    fd_ctx_t* fd_ctx;
 } net_tcp_bind_ctx_t;
 
 typedef struct {
@@ -65,6 +67,9 @@ void* net_tcp_bind_new_connection(void* ctx, void* tcp_ctx, ipv4_t* their_addr, 
     llist_append_ptr(bind_ctx->incoming_connections, new_socket);
 
     bind_ctx->canwake = true;
+    if (bind_ctx->fd_ctx != NULL) {
+        bind_ctx->fd_ctx->ready |= FD_READY_BIND_NEWCONN;
+    }
 
     return new_socket->socket_ctx;
 }
@@ -92,9 +97,17 @@ static int64_t net_tcp_bind_get_incoming(net_tcp_bind_ctx_t* bind_ctx) {
     bind_ctx->task->fds[fd_num].ctx = new_socket->socket_ctx;
     bind_ctx->task->fds[fd_num].valid = true;
 
+    net_tcp_socket_pass_fd_ctx(new_socket->socket_ctx, &bind_ctx->task->fds[fd_num]);
+
     net_tcp_conn_activate_connection(new_socket->tcp_ctx);
 
     vfree(new_socket);
+
+    if (llist_empty(bind_ctx->incoming_connections) &&
+        bind_ctx->fd_ctx != NULL) {
+
+        bind_ctx->fd_ctx->ready &= ~FD_READY_BIND_NEWCONN;
+    }
 
     return fd_num;
 }
@@ -137,7 +150,7 @@ static const fd_ops_t s_net_tcp_bind_ops = {
     .close = net_tcp_bind_close_fn
 };
 
-int64_t net_tcp_bind_port(k_bind_port_t* bind_port_ctx, fd_ops_t* ops, void** ctx_out) {
+int64_t net_tcp_bind_port(k_bind_port_t* bind_port_ctx, fd_ops_t* ops, void** ctx_out, fd_ctx_t* fd_ctx) {
 
     uint64_t listen_port = bind_port_ctx->tcp4.listen_port;
     if (hashmap_contains(s_tcp_listen_map, &listen_port)) {
@@ -147,6 +160,7 @@ int64_t net_tcp_bind_port(k_bind_port_t* bind_port_ctx, fd_ops_t* ops, void** ct
     net_tcp_bind_ctx_t* bind_ctx = vmalloc(sizeof(net_tcp_bind_ctx_t));
 
     bind_ctx->task = get_active_task();
+    bind_ctx->fd_ctx = fd_ctx;
 
     memcpy(&bind_ctx->our_addr, &bind_port_ctx->tcp4.bind_ip, sizeof(ipv4_t));
     bind_ctx->our_port = bind_port_ctx->tcp4.listen_port;

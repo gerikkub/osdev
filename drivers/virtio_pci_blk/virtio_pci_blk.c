@@ -285,8 +285,13 @@ memcache_ops_t s_virtio_blk_memcache_ops = {
     .populate_virt_fn = virtio_blk_populate_virt_cache
 };
 
-static int64_t virtio_pci_blk_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
+static int64_t virtio_pci_blk_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
     *ctx_out = ctx;
+
+    if (fd_ctx != NULL) {
+        fd_ctx->ready = FD_READY_ALL;
+    }
+
     return 0;
 }
 

@@ -36,6 +36,8 @@ typedef struct {
     uint16_t dest_port;
 
     llist_head_t incoming_packets;
+
+    fd_ctx_t* fd_ctx;
 } net_udp_socket_ctx_t;
 
 hashmap_ctx_t* s_udp_source_port_map = NULL;
@@ -144,7 +146,7 @@ static const fd_ops_t s_net_udp_socket_ops = {
     .close = net_udp_socket_close_fn
 };
 
-int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out) {
+int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out, fd_ctx_t* fd_ctx) {
 
     if (s_udp_source_port_map == NULL) {
         uint64_t* dummy = vmalloc(sizeof(uint64_t));
@@ -176,6 +178,11 @@ int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* op
     memcpy(&socket_ctx->dest_ip, &create_socket_ctx->udp4.dest_ip, sizeof(ipv4_t));
     socket_ctx->source_port = source_port64;
     socket_ctx->dest_port = create_socket_ctx->udp4.dest_port;
+    socket_ctx->fd_ctx = fd_ctx;
+
+    if (fd_ctx != NULL) {
+        fd_ctx->ready = FD_READY_GEN_WRITE;
+    }
 
     socket_ctx->incoming_packets = llist_create();
 

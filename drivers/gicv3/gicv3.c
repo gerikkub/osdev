@@ -96,10 +96,8 @@ void gicv3_get_spi_msi_intid(void* ctx, uint64_t* intid_out, uint64_t* data_out,
     *data_out = intid;
     *addr_out = KSPACE_TO_PHY(&s_gicv3_ctx.gicd->setspi_nsr);
 
-    s_gicv3_ctx.gicd->icfgr[intid / 16] = (0x2 << ((intid % 16) * 2));
     // Set Indit to edge triggered
-
-    console_log(LOG_DEBUG, "GICv3: Allocated SPI %d", intid);
+    s_gicv3_ctx.gicd->icfgr[intid / 16] = (0x2 << ((intid % 16) * 2));
 }
 
 void gicv3_set_spi_trigger(void* ctx, uint64_t intid, interrupt_trigger_type_t type) {

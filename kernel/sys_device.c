@@ -29,14 +29,14 @@ typedef struct {
 
 static sys_device_ctx_t s_sys_devices[MAX_NUM_SYS_DEVICES];
 
-int64_t sys_device_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
+int64_t sys_device_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
 
     for (int64_t idx = 0; idx < MAX_NUM_SYS_DEVICES; idx++) {
         if (s_sys_devices[idx].valid &&
             strncmp(s_sys_devices[idx].name, path, MAX_NUM_SYS_DEVICES) == 0) {
 
             void* open_ctx;
-            int64_t res = s_sys_devices[idx].open(s_sys_devices[idx].ctx, NULL, flags, &open_ctx);
+            int64_t res = s_sys_devices[idx].open(s_sys_devices[idx].ctx, NULL, flags, &open_ctx, fd_ctx);
             if (res >= 0) {
 
                 sys_device_open_ctx_t* dev_ctx = vmalloc(sizeof(sys_device_open_ctx_t));

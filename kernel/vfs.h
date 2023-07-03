@@ -8,7 +8,7 @@
 
 #define MAX_DEVICE_NAME_LEN 32
 
-typedef int64_t (*device_open_op)(void* ctx, const char* path, const uint64_t flags, void** ctx_out);
+typedef int64_t (*device_open_op)(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx);
 
 typedef struct {
     bool valid;
@@ -24,6 +24,7 @@ int64_t vfs_open_device(const char* device_name,
                         const char* path,
                         uint64_t flags,
                         fd_ops_t* ops_out,
-                        void** ctx_out);
+                        void** ctx_out,
+                        fd_ctx_t* fd_ctx);
 
 #endif

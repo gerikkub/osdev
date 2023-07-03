@@ -15,7 +15,7 @@ uint64_t exec_user_task(const char* device, const char* path, const char* name, 
     fd_ops_t file_ops;
     void* file_ctx;
 
-    open_res = vfs_open_device(device, path, 0, &file_ops, &file_ctx);
+    open_res = vfs_open_device(device, path, 0, &file_ops, &file_ctx, NULL);
     if (open_res < 0) {
         return 0;
     }

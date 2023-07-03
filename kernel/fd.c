@@ -37,7 +37,7 @@ int64_t syscall_open(uint64_t device, uint64_t path, uint64_t flags, uint64_t du
         return -1;
     }
 
-    ret = vfs_open_device(device_kptr, path_kptr, flags, &task->fds[fd_num].ops, &task->fds[fd_num].ctx);
+    ret = vfs_open_device(device_kptr, path_kptr, flags, &task->fds[fd_num].ops, &task->fds[fd_num].ctx, &task->fds[fd_num]);
     if (ret >= 0) {
         task->fds[fd_num].valid = true;
         return fd_num;

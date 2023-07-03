@@ -169,7 +169,8 @@ void kernel_init_lower_thread(void* ctx) {
                                "virtio-pci-net0",
                                0,
                                &nic_ops,
-                               &nic_ctx);
+                               &nic_ctx,
+                               NULL);
     if (open_res < 0) {
         console_log(LOG_INFO, "virtio-pci-net0 not available. Skipping IP set");
     } else {
@@ -294,6 +295,13 @@ void kernel_init_lower_thread(void* ctx) {
     http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
     (void)http_server_tid;
 
+    uint64_t count_a_tid;
+    uint64_t count_b_tid;
+    //count_a_tid = exec_user_task("home", "bin/count.elf", "count_a", NULL);
+    //count_b_tid = exec_user_task("home", "bin/count.elf", "count_a", NULL);
+    (void)count_a_tid;
+    (void)count_b_tid;
+
     uint64_t tcp_cat_tid;
     char* tcp_cat_argv[] = {
         "10.0.2.15",
@@ -313,7 +321,7 @@ void kernel_init_lower_thread(void* ctx) {
     while (1) {
         task_wait_timer_in(1000*1000);
 
-        console_log(LOG_DEBUG, "Tick");
+        //console_log(LOG_DEBUG, "Tick");
 
         ticknum++;
 
@@ -363,7 +371,8 @@ void kernel_init_lower_thread(void* ctx) {
             "profile",
             NULL
         };
-        cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+        //cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
+        (void)cat2_argv;
         (void)cat2_tid;
 /*
         uint64_t cat2_tid;

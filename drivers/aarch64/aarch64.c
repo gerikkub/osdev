@@ -5,7 +5,10 @@
 #include "stdlib/bitutils.h"
 
 #include "kernel/console.h"
+#include "kernel/drivers.h"
 #include "kernel/panic.h"
+
+#include "kernel/lib/libdtb.h"
 
 #include "drivers/aarch64/aarch64.h"
 
@@ -134,3 +137,28 @@ void assert_aarch64_support(void) {
     }
 
 }
+
+void cortex_a57_discovered(void* ctx) {
+
+    dt_block_t* dt_block = ((discovery_dtb_ctx_t*)ctx)->block;
+
+    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+
+    char* name = (char*)&dt_block->data[dt_node->name_off];
+
+    console_log(LOG_INFO, "Found Cortex-A57: %s:%d\n", name, dt_node->address);
+}
+
+static discovery_register_t s_a57_register = {
+    .type = DRIVER_DISCOVERY_DTB,
+    .dtb = {
+        .compat = "arm,cortex-a57"
+    },
+    .ctxfunc = cortex_a57_discovered
+};
+
+void cortex_a57_register(void) {
+    register_driver(&s_a57_register);
+}
+
+REGISTER_DRIVER(cortex_a57);

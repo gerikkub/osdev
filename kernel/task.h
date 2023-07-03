@@ -14,7 +14,9 @@
 #include "kernel/lock/lock.h"
 #include "kernel/lib/elapsedtimer.h"
 
-#define MAX_NUM_TASKS 8
+#include "k_syscall.h"
+
+#define MAX_NUM_TASKS 64
 
 #define TASK_STD_STACK_SIZE 8192
 #define KERNEL_STD_STACK_SIZE 8192
@@ -62,7 +64,8 @@ typedef enum {
     WAIT_IRQNOTIFY = 3,
     WAIT_VIRTIOIRQ = 4,
     WAIT_SIGNAL = 5,
-    WAIT_TIMER = 6
+    WAIT_TIMER = 6,
+    WAIT_SELECT = 7
 } wait_reason_t;
 
 typedef struct {
@@ -93,6 +96,15 @@ typedef struct {
     uint64_t wake_time_us;
 } wait_timer_t;
 
+typedef struct {
+    struct task_t_* task;
+    syscall_select_ctx_t* select_arr;
+    uint64_t select_len;
+    bool timeout_valid;
+    int64_t timeout_end_us;
+    uint64_t* ready_mask_out;
+} wait_select_t;
+
 typedef union {
     wait_lock_t lock;
     wait_getmsgs_t getmsgs;
@@ -101,6 +113,7 @@ typedef union {
     wait_virtioirq_t virtioirq;
     wait_signal_t signal;
     wait_timer_t timer;
+    wait_select_t select;
 } wait_ctx_t;
 
 typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);

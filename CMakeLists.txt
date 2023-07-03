@@ -58,6 +58,7 @@ add_custom_target (disk_image
 set_target_properties(disk_image PROPERTIES OUTPUT_NUM "disk_image.img")
 
 set (QEMU_VM_FLAGS -M virt,gic-version=3 -cpu cortex-a57 -nographic -s -kernel ${PROJECT_BINARY_DIR}/kernel.elf)
+set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -smp 2)
 set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -drive file=${CMAKE_BINARY_DIR}/disk_image.img,id=disk0,if=none)
 set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -device virtio-blk-pci,drive=disk0,disable-legacy=on)
 set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -device virtio-serial-pci,disable-legacy=on)
@@ -72,6 +73,8 @@ set (QEMU_VM_FLAGS ${QEMU_VM_FLAGS} -monitor none -serial none)
 
 set (QEMU_VM_DEBUG_FLAGS ${QEMU_VM_FLAGS} -S)
 
+set (QEMU_VM_DTB_FLAGS ${QEMU_VM_FLAGS} -machine dumpdtb=dtb.dtb)
+
 set (QEMU_PATH /home/gerik/Downloads/qemu/build/)
 #set (QEMU_PATH /usr/local/share/qemu/bin)
 
@@ -82,6 +85,14 @@ add_custom_target (run
 add_custom_target (debug
     COMMAND ${QEMU_PATH}/qemu-system-aarch64 ${QEMU_VM_DEBUG_FLAGS}
                    DEPENDS disk_image)
+
+add_custom_target (dtb.dtb
+    COMMAND ${QEMU_PATH}/qemu-system-aarch64 ${QEMU_VM_DTB_FLAGS}
+                   DEPENDS disk_image)
+                
+add_custom_target (dts.txt
+    COMMAND dtc -I dtb -O dts -o dts.txt dtb.dtb
+                   DEPENDS dtb.dtb)
 
 
 set_target_properties(kernel

@@ -39,6 +39,7 @@ typedef struct {
     file_data_t* file_data;
     int64_t seek_idx;
     int64_t can_write:1;
+    fd_ctx_t* fd_ctx;
 } file_ctx_t;
 
 void* file_create_ctx(file_ctx_t* file_ctx);
