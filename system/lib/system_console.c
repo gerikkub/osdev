@@ -63,7 +63,7 @@ void console_write_len(const char* s, uint64_t len) {
     strncpy(&s_console_buffer[s_console_idx], s, len);
     s_console_idx += len;
 
-    if (s_console_idx == CONSOLE_BUFFER_SIZE) {
+    if (s_console_idx == CONSOLE_BUFFER_SIZE || true) {
         console_flush();
     }
 }

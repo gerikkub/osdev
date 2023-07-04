@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "stdlib/bitutils.h"
+#include "stdlib/printf.h"
 
 #include "drivers/pl011_uart.h"
 #include "drivers/qemu_fw_cfg.h"
@@ -265,7 +266,6 @@ void kernel_init_lower_thread(void* ctx) {
     (void)udp_recv_tid;
     */
 
-   /*
    uint64_t echo_tid;
    char* echo_argv[] = {
         "Hello"
@@ -273,7 +273,6 @@ void kernel_init_lower_thread(void* ctx) {
    (void)echo_argv;
    echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
    (void)echo_tid;
-   */
 
     uint64_t tcp_listen_tid;
     char* tcp_listen_argv[] = {
@@ -321,9 +320,9 @@ void kernel_init_lower_thread(void* ctx) {
     while (1) {
         task_wait_timer_in(1000*1000);
 
-        //console_log(LOG_DEBUG, "Tick");
-
         ticknum++;
+
+        console_log(LOG_DEBUG, "Tick %d", ticknum);
 
         ipv4_t dest_ip = {
             .d = {10, 0, 2, 1}
@@ -345,6 +344,18 @@ void kernel_init_lower_thread(void* ctx) {
         */
 
         //net_udp_send_packet(&dest_ip, 5555, 2233, (uint8_t*)"Hello!\n", 7);
+
+        char buffer[5] = {0};
+        char* wait_task_argv[] = {
+            buffer,
+            NULL
+        };
+        snprintf(wait_task_argv[0], 5, "%d", echo_tid);
+        uint64_t wait_task_tid;
+        if (ticknum == 20) {
+            wait_task_tid = exec_user_task("home", "bin/wait_task.elf", "wait_task", wait_task_argv);
+        }
+        (void)wait_task_tid;
 
         char* tcp_argv[] = {
             "10.0.2.1",

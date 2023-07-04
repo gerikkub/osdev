@@ -22,5 +22,5 @@ int32_t main(uint64_t tid, char** argv) {
     console_write(argv[0]);
     console_flush();
 
-    return 0;
+    return 3;
 }

@@ -62,3 +62,9 @@ int64_t system_select(syscall_select_ctx_t* select_arr, uint64_t select_len, uin
     SYSCALL_CALL_RET(SYSCALL_SELECT, (uintptr_t)select_arr, select_len, timeout_us, (uintptr_t)ready_mask_out, ret);
     return ret;
 }
+
+int64_t system_taskctrl(uint64_t tid) {
+    int64_t ret;
+    SYSCALL_CALL_RET(SYSCALL_TASKCTRL, tid, 0, 0, 0, ret);
+    return ret;
+}

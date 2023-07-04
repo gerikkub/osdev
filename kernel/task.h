@@ -16,7 +16,7 @@
 
 #include "k_syscall.h"
 
-#define MAX_NUM_TASKS 64
+#define MAX_NUM_TASKS 128
 
 #define TASK_STD_STACK_SIZE 8192
 #define KERNEL_STD_STACK_SIZE 8192
@@ -56,6 +56,7 @@ typedef enum {
     TASK_RUNABLE_KERNEL,
     TASK_WAIT,
     TASK_AWAKE,
+    TASK_COMPLETE
 } run_state_t;
 
 typedef enum {
@@ -65,7 +66,8 @@ typedef enum {
     WAIT_VIRTIOIRQ = 4,
     WAIT_SIGNAL = 5,
     WAIT_TIMER = 6,
-    WAIT_SELECT = 7
+    WAIT_SELECT = 7,
+    WAIT_WAIT = 7
 } wait_reason_t;
 
 typedef struct {
@@ -105,6 +107,12 @@ typedef struct {
     uint64_t* ready_mask_out;
 } wait_select_t;
 
+typedef struct {
+    struct task_t_* task;
+    void* ctx;
+    bool complete;
+} wait_wait_t;
+
 typedef union {
     wait_lock_t lock;
     wait_getmsgs_t getmsgs;
@@ -114,6 +122,7 @@ typedef union {
     wait_signal_t signal;
     wait_timer_t timer;
     wait_select_t select;
+    wait_wait_t wait;
 } wait_ctx_t;
 
 typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);
@@ -131,6 +140,9 @@ typedef struct task_t_ {
     wait_ctx_t wait_ctx;
     task_wakeup_f wait_wakeup_fn;
     task_canwakeup_f wait_canwakeup_fn;
+
+    int64_t ret_val;
+    llist_head_t waiters;
 
     fd_ctx_t fds[MAX_TASK_FDS];
 
@@ -191,7 +203,11 @@ void restore_context_asm(task_reg_t* reg,
 // void task_wait(task_t* task, wait_reason_t reason, wait_ctx_t ctx, task_wakeup_f wakeup_fun);
 void task_wakeup(task_t* task, wait_reason_t reason);
 
-void task_cleanup(task_t* task, uint64_t ret_val);
+void task_cleanup(task_t* task, int64_t ret_val);
+void task_final_cleanup(task_t* task);
+uint64_t task_await(task_t* task, task_t* target_task);
+void task_clear_waiter(task_t* task, task_t* target_task);
+void task_add_waiter(task_t* task, task_t* target_task);
 
 void schedule(void);
 

@@ -13,7 +13,7 @@
 #include "stdlib/bitutils.h"
 #include "stdlib/printf.h"
 
-static int64_t console_dev_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out) {
+static int64_t console_dev_open(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
     *ctx_out = NULL;
     return 0;
 }

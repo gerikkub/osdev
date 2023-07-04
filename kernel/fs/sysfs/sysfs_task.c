@@ -31,18 +31,15 @@ void* sysfs_task_open(void) {
 
             uint8_t* data_str = vmalloc(4096);
             int64_t written = snprintf((char*)data_str, 4096,
-                "%d %s:\n"
-                "  name: %s\n"
-                "  state: %s\n"
-                "  profile time (us): %u\n"
-                ,
+                "%d %s %s %s %u\n",
                 task->tid & (~TASK_TID_KERNEL),
                 IS_USER_TASK(task->tid) ? "user" : "kernel",
                 task->name,
                 task->run_state == TASK_RUNABLE ? "RUNABLE" :
                 task->run_state == TASK_RUNABLE_KERNEL ? "RUNABLE_KERNEL" :
                 task->run_state == TASK_WAIT ? "WAIT" :
-                task->run_state == TASK_AWAKE ? "AWAKE" : "INVALID",
+                task->run_state == TASK_AWAKE ? "AWAKE" :
+                task->run_state == TASK_COMPLETE ? "COMPLETE": "INVALID",
                 elapsedtimer_get_us(&task->profile_time)
             );
             ASSERT(written < 4096);

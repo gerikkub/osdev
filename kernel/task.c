@@ -83,9 +83,11 @@ task_t* get_task_for_tid(uint64_t tid) {
         }
     }
 
-    ASSERT(idx < MAX_NUM_TASKS);
-
-    return &s_task_list[idx];
+    if (idx != MAX_NUM_TASKS) {
+        return &s_task_list[idx];
+    } else {
+        return NULL;
+    }
 }
 
 void save_context(task_reg_t* state_fp,
@@ -225,6 +227,9 @@ uint64_t create_task(uint64_t* user_stack_base,
     task->kernel_stack_size = kernel_stack_size;
 
     task->reg = *reg;
+
+    task->ret_val = 0xFFFFFFFFDEADBEEF;
+    task->waiters = llist_create();
 
     msg_queue_init(&task->msgs);
 
@@ -418,7 +423,7 @@ void task_wakeup(task_t* task, wait_reason_t reason) {
     }
 }
 
-void task_cleanup(task_t* task, uint64_t ret_val) {
+void task_cleanup(task_t* task, int64_t ret_val) {
 
     int idx;
     for (idx = 0; idx < MAX_TASK_FDS; idx++) {
@@ -449,11 +454,45 @@ void task_cleanup(task_t* task, uint64_t ret_val) {
 
     memspace_deallocate(&task->memory);
 
-    // TODO: cleanup kernel stack
-    // We're on kernel_stack_base, so need to switch stacks?
-    //kfree_phy(kernel_stack_base);
+    task->ret_val = ret_val;
+
+    if (!llist_empty(task->waiters)) {
+        task_t* waiter;
+        FOR_LLIST(task->waiters, waiter)
+            waiter->wait_ctx.wait.complete = true;
+        END_FOR_LLIST()
+    }
+
+    task->run_state = TASK_COMPLETE;
+}
+
+void task_final_cleanup(task_t* task) {
+    // Must be called from another task
+
+    // Not sure how to confirm this
+    //kfree_phy(task->kernel_stack_base);
 
     task->tid = 0;
+}
+
+uint64_t task_await(task_t* task, task_t* target_task) {
+    task_clear_waiter(task, target_task);
+
+    uint64_t ret_val = target_task->ret_val;
+
+    if (llist_empty(target_task->waiters)) {
+        task_final_cleanup(target_task);
+    }
+
+    return ret_val;
+}
+
+void task_clear_waiter(task_t* task, task_t* target_task) {
+    llist_delete_ptr(target_task->waiters, task);
+}
+
+void task_add_waiter(task_t* task, task_t* target_task) {
+    llist_append_ptr(target_task->waiters, task);
 }
 
 void wait_timer_setup(uint64_t now_us, uint64_t max_sleep_time) {

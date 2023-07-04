@@ -17,4 +17,7 @@
 // Bind Ops
 #define BIND_IOCTL_GET_INCOMING 64
 
+// Taskops Ops
+#define TASKCTRL_IOCTL_WAIT 64
+
 #endif

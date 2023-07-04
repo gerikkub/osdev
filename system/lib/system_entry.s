@@ -20,7 +20,9 @@ _start:
     // Main should not return
     bl main
 
+    stp x0, x1, [sp, #-16]!
     bl system_deinit
+    ldp x0, x1, [sp], #16
 
     // If main returns the kernel has setup a trap for us
     // Call syscall exit with the main return value

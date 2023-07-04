@@ -24,6 +24,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/syscall.c
             ${CMAKE_CURRENT_SOURCE_DIR}/sys_device.c
             ${CMAKE_CURRENT_SOURCE_DIR}/task.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/taskctrl.c
             ${CMAKE_CURRENT_SOURCE_DIR}/time.c
             ${CMAKE_CURRENT_SOURCE_DIR}/vfs.c
             ${CMAKE_CURRENT_SOURCE_DIR}/vmem.c

@@ -48,5 +48,6 @@ void system_yield(void);
 
 int64_t system_exec(const char* device, const char* path, const char* name, char** const argv);
 int64_t system_select(syscall_select_ctx_t* select_arr, uint64_t select_len, uint64_t timeout_us, uint64_t* ready_mask_out);
+int64_t system_taskctrl(uint64_t tid);
 
 #endif

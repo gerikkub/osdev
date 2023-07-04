@@ -15,6 +15,8 @@ function(create_system_target NAME SOURCES)
     set(APP_TARGETS "${APP_TARGETS};system_${NAME}" PARENT_SCOPE)
     set(APP_BINARIES "${APP_BINARIES};${CMAKE_CURRENT_BINARY_DIR}/${NAME}.elf" PARENT_SCOPE)
 
+    message(STATUS "Created system target: system_${NAME}")
+
 endfunction()
 
 set (APP_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../stdlib
@@ -40,6 +42,7 @@ create_system_target(udp_recv "udp_recv/udp_recv.c")
 create_system_target(udp_test "udp_test/udp_test.c")
 create_system_target(tcp_cat "tcp_cat/tcp_cat.c")
 create_system_target(count "count/count.c")
+create_system_target(wait_task "wait_task/wait_task.c")
 
 
 set(APP_TARGETS "${APP_TARGETS}" PARENT_SCOPE)
