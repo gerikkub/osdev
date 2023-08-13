@@ -49,6 +49,8 @@
 
 #include "drivers/aarch64/aarch64.h"
 
+#include "board_conf_generic.h"
+
 void kernel_init_lower_thread(void* ctx);
 
 void main() {
@@ -57,11 +59,6 @@ void main() {
 
     kmalloc_init();
 
-    pl011_init(VIRT_UART);
-
-    pl011_puts(VIRT_UART, "Hello World!\n");
-
-    assert_aarch64_support();
 
     pagefault_init();
     exception_init();
@@ -70,25 +67,20 @@ void main() {
 
     memspace_init_kernelspace();
     memspace_init_systemspace();
-    memory_entry_device_t earlycon_device = {
-       .start = (uint64_t)EARLY_CON_VIRT,
-       .end = (uint64_t)EARLY_CON_VIRT + VMEM_PAGE_SIZE,
+
+    board_init_mappings();
+
+    /*
+    memory_entry_device_t earlypl011_device = {
+       .start = (uint64_t)VIRT_UART_VMEM,
+       .end = (uint64_t)VIRT_UART_VMEM + VMEM_PAGE_SIZE,
        .type = MEMSPACE_DEVICE,
        .flags = MEMSPACE_FLAG_PERM_KRW,
-       .phy_addr = (uint64_t)EARLY_CON_PHY_BASE
+       .phy_addr = (uint64_t)VIRT_UART
     };
 
-    memspace_add_entry_to_kernel_memory((memory_entry_t*)&earlycon_device);
-
-    memory_entry_device_t earlypci_device = {
-       .start = (uint64_t)EARLY_PCI_VIRT,
-       .end = (uint64_t)EARLY_PCI_VIRT + VMEM_PAGE_SIZE,
-       .type = MEMSPACE_DEVICE,
-       .flags = MEMSPACE_FLAG_PERM_KRW,
-       .phy_addr = (uint64_t)EARLY_PCI_PHY_BASE
-    };
-
-    memspace_add_entry_to_kernel_memory((memory_entry_t*)&earlypci_device);
+    memspace_add_entry_to_kernel_memory((memory_entry_t*)&earlypl011_device);
+    */
 
     uint64_t* exstack_mem = kmalloc_phy(KSPACE_EXSTACK_SIZE);
     ASSERT(exstack_mem != NULL);
@@ -112,11 +104,12 @@ void main() {
 
     vmem_set_tables(kernel_vmem_table, dummy_user_table);
 
-    pci_poke_bar_entry((pci_header0_t*)EARLY_PCI_VIRT, 4, 16396);
-    pci_poke_bar_entry((pci_header0_t*)EARLY_PCI_VIRT, 5, 128);
-    virtio_pci_early_console_init((uint32_t*)(EARLY_CON_VIRT + EARLY_CON_BASE_OFFSET));
+    board_init_early_console();
 
-    console_log(LOG_DEBUG, "UART_VMEM is Mapped\n");
+    console_log(LOG_DEBUG, "Hello!\n");
+
+    assert_aarch64_support();
+
 
     syscall_init();
     interrupt_init();
@@ -136,7 +129,7 @@ void main() {
     ext2_register();
     sysfs_register();
 
-    dtb_init();
+    board_init_devices();
 
     gtimer_init();
 
@@ -156,7 +149,6 @@ void kernel_init_lower_thread(void* ctx) {
 
     driver_run_late_init();
 
-    pl011_init_rx(VIRT_UART_VMEM);
     net_tcp_conn_start_timeout_thread();
 
     int64_t open_res;

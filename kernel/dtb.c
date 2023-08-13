@@ -289,9 +289,9 @@ static void dtb_discover(uint8_t* dtbmem, fdt_node_t* node, fdt_header_t* header
     }
 }
 
-void dtb_init(void) {
+void dtb_init(uintptr_t dtb_init_phy_addr) {
 
-    void* header_phy_ptr = 0;
+    void* header_phy_ptr = (void*)dtb_init_phy_addr;
     uint8_t* devicetree = (uint8_t*)PHY_TO_KSPACE(header_phy_ptr);
 
     memspace_map_phy_kernel(header_phy_ptr,

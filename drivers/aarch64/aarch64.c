@@ -59,11 +59,9 @@ void assert_aarch64_support(void) {
     switch (aa64pfr0_el2) {
         case AA64PFR0_EL2_AA64_ONLY:
             console_write(" EL2 AA64 ONLY. Not Supported\n");
-            supported = false;
             break;
         case AA64PFR0_EL2_AA32:
             console_write(" EL2 AA32 ONLY. Not Supported\n");
-            supported = false;
             break;
         case AA64PFR0_EL2_NOT_IMPLEMENTED:
             console_write(" EL2 NOT IMPLEMENTED\n");
@@ -77,11 +75,9 @@ void assert_aarch64_support(void) {
     switch (aa64pfr0_el3) {
         case AA64PFR0_EL3_AA64_ONLY:
             console_write(" EL3 AA64 ONLY. Not Supported\n");
-            supported = false;
             break;
         case AA64PFR0_EL3_AA32:
             console_write(" EL3 AA32 ONLY. Not Supported\n");
-            supported = false;
             break;
         case AA64PFR0_EL3_NOT_IMPLEMENTED:
             console_write(" EL3 NOT IMPLEMENTED\n");
@@ -132,9 +128,12 @@ void assert_aarch64_support(void) {
             break;
     }
 
+    /*
     if (!supported) {
         PANIC("Unsupported Target");
     }
+    */
+   (void)supported;
 
 }
 

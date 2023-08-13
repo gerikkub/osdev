@@ -50,6 +50,7 @@ void register_driver(discovery_register_t* discovery) {
     ASSERT(s_driver_registers_end < s_driver_registers_size);
 
     s_driver_registers[s_driver_registers_end] = *discovery;
+    s_driver_registers[s_driver_registers_end].enabled = true;
     s_driver_registers_end++;
 }
 
@@ -95,8 +96,17 @@ void discover_driver(discovery_register_t* discovery, void* ctx) {
     ASSERT(discovery != NULL);
 
     int64_t driver_idx = get_driver_idx(discovery);
-    if (driver_idx >= 0) {
+    if (driver_idx >= 0 &&
+        s_driver_registers[driver_idx].enabled) {
         s_driver_registers[driver_idx].ctxfunc(ctx);
+    }
+}
+
+void driver_disable(discovery_register_t* discovery) {
+
+    int64_t driver_idx = get_driver_idx(discovery);
+    if (driver_idx >= 0) {
+        s_driver_registers[driver_idx].enabled = false;
     }
 }
 

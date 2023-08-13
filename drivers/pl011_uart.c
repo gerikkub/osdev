@@ -13,17 +13,6 @@ static void pl011_rx_handler(uint32_t intid, void* ctx) {
     dev->ticr = 0xFF;
 }
 
-void pl011_init(PL011_Struct* dev) {
-    dev->tlcr_h = PL011_TLCR_H_FEN |
-                  PL011_TLCR_H_WLEN_0 |
-                  PL011_TLCR_H_WLEN_1;
-
-    dev->tcr = PL011_CR_TXE |
-               PL011_CR_RXE |
-               PL011_CR_UARTEN;
-
-}
-
 void pl011_init_rx(PL011_Struct* dev) {
     dev->timsc = PL011_MIS_RX;
 
@@ -104,6 +93,18 @@ fd_ops_t pl011_ops = {
     .write = pl011_ops_write,
     .read = pl011_ops_read
 };
+
+
+void pl011_init(PL011_Struct* dev) {
+    dev->tlcr_h = PL011_TLCR_H_FEN |
+                  PL011_TLCR_H_WLEN_0 |
+                  PL011_TLCR_H_WLEN_1;
+
+    dev->tcr = PL011_CR_TXE |
+               PL011_CR_RXE |
+               PL011_CR_UARTEN;
+    console_add_driver(&pl011_ops, dev);
+}
 
 void pl011_discover(void* ctx) {
     //console_add_driver(&pl011_ops, VIRT_UART);

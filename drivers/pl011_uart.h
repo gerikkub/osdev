@@ -25,9 +25,10 @@ typedef struct __attribute__((__packed__)) {
     volatile uint32_t dmacr;
 } PL011_Struct ;
 
-#define VIRT_UART ((PL011_Struct*) 0x09000000)
-#define VIRT_UART_VMEM ((PL011_Struct*) 0xFFFF000009000000)
-// #define VIRT_UART ((PL011_Struct*) 0x40000100)
+//#define VIRT_UART ((PL011_Struct*) 0x09000000)
+//#define VIRT_UART_VMEM ((PL011_Struct*) 0xFFFF000009000000)
+#define VIRT_UART_VMEM ((PL011_Struct*) 0xFFFF00003F201000)
+#define VIRT_UART ((PL011_Struct*) 0x3F201000)
 
 #define PL011_FR_RI (1 << 8)
 #define PL011_FR_TXFE (1 << 7)

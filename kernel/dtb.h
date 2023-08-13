@@ -3,7 +3,7 @@
 
 #include "kernel/lib/libdtb.h"
 
-void dtb_init(void);
+void dtb_init(uintptr_t);
 
 const dt_block_t* dtb_get_devicetree(void);
 

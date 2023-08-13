@@ -37,6 +37,7 @@ typedef struct {
     };
 
     initctxfunc ctxfunc;
+    bool enabled;
 } discovery_register_t;
 
 void register_driver(discovery_register_t* discovery);
@@ -46,5 +47,6 @@ void driver_run_late_init(void);
 
 bool discovery_have_driver(discovery_register_t* discovery);
 void discover_driver(discovery_register_t* discovery, void* ctx);
+void driver_disable(discovery_register_t* discovery);
 
 #endif
