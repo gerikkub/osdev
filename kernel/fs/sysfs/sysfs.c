@@ -9,6 +9,8 @@
 
 #include <kernel/fs/sysfs/sysfs.h>
 
+#include "include/k_select.h"
+
 #include <stdlib/bitutils.h>
 
 #define SYSFS_FILENAME_MAX 128

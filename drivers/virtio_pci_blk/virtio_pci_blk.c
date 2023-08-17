@@ -17,6 +17,7 @@
 #include "kernel/kmalloc.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_select.h"
 
 #include "stdlib/bitutils.h"
 

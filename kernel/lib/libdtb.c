@@ -398,7 +398,7 @@ static int dt_build_node(dt_node_t* node, fdt_node_t* fdt_node, dt_prop_cells_t*
         if (have_address) {
             bool valid_address;
             node->address = hextou64(address_str, 16, &valid_address);
-            ASSERT(valid_address);
+            //ASSERT(valid_address);
         }
 
         node->name_off = dt_build_copy_mem(name_copy, name_len, block_data,
@@ -447,7 +447,7 @@ dt_block_t* dt_build_block(fdt_node_t* base_fdt_node, fdt_ctx_t* fdt_ctx, dt_pro
     block_size = dt_block_node_size(base_fdt_node, fdt_ctx);
 
     // Allocate memory for the block
-    block_out = vmalloc(block_size + sizeof(dt_block_t));
+    block_out = vmalloc(block_size + sizeof(dt_block_t) + 8192);
     if (block_out == NULL) {
         return block_out;
     }

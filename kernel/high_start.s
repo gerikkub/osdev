@@ -32,6 +32,12 @@ _high_start:
     ldr x0, =_stack_base
     mov sp, x0
 
+    ldr x0, =_bss_start
+    ldr x1, =_bss_end
+    sub x2, x1, x0
+    mov x1, 0
+    bl memset
+
     b main
 
 .loop:

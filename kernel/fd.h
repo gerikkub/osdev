@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "k_select.h"
-
 typedef int64_t (*fd_read_op)(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags);
 typedef int64_t (*fd_write_op)(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags);
 typedef int64_t (*fd_ioctl_op)(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count);

@@ -16,13 +16,14 @@
 #include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
 
-#define MAX_DTB_PROPERTIES 1024
-#define MAX_DTB_NODES 128
-#define MAX_DTB_NODE_PROPERTIES 32
-#define MAX_DTB_NODE_CHILDREN 64
-#define MAX_DTB_PROPERTY_LEN 128
+#define MAX_DTB_PROPERTIES 8192
+#define MAX_DTB_NODES 1024
+#define MAX_DTB_NODE_PROPERTIES 1024
+#define MAX_DTB_NODE_CHILDREN 512
+#define MAX_DTB_PROPERTY_LEN 256
 #define MAX_DTB_NODE_NAME 64
-#define MAX_DTB_SIZE 1048576
+//#define MAX_DTB_SIZE 1048576
+#define MAX_DTB_SIZE 0x10000
 
 static fdt_property_t s_fdt_property_list[MAX_DTB_PROPERTIES] = {0};
 static int64_t s_fdt_property_idx = 0;
@@ -255,6 +256,8 @@ static void dtb_discover(uint8_t* dtbmem, fdt_node_t* node, fdt_header_t* header
                 },
                 .ctxfunc = NULL
             };
+
+            console_log(LOG_DEBUG, "Discovering %s", prop->data_ptr);
 
             if (discovery_have_driver(&disc_reg)) {
                 // print_node(dtbmem, header, node, 2);

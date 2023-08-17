@@ -1,8 +1,8 @@
 
 ENTRY(_start)
 
-/*bootstrap_base = 0x100000;*/
 bootstrap_base = 0x80000;
+bootstrap_data_base = 0x84000;
 bootstrap_text_size = 0x4000;
 bootstrap_data_size = 0x4000;
 
@@ -10,7 +10,6 @@ kernel_base = 0x0;
 
 highmem_base = 0xFFFF000000000000;
 
-/*ram_base = 0x40000000;*/
 ram_base = 0x100000;
 
 ram_size = 128M;
@@ -24,21 +23,17 @@ SECTIONS
 
     . = bootstrap_base;
     .bootstrap.text : {
+        *(.bootstrap.text.first*)
         *(.bootstrap.text*)
     }
 
-    /*. = ram_base;
-    .bootstrap.data 0x40000000: {
-        *(.bootstrap.data*)
-    }*/
-
+    . = bootstrap_data_base;
     .bootstrap.data : {
+        *(.bootstrap.data.first*)
         *(.bootstrap.data*)
     }
 
-    /*. = highmem_base + bootstrap_base + bootstrap_text_size;*/
     . = highmem_base + bootstrap_base + bootstrap_text_size + bootstrap_data_size;
-    /*.text :  AT (bootstrap_base + bootstrap_text_size)*/
     .text :  AT (bootstrap_base + bootstrap_text_size + bootstrap_data_size)
     {
         . = ALIGN(4096);

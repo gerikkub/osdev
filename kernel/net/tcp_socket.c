@@ -22,6 +22,7 @@
 #include "kernel/net/ethernet.h"
 
 #include "include/k_net_api.h"
+#include "include/k_select.h"
 
 #include "stdlib/bitutils.h"
 

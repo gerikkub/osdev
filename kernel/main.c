@@ -54,11 +54,14 @@
 void kernel_init_lower_thread(void* ctx);
 
 void main() {
+    
+    board_init_main_early();
+
+    console_write("Kernel Main\n");
 
     gtimer_early_init();
 
     kmalloc_init();
-
 
     pagefault_init();
     exception_init();
@@ -69,18 +72,6 @@ void main() {
     memspace_init_systemspace();
 
     board_init_mappings();
-
-    /*
-    memory_entry_device_t earlypl011_device = {
-       .start = (uint64_t)VIRT_UART_VMEM,
-       .end = (uint64_t)VIRT_UART_VMEM + VMEM_PAGE_SIZE,
-       .type = MEMSPACE_DEVICE,
-       .flags = MEMSPACE_FLAG_PERM_KRW,
-       .phy_addr = (uint64_t)VIRT_UART
-    };
-
-    memspace_add_entry_to_kernel_memory((memory_entry_t*)&earlypl011_device);
-    */
 
     uint64_t* exstack_mem = kmalloc_phy(KSPACE_EXSTACK_SIZE);
     ASSERT(exstack_mem != NULL);
@@ -109,7 +100,6 @@ void main() {
     console_log(LOG_DEBUG, "Hello!\n");
 
     assert_aarch64_support();
-
 
     syscall_init();
     interrupt_init();
