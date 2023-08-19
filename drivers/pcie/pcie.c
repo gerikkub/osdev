@@ -436,13 +436,12 @@ void discover_pcie(void* pcie_mem, uint64_t len) {
 }
 
 
-pci_range_t pcie_parse_ranges(dt_block_t* dt_block) {
+pci_range_t pcie_parse_ranges(dt_node_t* dt_node) {
 
-    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+    ASSERT(dt_node->prop_ranges != NULL);
 
-    ASSERT(dt_node->std_properties_mask & DT_PROP_RANGES);
-    dt_prop_range_entry_t* dt_ranges = (dt_prop_range_entry_t*)&dt_block->data[dt_node->ranges.range_entries_off];
-    uint64_t dt_num_ranges = dt_node->ranges.num_ranges;
+    dt_prop_range_entry_t* dt_ranges = dt_node->prop_ranges->range_entries;
+    uint64_t dt_num_ranges = dt_node->prop_ranges->num_ranges;
 
     pci_range_t ranges = {0};
 
@@ -490,45 +489,36 @@ pci_range_t pcie_parse_ranges(dt_block_t* dt_block) {
     return ranges;
 }
 
-void* pcie_parse_allocate_reg(dt_block_t* dt_block) {
+void* pcie_parse_allocate_reg(dt_node_t* dt_node) {
 
-    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
-
-    ASSERT(dt_node->std_properties_mask & DT_PROP_REG);
-    uint64_t dt_num_reg = dt_node->reg.num_regs;
+    ASSERT(dt_node->prop_reg != NULL);
+    uint64_t dt_num_reg = dt_node->prop_reg->num_regs;
     ASSERT(dt_num_reg == 1);
-    dt_prop_reg_entry_t* dt_reg = (dt_prop_reg_entry_t*)&dt_block->data[dt_node->reg.reg_entries_off];
+    dt_prop_reg_entry_t* dt_reg = dt_node->prop_reg->reg_entries;
 
     memspace_map_device_kernel((void*)dt_reg->addr, PHY_TO_KSPACE_PTR(dt_reg->addr), dt_reg->size, MEMSPACE_FLAG_PERM_KRW);
     memspace_update_kernel_vmem();
     return PHY_TO_KSPACE_PTR(dt_reg->addr);
 }
 
-pci_interrupt_map_t* pcie_parse_interrupt_map(dt_block_t* dt_block) {
-
-    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+pci_interrupt_map_t* pcie_parse_interrupt_map(dt_node_t* dt_node) {
 
     pci_interrupt_map_t* map = vmalloc(sizeof(pci_interrupt_map_t));
 
     // Find interrupt-map-mask entry
-    uint64_t prop_idx = 0;
-    uint64_t* property_list = (uint64_t*)&dt_block->data[dt_node->property_list_off];
     dt_prop_generic_t* prop = NULL;
-    while (prop_idx < dt_node->num_properties) {
-       prop = (dt_prop_generic_t*)&dt_block->data[property_list[prop_idx]];
-
-       char* name = (char*)&dt_block->data[prop->name_off];
-       if (strncmp(name, "interrupt-map-mask", 19) == 0) {
-           break;
+    dt_prop_generic_t* prop_tmp = NULL;
+    FOR_LLIST(dt_node->properties, prop_tmp)
+       if (strncmp(prop_tmp->name, "interrupt-map-mask", 19) == 0) {
+            prop = prop_tmp;
        }
 
-       prop_idx++;
-    }
+    END_FOR_LLIST()
 
-    ASSERT(prop_idx < dt_node->num_properties);
+    ASSERT(prop != NULL);
     ASSERT(prop->data_len == 16);
 
-    uint32_t* prop_data = (uint32_t*)&dt_block->data[prop->data_off];
+    uint32_t* prop_data = (uint32_t*)prop->data;
 
     map->device_mask[0] = __builtin_bswap32(prop_data[0]);
     map->device_mask[1] = __builtin_bswap32(prop_data[1]);
@@ -536,18 +526,14 @@ pci_interrupt_map_t* pcie_parse_interrupt_map(dt_block_t* dt_block) {
     map->int_mask = __builtin_bswap32(prop_data[3]);
 
     // Find interrupt-map
-    while (prop_idx < dt_node->num_properties) {
-       prop = (dt_prop_generic_t*)&dt_block->data[property_list[prop_idx]];
-
-       char* name = (char*)&dt_block->data[prop->name_off];
-       if (strncmp(name, "interrupt-map", 14) == 0) {
-           break;
+    prop = NULL;
+    FOR_LLIST(dt_node->properties, prop_tmp)
+       if (strncmp(prop_tmp->name, "interrupt-map", 14) == 0) {
+           prop = prop_tmp;
        }
+    END_FOR_LLIST()
 
-       prop_idx++;
-    }
-
-    ASSERT(prop_idx < dt_node->num_properties);
+    ASSERT(prop != NULL);
     ASSERT(prop->data_len % 40 == 0);
 
     uint64_t map_count = prop->data_len / 40;
@@ -555,7 +541,7 @@ pci_interrupt_map_t* pcie_parse_interrupt_map(dt_block_t* dt_block) {
     map->entries = vmalloc(map_count * sizeof(pci_interrupt_map_entry_t));
     map->num_entries = map_count;
 
-    prop_data = (uint32_t*)&dt_block->data[prop->data_off];
+    prop_data = (uint32_t*)prop->data;
 
     for (uint64_t idx = 0; idx < map_count; idx++) {
         map->entries[idx].device[0] = __builtin_bswap32(prop_data[0]);
@@ -625,15 +611,15 @@ void pcie_init_interrupts() {
 }
 
 void pcie_discovered(void* ctx) {
-    dt_block_t* dt_block = ((discovery_dtb_ctx_t*)ctx)->block;
+    dt_node_t* dt_node = ((discovery_dtb_ctx_t*)ctx)->dt_node;
 
     console_log(LOG_INFO, "Discovered Pcie\n");
 
 
-    pci_range_t dtb_ranges = pcie_parse_ranges(dt_block);
-    void* pcie_ptr = pcie_parse_allocate_reg(dt_block);
+    pci_range_t dtb_ranges = pcie_parse_ranges(dt_node);
+    void* pcie_ptr = pcie_parse_allocate_reg(dt_node);
 
-    pci_interrupt_map_t* pcie_int_map = pcie_parse_interrupt_map(dt_block);
+    pci_interrupt_map_t* pcie_int_map = pcie_parse_interrupt_map(dt_node);
 
     //char* name = (char*)&dt_block->data[dt_node->name_off];
     //dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];

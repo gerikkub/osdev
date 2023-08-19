@@ -139,11 +139,9 @@ void assert_aarch64_support(void) {
 
 void cortex_a57_discovered(void* ctx) {
 
-    dt_block_t* dt_block = ((discovery_dtb_ctx_t*)ctx)->block;
+    dt_node_t* dt_node = ((discovery_dtb_ctx_t*)ctx)->dt_node; 
 
-    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
-
-    char* name = (char*)&dt_block->data[dt_node->name_off];
+    char* name = dt_node->name;
 
     console_log(LOG_INFO, "Found Cortex-A57: %s:%d\n", name, dt_node->address);
 }

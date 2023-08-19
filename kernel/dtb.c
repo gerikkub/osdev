@@ -8,6 +8,8 @@
 #include "kernel/kernelspace.h"
 #include "kernel/lib/libdtb.h"
 #include "kernel/lib/vmalloc.h"
+#include "kernel/lib/llist.h"
+#include "kernel/lib/intmap.h"
 
 #include "include/k_syscall.h"
 #include "include/k_messages.h"
@@ -19,24 +21,14 @@
 #define MAX_DTB_PROPERTIES 8192
 #define MAX_DTB_NODES 1024
 #define MAX_DTB_NODE_PROPERTIES 1024
-#define MAX_DTB_NODE_CHILDREN 512
 #define MAX_DTB_PROPERTY_LEN 256
 #define MAX_DTB_NODE_NAME 64
-//#define MAX_DTB_SIZE 1048576
-#define MAX_DTB_SIZE 0x10000
 
-static fdt_property_t s_fdt_property_list[MAX_DTB_PROPERTIES] = {0};
-static int64_t s_fdt_property_idx = 0;
-
-static fdt_node_t s_fdt_node_list[MAX_DTB_NODES] = {0};
-static int64_t s_fdt_node_idx = 0;
-
-static dt_block_t* s_full_dtb;
-
-typedef struct __attribute__((packed)) {
-    uint64_t address;
-    uint64_t size;
-} fdt_reserve_entry_t;
+char* fdt_get_string(fdt_header_t* header, uint8_t* dtbmem, uint32_t stroff) {
+    ASSERT(header != NULL);
+    
+    return (char*)&dtbmem[header->off_dt_strings + stroff];
+}
 
 void get_fdt_header(void* header_ptr, fdt_header_t* header_out) {
     const fdt_header_t* header = header_ptr;
@@ -70,20 +62,210 @@ bool is_token_value_or_nop(uint32_t token, fdt_token_t token_val) {
     return is_token_nop(token) || (en_swap_32(token) == token_val);
 }
 
-uint8_t* get_fdt_property(uint8_t* dtb_ptr, fdt_property_t* property) {
+static dt_prop_stringlist_t *fdt_create_stringlist_prop(fdt_ctx_t *fdt_ctx, uint8_t *dtb_ptr,
+                                                        dt_ctx_t *dt_ctx, dt_node_t *node,
+                                                        fdt_property_token_t* token, char *prop_name) {
+
+    dt_prop_stringlist_t* prop = vmalloc(sizeof(dt_prop_stringlist_t));
+
+    uint8_t* val_ptr = dtb_ptr + sizeof(fdt_property_token_t);
+    uint32_t val_len = en_swap_32(token->len);
+    prop->len = val_len;
+    prop->str = vmalloc(val_len);
+    memcpy(prop->str, val_ptr, val_len);
+
+    return prop;
+}
+
+static dt_prop_string_t *fdt_create_string_prop(fdt_ctx_t *fdt_ctx, uint8_t *dtb_ptr,
+                                                dt_ctx_t *dt_ctx, dt_node_t *node,
+                                                fdt_property_token_t* token, char *prop_name) {
+
+    dt_prop_string_t* prop = vmalloc(sizeof(dt_prop_string_t));
+
+    uint8_t* val_ptr = dtb_ptr + sizeof(fdt_property_token_t);
+    uint32_t val_len = en_swap_32(token->len);
+    prop->len = val_len;
+    prop->str = vmalloc(val_len);
+    memcpy(prop->str, val_ptr, val_len);
+
+    return prop;
+}
+
+static dt_prop_u32_t *fdt_create_u32_prop(fdt_ctx_t *fdt_ctx, uint8_t *dtb_ptr,
+                                          dt_ctx_t *dt_ctx, dt_node_t *node,
+                                          fdt_property_token_t* token, char *prop_name) {
+    dt_prop_u32_t* prop = vmalloc(sizeof(dt_prop_u32_t));
+
+    uint32_t* val_ptr = (uint32_t*)(dtb_ptr + sizeof(fdt_property_token_t));
+    prop->val = en_swap_32(*val_ptr);
+
+    return prop;
+}
+
+static dt_prop_reg_t* fdt_create_reg_prop(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr,
+                                          dt_ctx_t* dt_ctx, dt_node_t* node,
+                                          fdt_property_token_t* token, char* prop_name) {
+    dt_prop_reg_t* prop = vmalloc(sizeof(dt_prop_reg_t));
+
+    ASSERT(node->parent);
+    ASSERT(node->parent->prop_addr_cells != NULL);
+    ASSERT(node->parent->prop_size_cells != NULL);
+
+    uint32_t addr_cells = node->parent->prop_addr_cells->val;
+    uint32_t size_cells = node->parent->prop_size_cells->val;
+    uint32_t row_size = (addr_cells + size_cells) * sizeof(uint32_t);
+    uint64_t num_rows = en_swap_32(token->len) / row_size;
+
+    ASSERT(addr_cells < 3);
+    ASSERT(size_cells < 3);
+
+    prop->reg_entries = vmalloc(num_rows * sizeof(dt_prop_reg_entry_t));
+    prop->num_regs = num_rows;
+
+    uint32_t* reg_ptr = (uint32_t*)(dtb_ptr + sizeof(fdt_property_token_t));
+    for (uint64_t i = 0; i < num_rows; i++) {
+
+        uint64_t addr = 0;
+        for (uint64_t cell_idx = 0; cell_idx < addr_cells; cell_idx++)
+        {
+            uint32_t cell = en_swap_32(*reg_ptr);
+            addr = (addr << 32) | cell;
+            reg_ptr++;
+        }
+
+        uint64_t size = 0;
+        for (uint64_t cell_idx = 0; cell_idx < size_cells; cell_idx++)
+        {
+            uint32_t cell = en_swap_32(*reg_ptr);
+            size = (size << 32) | (cell);
+            reg_ptr++;
+        }
+
+        prop->reg_entries[i].addr = addr;
+        prop->reg_entries[i].size = size;
+    }
+
+    return prop;
+}
+
+static dt_prop_ranges_t* fdt_create_ranges_prop(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr,
+                                                dt_ctx_t* dt_ctx, dt_node_t* node,
+                                                fdt_property_token_t* token, char* prop_name) {
+    dt_prop_ranges_t* prop = vmalloc(sizeof(dt_prop_ranges_t));
+
+    ASSERT(node->parent);
+    ASSERT(node->parent->prop_addr_cells != NULL);
+    ASSERT(node->prop_addr_cells != NULL);
+    ASSERT(node->prop_size_cells != NULL);
+
+    uint32_t paddr_cells = node->parent->prop_addr_cells->val;
+    uint32_t addr_cells = node->prop_addr_cells->val;
+    uint32_t size_cells = node->prop_size_cells->val;
+    uint32_t row_size = (paddr_cells + addr_cells + size_cells) * sizeof(uint32_t);
+    uint64_t num_rows = en_swap_32(token->len) / row_size;
+
+    ASSERT(addr_cells < 4);
+    ASSERT(paddr_cells < 3);
+    ASSERT(size_cells < 3);
+
+    prop->range_entries = vmalloc(num_rows * sizeof(dt_prop_range_entry_t));
+    prop->num_ranges = num_rows;
+
+    uint32_t* reg_ptr = (uint32_t*)(dtb_ptr + sizeof(fdt_property_token_t));
+    for (uint64_t idx = 0; idx < num_rows; idx++) {
+
+        uint64_t pci_hi_addr = 0;
+        uint64_t temp_addr_cells = addr_cells;
+        if (temp_addr_cells == 3) {
+            // For three u32 cells, use the pci_hi_addr field
+            uint32_t cell = en_swap_32(*reg_ptr);
+            pci_hi_addr = cell;
+            reg_ptr++;
+            temp_addr_cells = 2;
+        }
+
+        uint64_t child_addr = 0;
+        for (uint64_t cell_idx = 0; cell_idx < temp_addr_cells; cell_idx++) {
+            uint32_t cell = en_swap_32(*reg_ptr);
+            child_addr = (child_addr << 32) | cell;
+            reg_ptr++;
+        }
+
+        uint64_t parent_addr = 0;
+        for (uint64_t cell_idx = 0; cell_idx < paddr_cells; cell_idx++) {
+            uint32_t cell = en_swap_32(*reg_ptr);
+            parent_addr = (parent_addr << 32) | cell;
+            reg_ptr++;
+        }
+
+        uint64_t size = 0;
+        for (uint64_t cell_idx = 0; cell_idx < size_cells; cell_idx++) {
+            uint32_t cell = en_swap_32(*reg_ptr);
+            size = (size << 32) | (cell);
+            reg_ptr++;
+        }
+
+        prop->range_entries[idx].child_addr = child_addr;
+        prop->range_entries[idx].pci_hi_addr = pci_hi_addr;
+        prop->range_entries[idx].parent_addr = parent_addr;
+        prop->range_entries[idx].size = size;
+    }
+
+    return prop;
+}
+
+static dt_prop_generic_t* fdt_create_generic_prop(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr,
+                                                  dt_ctx_t* dt_ctx, dt_node_t* node,
+                                                  fdt_property_token_t* token, char* prop_name) {
+    dt_prop_generic_t* prop = vmalloc(sizeof(dt_prop_generic_t));
+
+    uint64_t name_len = strnlen(prop_name, MAX_DTB_NODE_NAME);
+    prop->name = vmalloc(name_len + 1);
+    memset(prop->name, 0, name_len + 1);
+    memcpy(prop->name, prop_name, name_len);
+
+    uint64_t prop_len = en_swap_32(token->len);
+    prop->data_len = prop_len;
+    prop->data = vmalloc(prop_len);
+    memcpy(prop->data, dtb_ptr + sizeof(fdt_property_token_t), prop_len);
+
+    return prop;
+}
+
+void dt_register_phandle(dt_ctx_t* dt_ctx, dt_node_t* node) {
+
+    ASSERT(node->prop_phandle != NULL);
+
+    uint64_t* phandle_ptr = vmalloc(sizeof(uint64_t));
+    *phandle_ptr = node->prop_phandle->val;
+    if (!hashmap_contains(dt_ctx->phandle_map, &phandle_ptr)) {
+        console_log(LOG_WARN, "Duplicate phandle values in DT (%d)", *phandle_ptr);
+        vfree(phandle_ptr);
+        return;
+    }
+
+    hashmap_add(dt_ctx->phandle_map, &phandle_ptr, node);
+}
+
+uint8_t* add_fdt_cells_property(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt_node_t* node) {
+
     ASSERT(dtb_ptr != NULL);
-    ASSERT(property != NULL);
 
     fdt_property_token_t token = *(fdt_property_token_t*)dtb_ptr;
 
-
     ASSERT(en_swap_32(token.token) == FDT_TOKEN_PROP);
+
     uint8_t* prop_value_ptr = dtb_ptr + sizeof(fdt_property_token_t);
     uint32_t prop_len = en_swap_32(token.len);
 
-    property->nameoff = en_swap_32(token.nameoff);
-    property->data_len = prop_len;
-    property->data_ptr = prop_value_ptr;
+    char* prop_name = fdt_get_string(fdt_ctx->header, fdt_ctx->dtb_data, en_swap_32(token.nameoff));
+
+    if (!strcmp(prop_name, "#address-cells")) {
+        node->prop_addr_cells = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+    } else if (!strcmp(prop_name, "#size-cells")) {
+        node->prop_size_cells = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+    }
 
     // Skip over padding added to the property
     // to align the next token to a uint32_t
@@ -93,9 +275,70 @@ uint8_t* get_fdt_property(uint8_t* dtb_ptr, fdt_property_t* property) {
     return (uint8_t*)prop_padded;
 }
 
-uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
+uint8_t* add_fdt_property(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt_node_t* node) {
+
+    ASSERT(dtb_ptr != NULL);
+
+    fdt_property_token_t token = *(fdt_property_token_t*)dtb_ptr;
+
+    ASSERT(en_swap_32(token.token) == FDT_TOKEN_PROP);
+
+    uint8_t* prop_value_ptr = dtb_ptr + sizeof(fdt_property_token_t);
+    uint32_t prop_len = en_swap_32(token.len);
+
+    char* prop_name = fdt_get_string(fdt_ctx->header, fdt_ctx->dtb_data, en_swap_32(token.nameoff));
+
+    if (!strcmp(prop_name, "compatible")) {
+        node->prop_compat = fdt_create_stringlist_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+    } else if (!strcmp(prop_name, "model")) {
+        node->prop_model = fdt_create_string_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+    } else if (!strcmp(prop_name, "phandle")) {
+        node->prop_phandle = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        dt_register_phandle(dt_ctx, node);
+    } else if (!strcmp(prop_name, "#address-cells")) {
+        // Handled previously. Skip
+    } else if (!strcmp(prop_name, "#size-cells")) {
+        // Handled previously. Skip
+    } else if (!strcmp(prop_name, "reg")) {
+        node->prop_reg = fdt_create_reg_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+    } else if (!strcmp(prop_name, "ranges")) {
+        node->prop_ranges = fdt_create_ranges_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+    } else {
+        dt_prop_generic_t* new_prop = fdt_create_generic_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        llist_append_ptr(node->properties, new_prop);
+    }
+
+    // Skip over padding added to the property
+    // to align the next token to a uint32_t
+    uintptr_t prop_padded = (uintptr_t)(prop_value_ptr + prop_len);
+    prop_padded = (prop_padded + sizeof(uint32_t) - 1) & (~(sizeof(uint32_t) - 1));
+
+    return (uint8_t*)prop_padded;
+}
+
+dt_node_t* fdt_create_node(void) {
+    dt_node_t* new_node = vmalloc(sizeof(dt_node_t));
+    new_node->name = NULL;
+
+    new_node->prop_addr_cells = NULL;
+    new_node->prop_size_cells = NULL;
+    new_node->prop_compat = NULL;
+    new_node->prop_model = NULL;
+    new_node->prop_phandle = NULL;
+    new_node->prop_reg = NULL;
+    new_node->prop_ranges = NULL;
+
+    new_node->properties = llist_create();
+    new_node->children = llist_create();
+
+    return new_node;
+}
+
+uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt_node_t* node, bool is_root) {
     ASSERT(dtb_ptr != NULL);
     ASSERT(node != NULL);
+
+    console_log(LOG_DEBUG, "FDT Node");
 
     uint32_t* token_ptr = (uint32_t*)dtb_ptr;
     uint32_t token = en_swap_32(*token_ptr);
@@ -104,41 +347,49 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
     token_ptr++;
 
     // Read in the name as a null terminated string
-    char* node_name_ptr = (char*)token_ptr;
-    node->name = vmalloc(MAX_DTB_NODE_NAME);
-    if (node->name == NULL) {
-        node_name_ptr[0] = '\0';
+    if (is_root) {
+        node->name = vmalloc(2);
+        memset(node->name, 0, 2);
+        node->name[0] = '/';
+
+        token_ptr++;
     } else {
-        strncpy(node->name, node_name_ptr, MAX_DTB_NODE_NAME);
+        char* node_name_ptr = (char*)token_ptr;
+        uint64_t name_len = strnlen(node_name_ptr, MAX_DTB_NODE_NAME) + 1;
+        node->name = vmalloc(name_len);
+        memset(node->name, 0, name_len);
+        memcpy(node->name, node_name_ptr, name_len-1);
+
+        token_ptr = (uint32_t*)((uint8_t*)token_ptr + name_len);
     }
 
-    uint64_t node_name_len = 0;
-    while (*node_name_ptr != '\0') {
-        node_name_len++;
-        node_name_ptr++;
-    }
-
-    // Add an extra byte for the null terminator
-    node_name_len++;
-    node_name_ptr++;
-
-    if (node_name_len >= MAX_DTB_NODE_NAME) {
-        node->name_valid = false;
-    } else {
-        node->name_valid = true;
-    }
 
     // Optionally skip over padding added to the name
     // to align the next token to a uint32_t
-    uintptr_t node_name_padded = (uintptr_t)node_name_ptr;
-    node_name_padded = (node_name_padded + sizeof(uint32_t) - 1) & (~(sizeof(uint32_t) - 1));
+    token_ptr = (uint32_t*)(((uintptr_t)token_ptr + 3) & ~(0x3));
 
-    // Continue with token ptr to parse the rest
-    // of the node
-    token_ptr = (uint32_t*)node_name_padded;
+    // Scan for cells
+    uint32_t* cells_token_ptr = token_ptr;
+    while (is_token_value_or_nop(*cells_token_ptr, FDT_TOKEN_PROP)) {
+        if (is_token_nop(*cells_token_ptr)) {
+            cells_token_ptr++;
+        } else {
+            console_log(LOG_DEBUG, "FDT Property");
+            cells_token_ptr = (uint32_t*)add_fdt_cells_property(fdt_ctx, (uint8_t*)cells_token_ptr, dt_ctx, node);
+        }
+    }
 
-    node->properties_list = vmalloc(sizeof(uint64_t) * MAX_DTB_NODE_PROPERTIES);
-    node->num_properties = 0;
+    // Create fake addr (2) and size (1) cells if they don't exist
+    if (node->prop_addr_cells == NULL) {
+        node->prop_addr_cells = vmalloc(sizeof(dt_prop_u32_t));
+        node->prop_addr_cells->val = 2;
+    }
+
+    if (node->prop_size_cells == NULL) {
+        node->prop_size_cells = vmalloc(sizeof(dt_prop_u32_t));
+        node->prop_size_cells->val = 1;
+    }
+
 
     // Parse all properties first. These are guaranteed to be
     // before child nodes
@@ -146,35 +397,24 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
         if (is_token_nop(*token_ptr)) {
             token_ptr++;
         } else {
-            ASSERT(s_fdt_property_idx < MAX_DTB_PROPERTIES);
-            ASSERT(node->num_properties < MAX_DTB_NODE_PROPERTIES);
-            node->properties_list[node->num_properties] = s_fdt_property_idx;
-            node->num_properties++;
-            // Allocate a property
-            fdt_property_t* prop = &s_fdt_property_list[s_fdt_property_idx];
-            s_fdt_property_idx++;
-
-            token_ptr = (uint32_t*)get_fdt_property((uint8_t*)token_ptr, prop);
+            console_log(LOG_DEBUG, "FDT Property");
+            token_ptr = (uint32_t*)add_fdt_property(fdt_ctx, (uint8_t*)token_ptr, dt_ctx, node);
         }
     }
-
-    node->children_list = vmalloc(sizeof(uint64_t) * MAX_DTB_NODE_CHILDREN);
 
     // Parse all child nodes
     while (is_token_value_or_nop(*token_ptr, FDT_TOKEN_BEGIN_NODE)) {
         if (is_token_nop(*token_ptr)) {
             token_ptr++;
         } else {
-            ASSERT(s_fdt_node_idx < MAX_DTB_NODES);
-            ASSERT(node->num_children < MAX_DTB_NODE_CHILDREN);
-            node->children_list[node->num_children] = s_fdt_node_idx;
-            node->num_children++;
             // Allocate a node
-            fdt_node_t* node = &s_fdt_node_list[s_fdt_node_idx];
-            s_fdt_node_idx++;
+            dt_node_t* child_node = fdt_create_node();
+            child_node->parent = node;
 
             // Recurse
-            token_ptr = (uint32_t*)get_fdt_node((uint8_t*)token_ptr, node);
+            token_ptr = (uint32_t*)get_fdt_node(fdt_ctx, (uint8_t*)token_ptr, dt_ctx, child_node, false);
+
+            llist_append_ptr(node->children, child_node);
         }
     }
 
@@ -187,9 +427,11 @@ uint8_t* get_fdt_node(uint8_t* dtb_ptr, fdt_node_t* node) {
     ASSERT(en_swap_32(*token_ptr) == FDT_TOKEN_END_NODE);
     token_ptr++;
 
+    console_log(LOG_DEBUG, "FDT End Node");
     return (uint8_t*)token_ptr;
 }
 
+/*
 void print_node_padding(uint64_t padding) {
     for (uint64_t idx = 0; idx < padding; idx++) {
         console_putc(' ');
@@ -235,61 +477,40 @@ void print_node(uint8_t* dtbmem, fdt_header_t* header, fdt_node_t* node, uint64_
 
     console_flush();
 }
+*/
 
-static void dtb_discover(uint8_t* dtbmem, fdt_node_t* node, fdt_header_t* header, fdt_ctx_t* ctx, dt_prop_cells_t* parent_cells) {
+static void dtb_discover(dt_ctx_t* ctx, dt_node_t* node) {
 
-    dt_prop_cells_t this_cells = {
-        .addr = 2,
-        .size = 1
-    };
+    if (node->prop_compat != NULL) {
+        discovery_register_t disc_reg = {
+            .type = DRIVER_DISCOVERY_DTB,
+            .dtb = {
+                .compat = (char *)node->prop_compat->str},
+            .ctxfunc = NULL};
 
-    for (uint64_t prop_idx = 0; prop_idx < node->num_properties; prop_idx++) {
+        console_log(LOG_DEBUG, "Discovering %s", node->prop_compat->str);
 
-        fdt_property_t* prop = &s_fdt_property_list[node->properties_list[prop_idx]];
-        char* prop_name = fdt_get_string(header, dtbmem, prop->nameoff);
+        if (discovery_have_driver(&disc_reg))
+        {
+            // print_node(dtbmem, header, node, 2);
 
-        if (strncmp(prop_name, "compatible", 10) == 0) {
-            discovery_register_t disc_reg = {
-                .type = DRIVER_DISCOVERY_DTB,
-                .dtb = {
-                    .compat = (char*)prop->data_ptr
-                },
-                .ctxfunc = NULL
+            discovery_dtb_ctx_t disc_ctx = {
+                .dt_ctx = ctx,
+                .dt_node = node
             };
 
-            console_log(LOG_DEBUG, "Discovering %s", prop->data_ptr);
-
-            if (discovery_have_driver(&disc_reg)) {
-                // print_node(dtbmem, header, node, 2);
-
-                dt_block_t* disc_block = dt_build_block(node, ctx, parent_cells);
-                discovery_dtb_ctx_t disc_ctx = {
-                    .block = disc_block
-                };
-
-                discover_driver(&disc_reg, &disc_ctx);
-
-                // Block free'd by the driver
-            } else {
-                //console_printf("No driver for %s\n", prop->data_ptr);
-            }
-        } else if (strncmp(prop_name, "#size-cells", 11) == 0) {
-            this_cells.size = prop->data_ptr[0] << 24 |
-                              prop->data_ptr[1] << 16 |
-                              prop->data_ptr[2] << 8 |
-                              prop->data_ptr[3];
-        } else if (strncmp(prop_name, "#address-cells", 13) == 0) {
-            this_cells.addr = prop->data_ptr[0] << 24 |
-                              prop->data_ptr[1] << 16 |
-                              prop->data_ptr[2] << 8 |
-                              prop->data_ptr[3];
+            discover_driver(&disc_reg, &disc_ctx);
+        }
+        else
+        {
+            // console_printf("No driver for %s\n", prop->data_ptr);
         }
     }
 
-    for (uint64_t child_idx = 0; child_idx < node->num_children; child_idx++) {
-        fdt_node_t* child_node = &s_fdt_node_list[node->children_list[child_idx]];
-        dtb_discover(dtbmem, child_node, header, ctx, &this_cells);
-    }
+    dt_node_t* child_node;
+    FOR_LLIST(node->children, child_node)
+        dtb_discover(ctx, child_node);
+    END_FOR_LLIST()
 }
 
 void dtb_init(uintptr_t dtb_init_phy_addr) {
@@ -299,43 +520,39 @@ void dtb_init(uintptr_t dtb_init_phy_addr) {
 
     memspace_map_phy_kernel(header_phy_ptr,
                             devicetree,
-                            MAX_DTB_SIZE, MEMSPACE_FLAG_PERM_KRO);
+                            VMEM_PAGE_SIZE, MEMSPACE_FLAG_PERM_KRO);
     memspace_update_kernel_vmem();
 
     fdt_header_t header;
     get_fdt_header(devicetree, &header);
 
-    ASSERT(header.totalsize <= MAX_DTB_SIZE);
+    // Remap the entire DTB
+    memory_entry_t* old_entry = memspace_get_entry_at_addr_kernel(devicetree);
+    memspace_unmap_kernel(old_entry);
+    memspace_update_kernel_vmem();
+
+    memspace_map_phy_kernel(header_phy_ptr,
+                            devicetree,
+                            header.totalsize, MEMSPACE_FLAG_PERM_KRO);
+    memspace_update_kernel_vmem();
+
+
+    fdt_ctx_t fdt_ctx = {
+        .dtb_data = devicetree,
+        .header = &header
+    };
 
     uint8_t* dtb_tree = (devicetree + header.off_dt_struct);
 
-    fdt_node_t* root_node;
+    dt_node_t* root_node = fdt_create_node();
+    dt_ctx_t* dt_ctx = vmalloc(sizeof(dt_ctx_t));
+    dt_ctx->head = root_node;
+    dt_ctx->phandle_map = uintmap_alloc(64);
+    get_fdt_node(&fdt_ctx, dtb_tree, dt_ctx, root_node, true);
 
-    ASSERT(s_fdt_node_idx < MAX_DTB_NODES);
-    root_node = &s_fdt_node_list[s_fdt_node_idx];
-    s_fdt_node_idx++;
-
-    get_fdt_node(dtb_tree, root_node);
-
-    fdt_ctx_t fdt_ctx = {
-        .fdt = devicetree,
-        .header = &header,
-        .property_list = s_fdt_property_list,
-        .num_properties = s_fdt_property_idx,
-        .node_list = s_fdt_node_list,
-        .num_nodes = s_fdt_node_idx
-    };
-
-    s_full_dtb = dt_build_block(root_node, &fdt_ctx, NULL);
-    ASSERT(s_full_dtb != NULL);
-
-    // dt_block_t* block = dt_build_block(root_node, &fdt_ctx);
-
-    // print_node(devicetree, &header, root_node, 2);
-
-    dtb_discover(devicetree, root_node, &header, &fdt_ctx, NULL);
+    dtb_discover(dt_ctx, root_node);
 }
 
-const dt_block_t* dtb_get_devicetree(void) {
-    return s_full_dtb;
-}
+// const dt_block_t* dtb_get_devicetree(void) {
+//     return s_full_dtb;
+// }

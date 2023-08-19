@@ -4,6 +4,80 @@
 
 #include <stdint.h>
 
+#include "kernel/lib/llist.h"
+#include "kernel/lib/intmap.h"
+
+#define MAX_DTB_COMPAT_REG_NAME 256
+
+/**
+ * Device Tree Standard Properties
+ */
+
+enum {
+    DT_PROP_COMPAT = 1,
+    DT_PROP_MODEL = 2,
+    DT_PROP_PHANDLE = 4,
+    DT_PROP_REG = 8,
+    DT_PROP_RANGES = 16,
+    DT_PROP_DMA_RANGES = 32,
+};
+
+typedef struct {
+    char* str;
+    uint64_t len;
+} dt_prop_stringlist_t;
+
+typedef struct {
+    char* str;
+    uint64_t len;
+} dt_prop_string_t;
+
+typedef struct {
+    uint32_t val;
+} dt_prop_u32_t;
+
+typedef struct {
+    uint64_t addr;
+    uint64_t size;
+} dt_prop_reg_entry_t;
+
+typedef struct {
+    dt_prop_reg_entry_t* reg_entries;
+    uint64_t num_regs;
+} dt_prop_reg_t;
+
+typedef struct {
+    uint64_t child_addr;
+    uint32_t pci_hi_addr;
+    uint64_t parent_addr;
+    uint64_t size;
+} dt_prop_range_entry_t;
+
+typedef struct {
+    dt_prop_range_entry_t* range_entries;
+    uint64_t num_ranges;
+} dt_prop_ranges_t;
+
+typedef struct {
+    uint64_t child_addr;
+    uint32_t pci_hi_addr;
+    uint64_t parent_addr;
+    uint64_t size;
+} dt_prop_dma_range_entry_t;
+
+typedef struct {
+    uint64_t dma_range_entries_off;
+    uint64_t num_dma_ranges;
+} dt_prop_dma_ranges_t;
+
+typedef struct {
+    char* name;
+    uint8_t* data;
+    uint64_t data_len;
+} dt_prop_generic_t;
+
+
+
 typedef struct __attribute__((packed)) {
     uint32_t magic;
     uint32_t totalsize;
@@ -31,6 +105,11 @@ typedef struct __attribute__((packed)) {
     uint32_t nameoff;
 } fdt_property_token_t;
 
+typedef struct {
+    uint8_t* dtb_data;
+    fdt_header_t* header;
+} fdt_ctx_t;
+
 typedef enum {
     FDT_PROP_TYPE_UNKNOWN = 0,
     FDT_PROP_TYPE_EMPTY,
@@ -41,145 +120,34 @@ typedef enum {
     FDT_PROP_TYPE_STR
 } fdt_property_type_t;
 
-typedef struct {
-    uint8_t* data_ptr;
-    uint64_t data_len;
-
-    uint32_t nameoff;
-} fdt_property_t;
-
-typedef struct {
+typedef struct dt_node_ {
     char* name;
-    bool name_valid;
-    uint64_t* properties_list;
-    int64_t num_properties;
-    uint64_t* children_list;
-    int64_t num_children;
-} fdt_node_t;
-
-typedef struct {
-    uint8_t* fdt;
-    fdt_header_t* header;
-    fdt_property_t* property_list;
-    uint64_t num_properties;
-    fdt_node_t* node_list;
-    uint64_t num_nodes;
-} fdt_ctx_t;
-
-/**
- * Device Tree Standard Properties
- */
-
-enum {
-    DT_PROP_COMPAT = 1,
-    DT_PROP_MODEL = 2,
-    DT_PROP_PHANDLE = 4,
-    DT_PROP_REG = 8,
-    DT_PROP_RANGES = 16,
-    DT_PROP_DMA_RANGES = 32,
-};
-
-typedef struct {
-    uint64_t compat_off;
-} dt_prop_compat_t;
-
-typedef struct {
-    uint64_t model_off;
-} dt_prop_model_t;
-
-typedef struct {
-    uint32_t phandle;
-} dt_prop_phandle_t;
-
-typedef struct {
-    uint32_t addr;
-    uint32_t size;
-} dt_prop_cells_t;
-
-typedef struct {
-    uint64_t addr;
-    uint64_t size;
-} dt_prop_reg_entry_t;
-
-typedef struct {
-    uint64_t reg_entries_off;
-    uint64_t num_regs;
-} dt_prop_reg_t;
-
-typedef struct {
-    uint64_t child_addr;
-    uint32_t pci_hi_addr;
-    uint64_t parent_addr;
-    uint64_t size;
-} dt_prop_range_entry_t;
-
-typedef struct {
-    uint64_t range_entries_off;
-    uint64_t num_ranges;
-} dt_prop_ranges_t;
-
-typedef struct {
-    uint64_t child_addr;
-    uint32_t pci_hi_addr;
-    uint64_t parent_addr;
-    uint64_t size;
-} dt_prop_dma_range_entry_t;
-
-typedef struct {
-    uint64_t dma_range_entries_off;
-    uint64_t num_dma_ranges;
-} dt_prop_dma_ranges_t;
-
-typedef struct {
-    uint64_t data_off;
-    uint64_t data_len;
-    uint64_t name_off;
-} dt_prop_generic_t;
-
-typedef struct {
-    uint64_t name_off;
     uint64_t address;
 
-    uint64_t property_list_off;
-    uint64_t num_properties;
+    llist_head_t properties;
+    dt_prop_u32_t* prop_addr_cells;
+    dt_prop_u32_t* prop_size_cells;
+    dt_prop_stringlist_t* prop_compat;
+    dt_prop_string_t* prop_model;
+    dt_prop_u32_t* prop_phandle;
+    dt_prop_reg_t* prop_reg;
+    dt_prop_ranges_t* prop_ranges;
 
-    uint64_t node_list_off;
-    uint64_t num_nodes;
+    llist_head_t children;
 
-    dt_prop_cells_t cells;
-    dt_prop_cells_t parent_cells;
-
-    uint32_t std_properties_mask;
-    dt_prop_compat_t compat;
-    dt_prop_model_t model;
-    dt_prop_phandle_t phandle;
-    dt_prop_reg_t reg;
-    dt_prop_ranges_t ranges;
-    dt_prop_dma_ranges_t dma_ranges;
+    struct dt_node_* parent;
 } dt_node_t;
 
 typedef struct {
-    uint64_t node_off;
-    uint64_t len;
-    uint8_t data[];
-} dt_block_t;
+    dt_node_t* head;
+    hashmap_ctx_t* phandle_map;
+} dt_ctx_t;
+
 
 typedef struct {
-    dt_block_t* block;
+    dt_ctx_t* dt_ctx;
+    dt_node_t* dt_node;
 } discovery_dtb_ctx_t;
 
-#define MAX_DTB_COMPAT_REG_NAME 128
-
-
-char* fdt_get_string(fdt_header_t* header, uint8_t* dtbmem, uint32_t stroff);
-
-/**
- * dt_build_block
- * 
- * Build a single block of memory that contains all device tree information
- * for a single node and its children. This block can then be passed to
- * other modules through a message call
- */
-dt_block_t* dt_build_block(fdt_node_t* base_fdt_node, fdt_ctx_t* fdt_ctx, dt_prop_cells_t* parent_cells);
 
 #endif

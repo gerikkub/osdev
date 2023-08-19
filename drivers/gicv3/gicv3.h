@@ -141,7 +141,7 @@ typedef struct __attribute__((__packed__)) {
 enum {
     DTB_REG_IDX_GICD = 0,
     //DTB_REG_IDX_GICR = 1, // Need to better understand how large this is
-    DTB_REG_IDX_GICR = 2,
+    DTB_REG_IDX_GICR = 1,
     DTB_REG_IDX_Max
 };
 

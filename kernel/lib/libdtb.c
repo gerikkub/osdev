@@ -11,12 +11,7 @@
 #include "stdlib/bitutils.h"
 
 
-char* fdt_get_string(fdt_header_t* header, uint8_t* dtbmem, uint32_t stroff) {
-    ASSERT(header != NULL);
-    
-    return (char*)&dtbmem[header->off_dt_strings + stroff];
-}
-
+/*
 static uint64_t dt_block_prop_size(fdt_property_t* prop, fdt_node_t* node, fdt_ctx_t* fdt_ctx) {
 
     uint64_t block_size = 0;
@@ -484,3 +479,4 @@ dt_block_t* dt_build_block(fdt_node_t* base_fdt_node, fdt_ctx_t* fdt_ctx, dt_pro
 
     return block_out;
 }
+*/

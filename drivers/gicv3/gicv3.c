@@ -156,27 +156,26 @@ void gic_irq_handler(uint32_t vector) {
 }
 
 void gicv3_discover(void* ctx) {
-    dt_block_t* dt_block = ((discovery_dtb_ctx_t*)ctx)->block;
 
-    dt_node_t* dt_node = (dt_node_t*)&dt_block->data[dt_block->node_off];
+    dt_node_t* dt_node = ((discovery_dtb_ctx_t*)ctx)->dt_node;
 
-    ASSERT(dt_node->std_properties_mask & DT_PROP_REG);
+    ASSERT(dt_node->prop_reg != NULL);
 
     // TODO: Need to figure out how to properly allocate this
     // uint64_t dt_num_reg = dt_node->reg.num_regs;
     // ASSERT(dt_num_reg >= DTB_REG_IDX_Max);
-    uintptr_t* gic_reg_phy = (uint64_t*)&dt_block->data[dt_node->reg.reg_entries_off];
-    s_gicv3_ctx.gicd = PHY_TO_KSPACE_PTR(gic_reg_phy[DTB_REG_IDX_GICD]);
-    s_gicv3_ctx.gicr = PHY_TO_KSPACE_PTR(gic_reg_phy[DTB_REG_IDX_GICR]);
-    s_gicv3_ctx.gicrppi = PHY_TO_KSPACE_PTR(gic_reg_phy[DTB_REG_IDX_GICR] + 64*1024);
+    dt_prop_reg_entry_t* gic_reg_entries = dt_node->prop_reg->reg_entries;
+    s_gicv3_ctx.gicd = PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICD].addr);
+    s_gicv3_ctx.gicr = PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICR].addr);
+    s_gicv3_ctx.gicrppi = PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICR].addr + 64*1024);
 
-    memspace_map_device_kernel((void*)gic_reg_phy[DTB_REG_IDX_GICD],
-                               PHY_TO_KSPACE_PTR(gic_reg_phy[DTB_REG_IDX_GICD]),
-                               gic_reg_phy[DTB_REG_IDX_GICD + 1],
+    memspace_map_device_kernel((void*)gic_reg_entries[DTB_REG_IDX_GICD].addr,
+                               PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICD].addr),
+                               gic_reg_entries[DTB_REG_IDX_GICD].size,
                                MEMSPACE_FLAG_PERM_KRW);
-    memspace_map_device_kernel((void*)gic_reg_phy[DTB_REG_IDX_GICR],
-                               PHY_TO_KSPACE_PTR(gic_reg_phy[DTB_REG_IDX_GICR]),
-                               gic_reg_phy[DTB_REG_IDX_GICR + 1],
+    memspace_map_device_kernel((void*)gic_reg_entries[DTB_REG_IDX_GICR].addr,
+                               PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICR].addr),
+                               gic_reg_entries[DTB_REG_IDX_GICR].size,
                                MEMSPACE_FLAG_PERM_KRW);
     memspace_update_kernel_vmem();
 

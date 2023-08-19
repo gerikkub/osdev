@@ -12,6 +12,9 @@
 #include "kernel/dtb.h"
 #include "kernel/lib/libpci.h"
 
+void board_init_main_early(void) {
+}
+
 void board_init_mappings(void) {
 
     memory_entry_device_t earlycon_device = {
