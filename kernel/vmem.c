@@ -219,9 +219,8 @@ void vmem_map_address(_vmem_table* table_ptr, addr_phy_t addr_phy, addr_virt_t a
                        // Non Shareable
                        VMEM_STG1_BLK_AF | // Set AF to 1
                        VMEM_STG1_BLK_NS |
-                       VMEM_ATTR_NORMAL_NONCACHE |
                        VMEM_AP_EXTRACT(ap_flags) |
-                       mem_attr; // Device memory mapped to attr 1
+                       (mem_attr << 2); // Device memory mapped to attr 1
 
     level_3_table_ptr[level_3_idx] = vmem_entry_page(attr_hi, attr_lo, addr_phy);
 }
@@ -406,6 +405,8 @@ void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr) {
 
     WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
     WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
+
+    asm volatile ("tlbi VMALLE1");
 }
 
 void vmem_set_kernel_table(_vmem_table* kernel_table) {
@@ -417,6 +418,8 @@ void vmem_set_kernel_table(_vmem_table* kernel_table) {
     asm ("DSB SY");
 
     WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
+
+    asm volatile ("tlbi VMALLE1");
 }
 
 void vmem_set_user_table(_vmem_table* user_ptr, uint8_t asid) {
@@ -429,6 +432,8 @@ void vmem_set_user_table(_vmem_table* user_ptr, uint8_t asid) {
     asm ("DSB SY");
 
     WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
+
+    asm volatile ("tlbi VMALLE1");
 }
 
 void vmem_initialize(void) { 

@@ -38,6 +38,11 @@ _high_start:
     mov x1, 0
     bl memset
 
+    // Setup a dummy stackframe
+    stp xzr, xzr, [sp, #-16]
+    mov x29, sp
+    sub x29, x29, #16
+
     b main
 
 .loop:

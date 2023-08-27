@@ -52,10 +52,9 @@ void exception_handler_sync_lower(uint64_t vector) {
     panic("Exception", vector, "Sync Lower");
 }
 
-void gic_irq_handler(uint32_t vector);
-
 uint64_t exception_handler_irq(uint64_t vector, irq_stackframe_t* frame) {
-    gic_irq_handler(vector);
+
+    interrupt_handle_irq_entry(vector);
 
     schedule();
 

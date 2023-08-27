@@ -111,15 +111,6 @@ void gicv3_set_spi_trigger(void* ctx, uint64_t intid, interrupt_trigger_type_t t
     }
 }
 
-static intc_funcs_t intc_funcs = {
-    .enable = gicv3_enable,
-    .disable = gicv3_disable,
-    .enable_irq = gicv3_enable_intid,
-    .disable_irq = gicv3_disable_intid,
-    .set_irq_trigger = gicv3_set_spi_trigger,
-    .get_msi = gicv3_get_spi_msi_intid
-};
-
 bool gic_try_irq_handler(void) {
     uint32_t intid = 0;
     READ_SYS_REG(ICC_REG_IAR1_EL1, intid);
@@ -140,7 +131,7 @@ bool gic_try_irq_handler(void) {
     return true;
 }
 
-void gic_irq_handler(uint32_t vector) {
+void gic_irq_handler(void* ctx) {
 
     uint32_t intid = 0;
     READ_SYS_REG(ICC_REG_IAR1_EL1, intid);
@@ -155,6 +146,16 @@ void gic_irq_handler(uint32_t vector) {
     WRITE_SYS_REG(ICC_REG_EOIR1_EL1, intid);
 }
 
+static intc_funcs_t intc_funcs = {
+    .enable = gicv3_enable,
+    .disable = gicv3_disable,
+    .enable_irq = gicv3_enable_intid,
+    .disable_irq = gicv3_disable_intid,
+    .set_irq_trigger = gicv3_set_spi_trigger,
+    .get_msi = gicv3_get_spi_msi_intid,
+    .irq_handler = gic_irq_handler
+};
+
 void gicv3_discover(void* ctx) {
 
     dt_node_t* dt_node = ((discovery_dtb_ctx_t*)ctx)->dt_node;
@@ -165,17 +166,27 @@ void gicv3_discover(void* ctx) {
     // uint64_t dt_num_reg = dt_node->reg.num_regs;
     // ASSERT(dt_num_reg >= DTB_REG_IDX_Max);
     dt_prop_reg_entry_t* gic_reg_entries = dt_node->prop_reg->reg_entries;
-    s_gicv3_ctx.gicd = PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICD].addr);
-    s_gicv3_ctx.gicr = PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICR].addr);
-    s_gicv3_ctx.gicrppi = PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICR].addr + 64*1024);
 
-    memspace_map_device_kernel((void*)gic_reg_entries[DTB_REG_IDX_GICD].addr,
-                               PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICD].addr),
-                               gic_reg_entries[DTB_REG_IDX_GICD].size,
+    ASSERT(gic_reg_entries[DTB_REG_IDX_GICD].addr_size == 2);
+    ASSERT(gic_reg_entries[DTB_REG_IDX_GICD].size_size == 2);
+
+    uint64_t gicd_addr = gic_reg_entries[DTB_REG_IDX_GICD].addr_ptr[1] | (((uint64_t)gic_reg_entries[DTB_REG_IDX_GICD].addr_ptr[0]) << 32); 
+    uint64_t gicd_size = gic_reg_entries[DTB_REG_IDX_GICD].size_ptr[1] | (((uint64_t)gic_reg_entries[DTB_REG_IDX_GICD].size_ptr[0]) << 32);
+
+    uint64_t gicr_addr = gic_reg_entries[DTB_REG_IDX_GICR].addr_ptr[1] | (((uint64_t)gic_reg_entries[DTB_REG_IDX_GICR].addr_ptr[0]) << 32); 
+    uint64_t gicr_size = gic_reg_entries[DTB_REG_IDX_GICR].size_ptr[1] | (((uint64_t)gic_reg_entries[DTB_REG_IDX_GICR].size_ptr[0]) << 32);
+
+    s_gicv3_ctx.gicd = PHY_TO_KSPACE_PTR(gicd_addr);
+    s_gicv3_ctx.gicr = PHY_TO_KSPACE_PTR(gicr_addr);
+    s_gicv3_ctx.gicrppi = PHY_TO_KSPACE_PTR(gicr_addr + 64*1024);
+
+    memspace_map_device_kernel((void*)gicd_addr,
+                               PHY_TO_KSPACE_PTR(gicd_addr),
+                               gicd_size,
                                MEMSPACE_FLAG_PERM_KRW);
-    memspace_map_device_kernel((void*)gic_reg_entries[DTB_REG_IDX_GICR].addr,
-                               PHY_TO_KSPACE_PTR(gic_reg_entries[DTB_REG_IDX_GICR].addr),
-                               gic_reg_entries[DTB_REG_IDX_GICR].size,
+    memspace_map_device_kernel((void*)gicr_addr,
+                               PHY_TO_KSPACE_PTR(gicr_addr),
+                               gicr_size,
                                MEMSPACE_FLAG_PERM_KRW);
     memspace_update_kernel_vmem();
 
@@ -215,6 +226,7 @@ void gicv3_register(void) {
         .ctxfunc = gicv3_discover
     };
     register_driver(&reg);
+
 
 }
 

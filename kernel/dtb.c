@@ -117,33 +117,29 @@ static dt_prop_reg_t* fdt_create_reg_prop(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr,
     uint32_t row_size = (addr_cells + size_cells) * sizeof(uint32_t);
     uint64_t num_rows = en_swap_32(token->len) / row_size;
 
-    ASSERT(addr_cells < 3);
-    ASSERT(size_cells < 3);
-
     prop->reg_entries = vmalloc(num_rows * sizeof(dt_prop_reg_entry_t));
     prop->num_regs = num_rows;
 
     uint32_t* reg_ptr = (uint32_t*)(dtb_ptr + sizeof(fdt_property_token_t));
-    for (uint64_t i = 0; i < num_rows; i++) {
+    for (uint64_t idx = 0; idx < num_rows; idx++) {
 
-        uint64_t addr = 0;
+        prop->reg_entries[idx].addr_ptr = vmalloc(addr_cells * sizeof(uint32_t));
+        prop->reg_entries[idx].addr_size = addr_cells;
+
+        prop->reg_entries[idx].size_ptr = vmalloc(size_cells * sizeof(uint32_t));
+        prop->reg_entries[idx].size_size = size_cells;
+
         for (uint64_t cell_idx = 0; cell_idx < addr_cells; cell_idx++)
         {
-            uint32_t cell = en_swap_32(*reg_ptr);
-            addr = (addr << 32) | cell;
+            prop->reg_entries[idx].addr_ptr[cell_idx] = en_swap_32(*reg_ptr);
             reg_ptr++;
         }
 
-        uint64_t size = 0;
         for (uint64_t cell_idx = 0; cell_idx < size_cells; cell_idx++)
         {
-            uint32_t cell = en_swap_32(*reg_ptr);
-            size = (size << 32) | (cell);
+            prop->reg_entries[idx].size_ptr[cell_idx] = en_swap_32(*reg_ptr);
             reg_ptr++;
         }
-
-        prop->reg_entries[i].addr = addr;
-        prop->reg_entries[i].size = size;
     }
 
     return prop;
@@ -165,51 +161,35 @@ static dt_prop_ranges_t* fdt_create_ranges_prop(fdt_ctx_t* fdt_ctx, uint8_t* dtb
     uint32_t row_size = (paddr_cells + addr_cells + size_cells) * sizeof(uint32_t);
     uint64_t num_rows = en_swap_32(token->len) / row_size;
 
-    ASSERT(addr_cells < 4);
-    ASSERT(paddr_cells < 3);
-    ASSERT(size_cells < 3);
-
     prop->range_entries = vmalloc(num_rows * sizeof(dt_prop_range_entry_t));
     prop->num_ranges = num_rows;
 
     uint32_t* reg_ptr = (uint32_t*)(dtb_ptr + sizeof(fdt_property_token_t));
     for (uint64_t idx = 0; idx < num_rows; idx++) {
 
-        uint64_t pci_hi_addr = 0;
-        uint64_t temp_addr_cells = addr_cells;
-        if (temp_addr_cells == 3) {
-            // For three u32 cells, use the pci_hi_addr field
-            uint32_t cell = en_swap_32(*reg_ptr);
-            pci_hi_addr = cell;
-            reg_ptr++;
-            temp_addr_cells = 2;
-        }
+        prop->range_entries[idx].addr_ptr = vmalloc(addr_cells * sizeof(uint32_t));
+        prop->range_entries[idx].addr_size = addr_cells;
 
-        uint64_t child_addr = 0;
-        for (uint64_t cell_idx = 0; cell_idx < temp_addr_cells; cell_idx++) {
-            uint32_t cell = en_swap_32(*reg_ptr);
-            child_addr = (child_addr << 32) | cell;
+        prop->range_entries[idx].paddr_ptr = vmalloc(paddr_cells * sizeof(uint32_t));
+        prop->range_entries[idx].paddr_size = paddr_cells;
+
+        prop->range_entries[idx].size_ptr = vmalloc(size_cells * sizeof(uint32_t));
+        prop->range_entries[idx].size_size = size_cells;
+
+        for (uint64_t cell_idx = 0; cell_idx < addr_cells; cell_idx++) {
+            prop->range_entries[idx].addr_ptr[cell_idx] = en_swap_32(*reg_ptr);
             reg_ptr++;
         }
 
-        uint64_t parent_addr = 0;
         for (uint64_t cell_idx = 0; cell_idx < paddr_cells; cell_idx++) {
-            uint32_t cell = en_swap_32(*reg_ptr);
-            parent_addr = (parent_addr << 32) | cell;
+            prop->range_entries[idx].paddr_ptr[cell_idx] = en_swap_32(*reg_ptr);
             reg_ptr++;
         }
 
-        uint64_t size = 0;
         for (uint64_t cell_idx = 0; cell_idx < size_cells; cell_idx++) {
-            uint32_t cell = en_swap_32(*reg_ptr);
-            size = (size << 32) | (cell);
+            prop->range_entries[idx].size_ptr[cell_idx] = en_swap_32(*reg_ptr);
             reg_ptr++;
         }
-
-        prop->range_entries[idx].child_addr = child_addr;
-        prop->range_entries[idx].pci_hi_addr = pci_hi_addr;
-        prop->range_entries[idx].parent_addr = parent_addr;
-        prop->range_entries[idx].size = size;
     }
 
     return prop;
@@ -239,32 +219,34 @@ void dt_register_phandle(dt_ctx_t* dt_ctx, dt_node_t* node) {
 
     uint64_t* phandle_ptr = vmalloc(sizeof(uint64_t));
     *phandle_ptr = node->prop_phandle->val;
-    if (!hashmap_contains(dt_ctx->phandle_map, &phandle_ptr)) {
+    if (hashmap_contains(dt_ctx->phandle_map, phandle_ptr)) {
         console_log(LOG_WARN, "Duplicate phandle values in DT (%d)", *phandle_ptr);
         vfree(phandle_ptr);
         return;
     }
 
-    hashmap_add(dt_ctx->phandle_map, &phandle_ptr, node);
+    hashmap_add(dt_ctx->phandle_map, phandle_ptr, node);
 }
 
 uint8_t* add_fdt_cells_property(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt_node_t* node) {
 
     ASSERT(dtb_ptr != NULL);
 
-    fdt_property_token_t token = *(fdt_property_token_t*)dtb_ptr;
+    fdt_property_token_t* token = (fdt_property_token_t*)dtb_ptr;
 
-    ASSERT(en_swap_32(token.token) == FDT_TOKEN_PROP);
+    ASSERT(en_swap_32(token->token) == FDT_TOKEN_PROP);
 
     uint8_t* prop_value_ptr = dtb_ptr + sizeof(fdt_property_token_t);
-    uint32_t prop_len = en_swap_32(token.len);
+    uint32_t prop_len = en_swap_32(token->len);
 
-    char* prop_name = fdt_get_string(fdt_ctx->header, fdt_ctx->dtb_data, en_swap_32(token.nameoff));
+    char* prop_name = fdt_get_string(fdt_ctx->header, fdt_ctx->dtb_data, en_swap_32(token->nameoff));
 
     if (!strcmp(prop_name, "#address-cells")) {
-        node->prop_addr_cells = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        node->prop_addr_cells = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
     } else if (!strcmp(prop_name, "#size-cells")) {
-        node->prop_size_cells = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        node->prop_size_cells = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
+    } else if (!strcmp(prop_name, "#interrupt-cells")) {
+        node->prop_int_cells = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
     }
 
     // Skip over padding added to the property
@@ -279,32 +261,34 @@ uint8_t* add_fdt_property(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx
 
     ASSERT(dtb_ptr != NULL);
 
-    fdt_property_token_t token = *(fdt_property_token_t*)dtb_ptr;
+    fdt_property_token_t* token = (fdt_property_token_t*)dtb_ptr;
 
-    ASSERT(en_swap_32(token.token) == FDT_TOKEN_PROP);
+    ASSERT(en_swap_32(token->token) == FDT_TOKEN_PROP);
 
     uint8_t* prop_value_ptr = dtb_ptr + sizeof(fdt_property_token_t);
-    uint32_t prop_len = en_swap_32(token.len);
+    uint32_t prop_len = en_swap_32(token->len);
 
-    char* prop_name = fdt_get_string(fdt_ctx->header, fdt_ctx->dtb_data, en_swap_32(token.nameoff));
+    char* prop_name = fdt_get_string(fdt_ctx->header, fdt_ctx->dtb_data, en_swap_32(token->nameoff));
 
     if (!strcmp(prop_name, "compatible")) {
-        node->prop_compat = fdt_create_stringlist_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        node->prop_compat = fdt_create_stringlist_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
     } else if (!strcmp(prop_name, "model")) {
-        node->prop_model = fdt_create_string_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        node->prop_model = fdt_create_string_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
     } else if (!strcmp(prop_name, "phandle")) {
-        node->prop_phandle = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        node->prop_phandle = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
         dt_register_phandle(dt_ctx, node);
     } else if (!strcmp(prop_name, "#address-cells")) {
         // Handled previously. Skip
     } else if (!strcmp(prop_name, "#size-cells")) {
         // Handled previously. Skip
     } else if (!strcmp(prop_name, "reg")) {
-        node->prop_reg = fdt_create_reg_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        node->prop_reg = fdt_create_reg_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
     } else if (!strcmp(prop_name, "ranges")) {
-        node->prop_ranges = fdt_create_ranges_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        node->prop_ranges = fdt_create_ranges_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
+    } else if (!strcmp(prop_name, "interrupt-parent")) {
+        node->prop_int_parent = fdt_create_u32_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
     } else {
-        dt_prop_generic_t* new_prop = fdt_create_generic_prop(fdt_ctx, dtb_ptr, dt_ctx, node, &token, prop_name);
+        dt_prop_generic_t* new_prop = fdt_create_generic_prop(fdt_ctx, dtb_ptr, dt_ctx, node, token, prop_name);
         llist_append_ptr(node->properties, new_prop);
     }
 
@@ -322,14 +306,21 @@ dt_node_t* fdt_create_node(void) {
 
     new_node->prop_addr_cells = NULL;
     new_node->prop_size_cells = NULL;
+    new_node->prop_int_cells = NULL;
     new_node->prop_compat = NULL;
     new_node->prop_model = NULL;
     new_node->prop_phandle = NULL;
     new_node->prop_reg = NULL;
     new_node->prop_ranges = NULL;
 
+    new_node->prop_int_parent = NULL;
+    new_node->prop_ints = NULL;
+
     new_node->properties = llist_create();
     new_node->children = llist_create();
+
+    new_node->dtb_funcs = NULL;
+    new_node->dtb_ctx = NULL;
 
     return new_node;
 }
@@ -337,8 +328,6 @@ dt_node_t* fdt_create_node(void) {
 uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt_node_t* node, bool is_root) {
     ASSERT(dtb_ptr != NULL);
     ASSERT(node != NULL);
-
-    console_log(LOG_DEBUG, "FDT Node");
 
     uint32_t* token_ptr = (uint32_t*)dtb_ptr;
     uint32_t token = en_swap_32(*token_ptr);
@@ -363,6 +352,7 @@ uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt
         token_ptr = (uint32_t*)((uint8_t*)token_ptr + name_len);
     }
 
+    console_log(LOG_DEBUG, "Created DTB Node %s", node->name);
 
     // Optionally skip over padding added to the name
     // to align the next token to a uint32_t
@@ -374,7 +364,6 @@ uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt
         if (is_token_nop(*cells_token_ptr)) {
             cells_token_ptr++;
         } else {
-            console_log(LOG_DEBUG, "FDT Property");
             cells_token_ptr = (uint32_t*)add_fdt_cells_property(fdt_ctx, (uint8_t*)cells_token_ptr, dt_ctx, node);
         }
     }
@@ -390,6 +379,10 @@ uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt
         node->prop_size_cells->val = 1;
     }
 
+    // Inherit interrupt-properties from parent
+    if (node->parent != NULL) {
+        node->prop_int_parent = node->parent->prop_int_parent;
+    }
 
     // Parse all properties first. These are guaranteed to be
     // before child nodes
@@ -397,7 +390,6 @@ uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt
         if (is_token_nop(*token_ptr)) {
             token_ptr++;
         } else {
-            console_log(LOG_DEBUG, "FDT Property");
             token_ptr = (uint32_t*)add_fdt_property(fdt_ctx, (uint8_t*)token_ptr, dt_ctx, node);
         }
     }
@@ -427,57 +419,171 @@ uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt
     ASSERT(en_swap_32(*token_ptr) == FDT_TOKEN_END_NODE);
     token_ptr++;
 
-    console_log(LOG_DEBUG, "FDT End Node");
     return (uint8_t*)token_ptr;
 }
 
-/*
+void fdt_print_header(fdt_header_t* fdt_header) {
+    console_log(LOG_DEBUG, "FDT Header");
+    console_log(LOG_DEBUG, " Magic: %8x", fdt_header->magic);
+    console_log(LOG_DEBUG, " Total Size: %d", fdt_header->totalsize);
+    console_log(LOG_DEBUG, " Struct Offset: %8x", fdt_header->off_dt_struct);
+    console_log(LOG_DEBUG, " String Offset : %8x", fdt_header->off_dt_strings);
+    console_log(LOG_DEBUG, " Mem Reserve Map Offset: %8x", fdt_header->off_mem_rsvmap);
+    console_log(LOG_DEBUG, " Version: %d", fdt_header->version);
+    console_log(LOG_DEBUG, " Last Comp Version: %8x", fdt_header->last_comp_version);
+    console_log(LOG_DEBUG, " Boot CPUID: %8x", fdt_header->boot_cpuid_phys);
+    console_log(LOG_DEBUG, " Strings Size: %8x", fdt_header->size_dt_strings);
+    console_log(LOG_DEBUG, " Struct Size: %8x", fdt_header->size_dt_struct);
+}
+
 void print_node_padding(uint64_t padding) {
     for (uint64_t idx = 0; idx < padding; idx++) {
         console_putc(' ');
     }
 }
 
-void print_node(uint8_t* dtbmem, fdt_header_t* header, fdt_node_t* node, uint64_t padding) {
+void print_node(dt_ctx_t* ctx, dt_node_t* node, uint64_t padding) {
 
-    ASSERT(dtbmem != NULL);
-    ASSERT(header != NULL);
+    ASSERT(ctx != NULL);
     ASSERT(node != NULL);
 
     print_node_padding(padding);
-    console_printf("NODE: %s %c\n", node->name, node->name_valid ? 'v' : 'x');
+    console_printf("%s", node->name);
+    if (node->address != 0) {
+        console_printf("@%x", node->address);
+    }
+    console_printf(" {\n");
 
     // Print all properties
     uint64_t sub_padding = padding + 2;
-    for (uint64_t idx = 0; idx < node->num_properties; idx++) {
-        fdt_property_t* prop = &s_fdt_property_list[node->properties_list[idx]];
-        char* prop_name = fdt_get_string(header, dtbmem, prop->nameoff);
 
+    print_node_padding(sub_padding);
+    console_printf("#address-cells: %d\n", node->prop_addr_cells->val);
+    print_node_padding(sub_padding);
+    console_printf("#size-cells: %d\n", node->prop_size_cells->val);
+    
+    if (node->prop_compat) {
         print_node_padding(sub_padding);
-        console_printf("PROP %s: ", prop_name);
-        //print_node_padding(sub_padding + 2);
-
-        if (strncmp(prop_name, "compatible", 10) == 0) {
-            console_printf("%s", prop->data_ptr);
-        } else {
-
-            for (uint64_t i = 0; i < prop->data_len; i++) {
-                console_printf("%2x ", prop->data_ptr[i]);
-            }
-        }
-
+        console_printf("compatible: ");
+        console_write_len(node->prop_compat->str, node->prop_compat->len);
         console_printf("\n");
     }
 
-    // Print all children nodes
-    for (uint64_t idx = 0; idx < node->num_children; idx++ ) {
-        fdt_node_t* child = &s_fdt_node_list[node->children_list[idx]];
-        print_node(dtbmem, header, child, padding + 2);
+    if (node->prop_model) {
+        print_node_padding(sub_padding);
+        console_printf("model: %s\n", node->prop_model->str);
     }
 
-    console_flush();
+    if (node->prop_phandle) {
+        print_node_padding(sub_padding);
+        console_printf("phandle: 0x%x\n", node->prop_phandle->val);
+    }
+
+    if (node->prop_reg) {
+        print_node_padding(sub_padding);
+        console_printf("reg: <");
+        for (uint64_t regs = 0; regs < node->prop_reg->num_regs; regs++) {
+            for (uint64_t idx = 0; idx < node->prop_reg->reg_entries[regs].addr_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_reg->reg_entries[regs].addr_ptr[idx]);
+            }
+            for (uint64_t idx = 0; idx < node->prop_reg->reg_entries[regs].size_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_reg->reg_entries[regs].size_ptr[idx]);
+            }
+        }
+        console_printf(" >\n");
+    }
+
+    if (node->prop_ranges) {
+        print_node_padding(sub_padding);
+        console_printf("ranges: <");
+        for (uint64_t ranges = 0; ranges < node->prop_ranges->num_ranges; ranges++) {
+            for (uint64_t idx = 0; idx < node->prop_ranges->range_entries[ranges].addr_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_ranges->range_entries[ranges].addr_ptr[idx]);
+            }
+            for (uint64_t idx = 0; idx < node->prop_ranges->range_entries[ranges].paddr_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_ranges->range_entries[ranges].paddr_ptr[idx]);
+            }
+            for (uint64_t idx = 0; idx < node->prop_ranges->range_entries[ranges].size_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_ranges->range_entries[ranges].size_ptr[idx]);
+            }
+        }
+        console_printf(" >\n");
+    }
+
+    dt_prop_generic_t* prop;
+    FOR_LLIST(node->properties, prop)
+        print_node_padding(sub_padding);
+        console_printf("%s", prop->name);
+        if (prop->data_len > 0) {
+            console_printf(": <");
+            if (prop->data_len % 4 == 0) {
+                for (uint64_t idx = 0; idx < prop->data_len/4; idx++) {
+                    console_printf(" 0x%8x", (uint64_t)en_swap_32(prop->data[idx]));
+                }
+            } else {
+                uint8_t* data8 = (uint8_t*)prop->data;
+                for (uint64_t idx = 0; idx < prop->data_len; idx++) {
+                    console_printf(" 0x%8x", (uint64_t)data8[idx]);
+                }
+            }
+            console_printf(" >\n");
+        } else {
+            console_printf(";\n");
+        }
+    END_FOR_LLIST()
+
+    dt_node_t* child_node;
+    FOR_LLIST(node->children, child_node)
+        print_node(ctx, child_node, sub_padding);
+    END_FOR_LLIST()
+
+    print_node_padding(padding);
+    console_printf("}\n");
 }
-*/
+
+static dt_prop_ints_t* dtb_create_ints_prop(dt_ctx_t* ctx, dt_node_t* node, dt_prop_generic_t* prop) {
+
+    dt_prop_ints_t* ints_prop = vmalloc(sizeof(dt_prop_ints_t));
+
+    ASSERT(node->prop_int_parent != NULL);
+    uint64_t phandle = node->prop_int_parent->val;
+    dt_node_t* intc_node = hashmap_get(ctx->phandle_map, &phandle);
+    ASSERT(intc_node);
+    ASSERT(intc_node->prop_int_cells);
+
+    uint64_t int_cells = intc_node->prop_int_cells->val;
+    uint64_t num_entries = (prop->data_len/4) / int_cells;
+
+    ints_prop->int_entries = vmalloc(sizeof(dt_prop_int_entry_t) * num_entries);
+    ints_prop->num_ints = num_entries;
+    ints_prop->handler = intc_node;
+
+    for (uint64_t idx = 0; idx < num_entries; idx++) {
+        ints_prop->int_entries[idx].data = vmalloc(int_cells * sizeof(uint32_t));
+
+        for (uint64_t cell_idx = 0; cell_idx < int_cells; cell_idx++) {
+            ints_prop->int_entries[idx].data[cell_idx] = en_swap_32(prop->data[idx*int_cells + cell_idx]);
+        }
+    }
+
+    return ints_prop;
+}
+
+static void dtb_post_process(dt_ctx_t* ctx, dt_node_t* node) {
+
+    dt_prop_generic_t* prop;
+    FOR_LLIST(node->properties, prop)
+        if (!strncmp(prop->name, "interrupts", MAX_DTB_PROPERTY_LEN)) {
+            node->prop_ints = dtb_create_ints_prop(ctx, node, prop);
+        }
+    END_FOR_LLIST()
+
+    dt_node_t* child_node;
+    FOR_LLIST(node->children, child_node)
+        dtb_post_process(ctx, child_node);
+    END_FOR_LLIST()
+
+}
 
 static void dtb_discover(dt_ctx_t* ctx, dt_node_t* node) {
 
@@ -488,11 +594,10 @@ static void dtb_discover(dt_ctx_t* ctx, dt_node_t* node) {
                 .compat = (char *)node->prop_compat->str},
             .ctxfunc = NULL};
 
-        console_log(LOG_DEBUG, "Discovering %s", node->prop_compat->str);
 
         if (discovery_have_driver(&disc_reg))
         {
-            // print_node(dtbmem, header, node, 2);
+            console_log(LOG_DEBUG, "Discovered %s", node->prop_compat->str);
 
             discovery_dtb_ctx_t disc_ctx = {
                 .dt_ctx = ctx,
@@ -500,10 +605,6 @@ static void dtb_discover(dt_ctx_t* ctx, dt_node_t* node) {
             };
 
             discover_driver(&disc_reg, &disc_ctx);
-        }
-        else
-        {
-            // console_printf("No driver for %s\n", prop->data_ptr);
         }
     }
 
@@ -550,9 +651,7 @@ void dtb_init(uintptr_t dtb_init_phy_addr) {
     dt_ctx->phandle_map = uintmap_alloc(64);
     get_fdt_node(&fdt_ctx, dtb_tree, dt_ctx, root_node, true);
 
+    dtb_post_process(dt_ctx, root_node);
+
     dtb_discover(dt_ctx, root_node);
 }
-
-// const dt_block_t* dtb_get_devicetree(void) {
-//     return s_full_dtb;
-// }

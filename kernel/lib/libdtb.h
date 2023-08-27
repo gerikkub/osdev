@@ -3,6 +3,7 @@
 #define __LIBDTB_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "kernel/lib/llist.h"
 #include "kernel/lib/intmap.h"
@@ -37,8 +38,10 @@ typedef struct {
 } dt_prop_u32_t;
 
 typedef struct {
-    uint64_t addr;
-    uint64_t size;
+    uint32_t* addr_ptr;
+    uint64_t addr_size;
+    uint32_t* size_ptr;
+    uint64_t size_size;
 } dt_prop_reg_entry_t;
 
 typedef struct {
@@ -47,10 +50,12 @@ typedef struct {
 } dt_prop_reg_t;
 
 typedef struct {
-    uint64_t child_addr;
-    uint32_t pci_hi_addr;
-    uint64_t parent_addr;
-    uint64_t size;
+    uint32_t* addr_ptr;
+    uint64_t addr_size;
+    uint32_t* paddr_ptr;
+    uint64_t paddr_size;
+    uint32_t* size_ptr;
+    uint64_t size_size;
 } dt_prop_range_entry_t;
 
 typedef struct {
@@ -72,11 +77,20 @@ typedef struct {
 
 typedef struct {
     char* name;
-    uint8_t* data;
+    uint32_t* data;
     uint64_t data_len;
 } dt_prop_generic_t;
 
+typedef struct {
+    uint32_t* data;
+    uint64_t data_len;
+} dt_prop_int_entry_t;
 
+typedef struct {
+    struct dt_node_* handler;
+    dt_prop_int_entry_t* int_entries;
+    uint64_t num_ints;
+} dt_prop_ints_t;
 
 typedef struct __attribute__((packed)) {
     uint32_t magic;
@@ -127,19 +141,29 @@ typedef struct dt_node_ {
     llist_head_t properties;
     dt_prop_u32_t* prop_addr_cells;
     dt_prop_u32_t* prop_size_cells;
+    dt_prop_u32_t* prop_int_cells;
     dt_prop_stringlist_t* prop_compat;
     dt_prop_string_t* prop_model;
     dt_prop_u32_t* prop_phandle;
     dt_prop_reg_t* prop_reg;
     dt_prop_ranges_t* prop_ranges;
 
+    dt_prop_u32_t* prop_int_parent;
+
+    dt_prop_ints_t* prop_ints;
+
     llist_head_t children;
 
     struct dt_node_* parent;
+
+    void* dtb_funcs;
+    void* dtb_ctx;
 } dt_node_t;
 
+struct dt_node_;
+
 typedef struct {
-    dt_node_t* head;
+    struct dt_node_* head;
     hashmap_ctx_t* phandle_map;
 } dt_ctx_t;
 
@@ -149,5 +173,6 @@ typedef struct {
     dt_node_t* dt_node;
 } discovery_dtb_ctx_t;
 
+uintptr_t dt_map_addr_to_phy(dt_node_t* node, uintptr_t addr, bool* valid);
 
 #endif

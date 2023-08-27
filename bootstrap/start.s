@@ -32,6 +32,10 @@ cpu_jail:
     b cpu_jail
 
 el1_start:
+
+    ldr x0, =el1_bootstrap_exception_vectors
+    msr VBAR_EL1, x0
+
     ldr x0, =_stack_base
     and x0, x0, 0xFFFFFFFF
     mov sp, x0
@@ -86,6 +90,10 @@ el2_start:
     mov x2, 0x80000000
     msr HCR_EL2, x2
 
+    mov  x2, #0x0800
+    movk x2, #0x30d0, lsl #16
+    msr sctlr_el1, x2
+
     // Enter EL1
     ldr x2, =el1_start
     msr ELR_EL2, x2
@@ -110,56 +118,179 @@ el1_enter_from_el3:
     // Return to EL1
     eret
 
-.macro el3_el2_exception_generic name
+
+write_byte:
+    str x1, [x0]
+    mov x20, #10000
+1:
+    sub x20, x20, #1
+    bne 1b
+    ret
+
+write_nibble:
+    cmp x1, #10
+    bgt 1f
+    add x1, x1, '0'
+    b 1f
+
+    sub x1, x1, #10
+    add x1, x1, 'a'
+    b write_byte
+1:
+    add x1, x1, '0'
+    b write_byte
+
+
+write_u64:
+    mov x2, x1
+    mov x3, #16
+    mov x4, lr
+
+1:
+    lsr x1, x2, #60
+    bl write_nibble
+    lsl x2, x2, #4
+    sub x3, x3, #1
+    cbnz x3, 1b
+
+    mov lr, x4
+    ret
+
+.extern bootstrap_write_byte
+.extern bootstrap_write_word
+
+.macro el1_exception_generic name num
 .align 7
 \name:
-    b \name
+// Disable MMU
+    mrs x0, SCTLR_EL1
+    bic x0, x0, #1
+    msr SCTLR_EL1, x0
+
+    //ldr x0, =0x47E215040
+    mov x0, 'E'
+    bl bootstrap_write_byte
+    //str x1, [x0]
+
+    mov x1, #0x30
+    add x0, x1, \num
+    bl bootstrap_write_byte
+    //str x1, [x0]
+
+    mov x0, ' '
+    bl bootstrap_write_byte
+
+    mrs x0, ESR_EL1
+    bl bootstrap_write_word
+
+    mov x0, ' '
+    bl bootstrap_write_byte
+
+    mrs x0, FAR_EL1
+    bl bootstrap_write_word
+
+    mov x0, ' '
+    bl bootstrap_write_byte
+
+    mrs x0, ELR_EL1
+    bl bootstrap_write_word
+
+    mov x0, ' '
+    bl bootstrap_write_byte
+
+    ldr x1, =0x4C004200C
+    dc IVAC, x1
+    mov x0, 0
+    ldr w0, [x1]
+    bl bootstrap_write_word
+
+1:
+    b 1b
+
+.endm
+
+
+.macro el3_el2_exception_generic name num
+.align 7
+\name:
+    ldr x0, =0x47E215040
+    mov x1, 'E'
+    str x1, [x0]
+
+    mov x1, #0x30
+    add x1, x1, \num
+    str x1, [x0]
+
+1:
+    b 1b
+
 .endm
 
 .align 11
 el3_exception_vectors:
-el3_el2_exception_generic el3_sp_0_sync
-el3_el2_exception_generic el3_sp_0_irq
-el3_el2_exception_generic el3_sp_0_fiq
-el3_el2_exception_generic el3_sp_0_serror
+el3_el2_exception_generic el3_sp_0_sync 0
+el3_el2_exception_generic el3_sp_0_irq 1
+el3_el2_exception_generic el3_sp_0_fiq 2
+el3_el2_exception_generic el3_sp_0_serror 3
 
-el3_el2_exception_generic el3_sp_X_sync
-el3_el2_exception_generic el3_sp_X_irq
-el3_el2_exception_generic el3_sp_X_fiq
-el3_el2_exception_generic el3_sp_X_serror
+el3_el2_exception_generic el3_sp_X_sync 4
+el3_el2_exception_generic el3_sp_X_irq 5
+el3_el2_exception_generic el3_sp_X_fiq 6
+el3_el2_exception_generic el3_sp_X_serror 7
 
-el3_el2_exception_generic el3_lower_64_sync
-el3_el2_exception_generic el3_lower_64_irq
-el3_el2_exception_generic el3_lower_64_fiq
-el3_el2_exception_generic el3_lower_64_serror
+el3_el2_exception_generic el3_lower_64_sync 8
+el3_el2_exception_generic el3_lower_64_irq 9
+el3_el2_exception_generic el3_lower_64_fiq 10
+el3_el2_exception_generic el3_lower_64_serror 11
 
-el3_el2_exception_generic el3_lower_32_sync
-el3_el2_exception_generic el3_lower_32_irq
-el3_el2_exception_generic el3_lower_32_fiq
-el3_el2_exception_generic el3_lower_32_serror
+el3_el2_exception_generic el3_lower_32_sync 12
+el3_el2_exception_generic el3_lower_32_irq 13
+el3_el2_exception_generic el3_lower_32_fiq 14
+el3_el2_exception_generic el3_lower_32_serror 15
 
 .align 11
 el2_exception_vectors:
-el3_el2_exception_generic el2_sp_0_sync
-el3_el2_exception_generic el2_sp_0_irq
-el3_el2_exception_generic el2_sp_0_fiq
-el3_el2_exception_generic el2_sp_0_serror
+el3_el2_exception_generic el2_sp_0_sync 0
+el3_el2_exception_generic el2_sp_0_irq 1
+el3_el2_exception_generic el2_sp_0_fiq 2
+el3_el2_exception_generic el2_sp_0_serror 3
 
-el3_el2_exception_generic el2_sp_X_sync
-el3_el2_exception_generic el2_sp_X_irq
-el3_el2_exception_generic el2_sp_X_fiq
-el3_el2_exception_generic el2_sp_X_serror
+el3_el2_exception_generic el2_sp_X_sync 4
+el3_el2_exception_generic el2_sp_X_irq 5
+el3_el2_exception_generic el2_sp_X_fiq 6
+el3_el2_exception_generic el2_sp_X_serror 7
 
-el3_el2_exception_generic el2_lower_64_sync
-el3_el2_exception_generic el2_lower_64_irq
-el3_el2_exception_generic el2_lower_64_fiq
-el3_el2_exception_generic el2_lower_64_serror
+el3_el2_exception_generic el2_lower_64_sync 8
+el3_el2_exception_generic el2_lower_64_irq 9
+el3_el2_exception_generic el2_lower_64_fiq 10
+el3_el2_exception_generic el2_lower_64_serror 11
 
-el3_el2_exception_generic el2_lower_32_sync
-el3_el2_exception_generic el2_lower_32_irq
-el3_el2_exception_generic el2_lower_32_fiq
-el3_el2_exception_generic el2_lower_32_serror
+el3_el2_exception_generic el2_lower_32_sync 12
+el3_el2_exception_generic el2_lower_32_irq 13
+el3_el2_exception_generic el2_lower_32_fiq 14
+el3_el2_exception_generic el2_lower_32_serror 15
 
+.align 11
+el1_bootstrap_exception_vectors:
+el1_exception_generic el1_bootstrap_sp_0_sync 0
+el1_exception_generic el1_bootstrap_sp_0_irq 1
+el1_exception_generic el1_bootstrap_sp_0_fiq 2
+el1_exception_generic el1_bootstrap_sp_0_serror 3
+
+el1_exception_generic el1_bootstrap_sp_X_sync 4
+el1_exception_generic el1_bootstrap_sp_X_irq 5
+el1_exception_generic el1_bootstrap_sp_X_fiq 6
+el1_exception_generic el1_bootstrap_sp_X_serror 7
+
+el1_exception_generic el1_bootstrap_lower_64_sync 8
+el1_exception_generic el1_bootstrap_lower_64_irq 9
+el1_exception_generic el1_bootstrap_lower_64_fiq 10
+el1_exception_generic el1_bootstrap_lower_64_serror 11
+
+el1_exception_generic el1_bootstrap_lower_32_sync 12
+el1_exception_generic el1_bootstrap_lower_32_irq 13
+el1_exception_generic el1_bootstrap_lower_32_fiq 14
+el1_exception_generic el1_bootstrap_lower_32_serror 15
 .section .bootstrap.data
 
 .bss

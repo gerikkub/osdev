@@ -14,6 +14,9 @@ static _vmem_entry_t vmem_entry_table_bootstrap(uintptr_t addr, uint64_t flags)
 void setup_vmem_bootstrap(void)
     __attribute__((section (".bootstrap.text")));
 
+void bootstrap_write_byte(uint64_t w);
+void bootstrap_write_word(uint64_t w);
+
 static _vmem_entry_t vmem_entry_block_bootstrap(uint16_t attr_hi, uint16_t attr_lo, uintptr_t addr, uint8_t block_level) {
 
     if (block_level == 1) {
@@ -49,15 +52,16 @@ void setup_vmem_bootstrap(void) {
 
     l0_table_bootstrap[0] = vmem_entry_table_bootstrap((uintptr_t)&l1_table_bootstrap, VMEM_STG1_TBL_NSTABLE);
 
+
     uint16_t block_attr_hi = 0;
     uint16_t block_attr_lo = VMEM_STG1_BLK_AF | // Prevent nusiance page faults during bootstrap
                              VMEM_STG1_BLK_NS | // Non-secure memory
-                             VMEM_ATTR_NORMAL_NONCACHE |
+                            VMEM_ATTR_DEVICE |
                              0; // EL1 RW access. No kernel access
 
 
-    // Map the bottom 4 GB of address space
-    for (uint64_t idx = 0; idx < 4; idx++) {
+    // Map the bottom 20 GB of address space
+    for (uint64_t idx = 0; idx < 20; idx++) {
         l1_table_bootstrap[idx] =
             vmem_entry_block_bootstrap(block_attr_hi,
                                        block_attr_lo,
@@ -77,7 +81,7 @@ void setup_vmem_bootstrap(void) {
     uint64_t tcr_el1 = SYS_TCR_EL1_TBI1 | // Ignore top byte in address translations
                        SYS_TCR_EL1_TBI0 | // Ignore top byte in address translations
                        // ASID Size 8 bit
-                       // IPS Phy address space 32 bits
+                       SYS_TCR_EL1_IPS0 | // IPS Phy address space 36 bits
                        SYS_TCR_EL1_TG11 | // 4K TTBR1_EL1 
                        // Non-shareable memory
                        // Non-cacheable
@@ -93,13 +97,12 @@ void setup_vmem_bootstrap(void) {
 
     WRITE_SYS_REG(TCR_EL1, tcr_el1);
 
-
     uint64_t mair_el1 = ((0x3 << 4) | 0x4) | // Attr 0. Normal memory Non-cacheable
                         (0 << 8); // Attr 1. Device Memory
 
     WRITE_SYS_REG(MAIR_EL1, mair_el1);
 
-    asm ("ISB");
+    asm volatile ("ISB");
 
     // Enable translations 
     uint64_t sctlr_el1;
@@ -110,6 +113,7 @@ void setup_vmem_bootstrap(void) {
 
     WRITE_SYS_REG(SCTLR_EL1, sctlr_el1);
 
-    asm ("ISB");
+    asm volatile ("ISB");
+
 }
 

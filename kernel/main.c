@@ -51,9 +51,26 @@
 
 #include "board_conf_generic.h"
 
+#include "drivers/timer/bcm2835_systemtimer.h"
+#include "drivers/gicv2/gicv2.h"
+
+
+void write32(void* ptr, uint32_t val) {
+    *(volatile uint32_t*)ptr = val;
+    asm volatile ("dmb SY");
+}
+
+uint32_t read32(void* ptr) {
+    asm volatile ("dmb SY");
+    return *(volatile uint32_t*)ptr;
+}
+
 void kernel_init_lower_thread(void* ctx);
 
 void main() {
+
+    volatile uint8_t* uart_tx_ptr = (volatile uint8_t*)0x47E215040;
+    *uart_tx_ptr = 'A';
     
     board_init_main_early();
 
@@ -124,7 +141,6 @@ void main() {
     gtimer_init();
 
     DISABLE_IRQ();
-    interrupt_enable();
 
     task_init((uint64_t*)exstack_entry.base);
     create_kernel_task(8192, kernel_init_lower_thread, NULL, "kernel");
@@ -138,9 +154,11 @@ void main() {
 void kernel_init_lower_thread(void* ctx) {
 
     driver_run_late_init();
+    interrupt_enable();
 
     net_tcp_conn_start_timeout_thread();
 
+    /*
     int64_t open_res;
     open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                                        "home");
@@ -186,6 +204,7 @@ void kernel_init_lower_thread(void* ctx) {
         };
         res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_DEFAULT_ROUTE, args_default, 2);
     }
+    */
 
     /*
     uint64_t addline_tid;
@@ -248,6 +267,7 @@ void kernel_init_lower_thread(void* ctx) {
     (void)udp_recv_tid;
     */
 
+   /*
    uint64_t echo_tid;
    char* echo_argv[] = {
         "Hello"
@@ -275,6 +295,7 @@ void kernel_init_lower_thread(void* ctx) {
     (void)http_server_argv;
     http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
     (void)http_server_tid;
+    */
 
     uint64_t count_a_tid;
     uint64_t count_b_tid;
@@ -283,6 +304,7 @@ void kernel_init_lower_thread(void* ctx) {
     (void)count_a_tid;
     (void)count_b_tid;
 
+    /*
     uint64_t tcp_cat_tid;
     char* tcp_cat_argv[] = {
         "10.0.2.15",
@@ -292,6 +314,7 @@ void kernel_init_lower_thread(void* ctx) {
     (void)tcp_cat_argv;
     tcp_cat_tid = exec_user_task("home", "bin/tcp_cat.elf", "tcp_cat", tcp_cat_argv);
     (void)tcp_cat_tid;
+    */
 
     console_log(LOG_DEBUG, "Starting Timer\n");
 
@@ -327,6 +350,7 @@ void kernel_init_lower_thread(void* ctx) {
 
         //net_udp_send_packet(&dest_ip, 5555, 2233, (uint8_t*)"Hello!\n", 7);
 
+        /*
         char buffer[5] = {0};
         char* wait_task_argv[] = {
             buffer,
@@ -338,6 +362,7 @@ void kernel_init_lower_thread(void* ctx) {
             wait_task_tid = exec_user_task("home", "bin/wait_task.elf", "wait_task", wait_task_argv);
         }
         (void)wait_task_tid;
+        */
 
         char* tcp_argv[] = {
             "10.0.2.1",

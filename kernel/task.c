@@ -298,7 +298,7 @@ uint64_t create_kernel_task(uint64_t stack_size,
     task_reg_t reg;
     reg.gp[TASK_REG(1)] = (uint64_t)ctx;
     reg.spsr = TASK_SPSR_M(4) | // EL1t SP
-               TASK_SPSR_I | // Mask IRQs for kernel tasks
+               TASK_SPSR_I |
                TASK_SPSR_F;
     reg.elr = (uint64_t)task_entry;
 
@@ -567,7 +567,7 @@ void schedule(void) {
     elapsedtimer_stop(&s_task_list[s_active_task_idx].profile_time);
 
 
-    while (gic_try_irq_handler());
+    //while (gic_try_irq_handler());
 
     elapsedtimer_start(&s_idletime);
 
@@ -608,10 +608,11 @@ void schedule(void) {
     ASSERT(task_count < MAX_NUM_TASKS);
 
     wait_timer_setup(now_us, TASK_MAX_PROC_TIME_US);
+    (void)now_us;
 
     s_active_task_idx = task_idx;
 
-    //console_log(LOG_DEBUG, "Scheduling %d (%s)", s_task_list[s_active_task_idx].tid, s_task_list[s_active_task_idx].name);
+    // console_log(LOG_DEBUG, "Scheduling %d (%s)", s_task_list[s_active_task_idx].tid, s_task_list[s_active_task_idx].name);
 
     elapsedtimer_stop(&s_idletime);
     elapsedtimer_start(&s_task_list[s_active_task_idx].profile_time);

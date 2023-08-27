@@ -98,9 +98,11 @@ memory_space_t* memspace_get_systemspace(void) {
 
 void memspace_map_phy_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint32_t flags) {
 
+    uint64_t len_aligned = PAGE_CEIL(len);
+
     memory_entry_phy_t entry = {
         .start = (uintptr_t)virt_addr,
-        .end = ((uintptr_t)virt_addr) + len,
+        .end = ((uintptr_t)virt_addr) + len_aligned,
         .type = MEMSPACE_PHY,
         .flags = flags,
         .phy_addr = (uintptr_t)phy_addr,
@@ -112,9 +114,11 @@ void memspace_map_phy_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint
 
 void memspace_map_device_kernel(void* phy_addr, void* virt_addr, uint64_t len, uint32_t flags) {
 
+    uint64_t len_aligned = PAGE_CEIL(len);
+
     memory_entry_device_t entry = {
         .start = (uintptr_t)virt_addr,
-        .end = ((uintptr_t)virt_addr) + len,
+        .end = ((uintptr_t)virt_addr) + len_aligned,
         .type = MEMSPACE_DEVICE,
         .flags = flags,
         .phy_addr = (uintptr_t)phy_addr

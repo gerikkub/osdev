@@ -46,9 +46,19 @@ _start:
     ldr x0, =_init_reg
     str x1, [x0]
 
-    ldr x0, =0xFE215040
-    mov x1, 0x47
+    ldr x0, =0x47E215040
+    mov x1, '\n'
     str x1, [x0]
+    mrs x1, CurrentEL
+    add x1, x1, #0x30
+    str x1, [x0]
+
+    ldr x2, =0x4c0041000
+    ldr x3, [x2]
+    mov x1, '0'
+    add x1, x1, x3
+    str x1, [x0]
+
 
     b _bootstrap_start
 

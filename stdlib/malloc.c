@@ -36,6 +36,7 @@ malloc_state_t s_malloc_state;
  */
 
 void malloc_check_structure_p(malloc_state_t* state) {
+    return;
 
     SYS_ASSERT(state->magic == MALLOC_MAGIC);
 

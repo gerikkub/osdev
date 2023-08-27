@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "kernel/console.h"
 #include "kernel/memoryspace.h"
 #include "kernel/vmem.h"
 #include "kernel/task.h"
@@ -100,6 +101,8 @@ static bool memspace_vmem_add_phy(_vmem_table* table, memory_entry_phy_t* entry)
 
     _vmem_ap_flags vmem_flags = memspace_vmem_get_vmem_flags(entry->flags);
 
+    ASSERT(len > 0);
+
     vmem_map_address_range(table,
                            entry->phy_addr,
                            entry->start,
@@ -123,6 +126,8 @@ static bool memspace_vmem_add_device(_vmem_table* table, memory_entry_device_t* 
         // Don't want to execute device memory
         return false;
     }
+
+    ASSERT(len > 0);
 
     vmem_map_address_range(table,
                            entry->phy_addr,
@@ -151,6 +156,8 @@ static bool memspace_vmem_add_stack(_vmem_table* table, memory_entry_stack_t* en
 
     ASSERT(entry->base > entry->limit);
     uint64_t len = entry->base - entry->limit;
+    ASSERT(len > 0);
+
     vmem_map_address_range(table,
                            entry->phy_addr,
                            entry->limit,
@@ -172,6 +179,7 @@ static bool memspace_vmem_add_cache(_vmem_table* table, memory_entry_cache_t* en
     FOR_LLIST(entry->phy_addr_list, phy_entry)
 
         ASSERT(entry->start + phy_entry->offset <= entry->end);
+        ASSERT(phy_entry->len > 0);
         vmem_map_address_range(table,
                                phy_entry->phy_addr,
                                entry->start + phy_entry->offset,

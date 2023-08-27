@@ -447,7 +447,20 @@ pci_range_t pcie_parse_ranges(dt_node_t* dt_node) {
 
     for (uint64_t idx = 0; idx < dt_num_ranges; idx++) {
         dt_prop_range_entry_t* this_dt_range = &dt_ranges[idx];
-        uint64_t space = this_dt_range->pci_hi_addr & PCI_ADDR_HI_SPACE_MASK;
+
+        ASSERT(this_dt_range->addr_size == 3);
+        ASSERT(this_dt_range->paddr_size == 2);
+        ASSERT(this_dt_range->size_size == 2);
+
+        uint32_t pci_hi_addr = this_dt_range->addr_ptr[0];
+
+        uint64_t addr = this_dt_range->addr_ptr[2] | (((uint64_t)this_dt_range->addr_ptr[1]) << 32);
+        uint64_t paddr = this_dt_range->paddr_ptr[1] | (((uint64_t)this_dt_range->paddr_ptr[0]) << 32);
+        uint64_t size = this_dt_range->size_ptr[1] | (((uint64_t)this_dt_range->size_ptr[0]) << 32);
+
+        uint64_t space = pci_hi_addr & PCI_ADDR_HI_SPACE_MASK;
+
+        console_log(LOG_INFO, "PCIE Range: %8x %16x %16x %16x", pci_hi_addr, addr, paddr, size);
 
         pci_addr_t* pci_addr = NULL;
 
@@ -456,34 +469,34 @@ pci_range_t pcie_parse_ranges(dt_node_t* dt_node) {
                 break;
             case PCI_ADDR_HI_SPACE_IO:
                 pci_addr = &ranges.io_pci_addr;
-                ranges.io_mem_addr = this_dt_range->parent_addr;
-                ranges.io_size = this_dt_range->size;
+                ranges.io_mem_addr = paddr;
+                ranges.io_size = size;
                 pci_addr->space = PCI_SPACE_IO;
                 break;
             case PCI_ADDR_HI_SPACE_M32:
                 pci_addr = &ranges.m32_pci_addr;
-                ranges.m32_mem_addr = this_dt_range->parent_addr;
-                ranges.m32_size = this_dt_range->size;
+                ranges.m32_mem_addr = paddr;
+                ranges.m32_size = size;
                 pci_addr->space = PCI_SPACE_M32;
                 break;
             case PCI_ADDR_HI_SPACE_M64:
                 pci_addr = &ranges.m64_pci_addr;
-                ranges.m64_mem_addr = this_dt_range->parent_addr;
-                ranges.m64_size = this_dt_range->size;
+                ranges.m64_mem_addr = paddr;
+                ranges.m64_size = size;
                 pci_addr->space = PCI_SPACE_M64;
                 break;
             default:
                 ASSERT(false);
         }
 
-        pci_addr->relocatable = this_dt_range->pci_hi_addr & PCI_ADDR_HI_RELOCATABLE;
-        pci_addr->prefetchable = this_dt_range->pci_hi_addr & PCI_ADDR_HI_PREFETCHABLE;
-        pci_addr->aliased = this_dt_range->pci_hi_addr & PCI_ADDR_HI_ALIASED;
-        pci_addr->bus = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_BUS_MASK) >> PCI_ADDR_HI_BUS_SHIFT;
-        pci_addr->device = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_DEVICE_MASK) >> PCI_ADDR_HI_DEVICE_SHIFT;
-        pci_addr->function = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_FUNCTION_MASK) >> PCI_ADDR_HI_FUNCTION_SHIFT;
-        pci_addr->reg = (this_dt_range->pci_hi_addr & PCI_ADDR_HI_REGISTER_MASK) >> PCI_ADDR_HI_REGISTER_SHIFT;
-        pci_addr->addr = this_dt_range->child_addr;
+        pci_addr->relocatable = pci_hi_addr & PCI_ADDR_HI_RELOCATABLE;
+        pci_addr->prefetchable = pci_hi_addr & PCI_ADDR_HI_PREFETCHABLE;
+        pci_addr->aliased = pci_hi_addr & PCI_ADDR_HI_ALIASED;
+        pci_addr->bus = (pci_hi_addr & PCI_ADDR_HI_BUS_MASK) >> PCI_ADDR_HI_BUS_SHIFT;
+        pci_addr->device = (pci_hi_addr & PCI_ADDR_HI_DEVICE_MASK) >> PCI_ADDR_HI_DEVICE_SHIFT;
+        pci_addr->function = (pci_hi_addr & PCI_ADDR_HI_FUNCTION_MASK) >> PCI_ADDR_HI_FUNCTION_SHIFT;
+        pci_addr->reg = (pci_hi_addr & PCI_ADDR_HI_REGISTER_MASK) >> PCI_ADDR_HI_REGISTER_SHIFT;
+        pci_addr->addr = addr;
     }
 
     return ranges;
@@ -496,9 +509,17 @@ void* pcie_parse_allocate_reg(dt_node_t* dt_node) {
     ASSERT(dt_num_reg == 1);
     dt_prop_reg_entry_t* dt_reg = dt_node->prop_reg->reg_entries;
 
-    memspace_map_device_kernel((void*)dt_reg->addr, PHY_TO_KSPACE_PTR(dt_reg->addr), dt_reg->size, MEMSPACE_FLAG_PERM_KRW);
+    ASSERT(dt_reg->addr_size == 2);
+    ASSERT(dt_reg->size_size == 2);
+
+    uint64_t addr = dt_reg->addr_ptr[1] | (((uint64_t)dt_reg->addr_ptr[0]) << 32);
+    uint64_t size = dt_reg->size_ptr[1] | (((uint64_t)dt_reg->size_ptr[0]) << 32);
+
+    console_log(LOG_INFO, "PCIE Reg: %16x %8x", addr, size);
+
+    memspace_map_device_kernel((void*)addr, PHY_TO_KSPACE_PTR(addr), size, MEMSPACE_FLAG_PERM_KRW);
     memspace_update_kernel_vmem();
-    return PHY_TO_KSPACE_PTR(dt_reg->addr);
+    return PHY_TO_KSPACE_PTR(addr);
 }
 
 pci_interrupt_map_t* pcie_parse_interrupt_map(dt_node_t* dt_node) {

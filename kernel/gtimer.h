@@ -21,6 +21,7 @@ void gtimer_start_downtimer(int32_t downcount, bool enable_interrupt);
 void gtimer_start_downtimer_us(int32_t downcount_us, bool enable_interrupt);
 
 bool gtimer_downtimer_triggered(void);
+uint64_t gtimer_downtimer_get_count(void);
 void gtimer_wait_for_trigger(void);
 
 uint64_t gtimer_get_count(void);
