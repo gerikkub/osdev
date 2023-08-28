@@ -90,10 +90,6 @@ el2_start:
     mov x2, 0x80000000
     msr HCR_EL2, x2
 
-    mov  x2, #0x0800
-    movk x2, #0x30d0, lsl #16
-    msr sctlr_el1, x2
-
     // Enter EL1
     ldr x2, =el1_start
     msr ELR_EL2, x2
@@ -167,43 +163,6 @@ write_u64:
     bic x0, x0, #1
     msr SCTLR_EL1, x0
 
-    //ldr x0, =0x47E215040
-    mov x0, 'E'
-    bl bootstrap_write_byte
-    //str x1, [x0]
-
-    mov x1, #0x30
-    add x0, x1, \num
-    bl bootstrap_write_byte
-    //str x1, [x0]
-
-    mov x0, ' '
-    bl bootstrap_write_byte
-
-    mrs x0, ESR_EL1
-    bl bootstrap_write_word
-
-    mov x0, ' '
-    bl bootstrap_write_byte
-
-    mrs x0, FAR_EL1
-    bl bootstrap_write_word
-
-    mov x0, ' '
-    bl bootstrap_write_byte
-
-    mrs x0, ELR_EL1
-    bl bootstrap_write_word
-
-    mov x0, ' '
-    bl bootstrap_write_byte
-
-    ldr x1, =0x4C004200C
-    dc IVAC, x1
-    mov x0, 0
-    ldr w0, [x1]
-    bl bootstrap_write_word
-
 1:
     b 1b
 
@@ -213,14 +172,6 @@ write_u64:
 .macro el3_el2_exception_generic name num
 .align 7
 \name:
-    ldr x0, =0x47E215040
-    mov x1, 'E'
-    str x1, [x0]
-
-    mov x1, #0x30
-    add x1, x1, \num
-    str x1, [x0]
-
 1:
     b 1b
 

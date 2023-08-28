@@ -37,10 +37,6 @@ void gicv2_enable(void* ctx) {
     gic->gicc->bpr = 1;
 
     // Enable the Controller and Distributor
-    //gic->gicd->ctlr |= GICDv2_CTLR_ENABLEGRP1;
-
-    // MEM_D<B();
-
     gic->gicd->ctlr = GICDv2_CTLR_ENABLE;
     gic->gicc->ctlr |= GICCv2_CTLR_ENABLEGRP1;
 
@@ -174,18 +170,7 @@ void gicv2_irq_handler(void* ctx) {
     uint32_t intid_word = intid / 32;
     uint32_t intid_bit = intid % 32;
 
-    console_log(LOG_DEBUG, "Gicv2 Got IRQ %d %8x", intid, iar);
-
-    /*
-    console_log(LOG_DEBUG, "GICD PENDR & ENABLER");
-    for (uint64_t idx = 0; idx < GICv2_MAX_IRQ_WORDS; idx++) {
-        console_log(LOG_DEBUG, "%d: %8x", idx*32, gic->gicd->ispendr[idx] & gic->gicd->isenabler[idx]);
-    }
-    */
-
     if (intid != 1023) {
-
-        //console_log(LOG_DEBUG, "Gicv2 Got IRQ %d", intid);
 
         gic->gicd->icpendr[intid_word] = BIT(intid_bit);
 
@@ -197,10 +182,6 @@ void gicv2_irq_handler(void* ctx) {
             MEM_DMB();
             gic->gicc->dir = iar;
         }
-    }
-
-    while (1) {
-        asm ("wfi");
     }
 }
 

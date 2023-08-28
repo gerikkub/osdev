@@ -13,7 +13,7 @@ uintptr_t dt_map_addr_to_phy(dt_node_t* node, uintptr_t addr, bool* valid) {
 
     if (node->parent == NULL ||
         node->parent->prop_ranges == NULL) {
-        
+
         *valid = true;
         return addr;
     }

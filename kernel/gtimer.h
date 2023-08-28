@@ -15,6 +15,7 @@
 
 void gtimer_early_init(void);
 void gtimer_init(void);
+void gtimer_enable_irq(void);
 
 uint64_t gtimer_get_frequency();
 void gtimer_start_downtimer(int32_t downcount, bool enable_interrupt);

@@ -15,7 +15,7 @@ void gtimer_irq_handler(uint32_t intid, void* ctx) {
     uint32_t cntp_ctl = 0;
     WRITE_SYS_REG(CNTP_CTL_EL0, cntp_ctl);
 
-    console_log(LOG_DEBUG, "Timer fired");
+    // console_log(LOG_DEBUG, "Timer fired");
 }
 
 void gtimer_early_init(void) {
@@ -28,6 +28,7 @@ void gtimer_early_init(void) {
 
 void gtimer_init(void) {
     interrupt_register_irq_handler(GTIMER_EL0_IRQn, gtimer_irq_handler, NULL);
+    interrupt_enable_irq(GTIMER_EL0_IRQn);
 
     console_log(LOG_DEBUG, "Arch timer frequency is %d Hz", gtimer_get_frequency());
 }
@@ -52,13 +53,12 @@ void gtimer_start_downtimer(int32_t downcount, bool enable_interrupt) {
     }
 
     if (enable_interrupt) {
-        interrupt_enable_irq(GTIMER_EL0_IRQn);
         interrupt_await_reset(GTIMER_EL0_IRQn);
     }
 
     if (enable_interrupt) {
-        int32_t ticks_per_us = gtimer_get_frequency() / (1000 * 1000);
-        console_log(LOG_DEBUG, "Timer irq in %d us", downcount / ticks_per_us);
+        // int32_t ticks_per_us = gtimer_get_frequency() / (1000 * 1000);
+        // console_log(LOG_DEBUG, "Timer irq in %d us", downcount / ticks_per_us);
     }
 
     // Set the downcount and enable the timer

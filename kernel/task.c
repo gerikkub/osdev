@@ -117,30 +117,6 @@ void save_context(task_reg_t* state_fp,
     ASSERT(1); // Should not reach
 }
 
-/*
-void save_context_kernel(task_reg_t* state_fp,
-                         uint64_t vector,
-                         exception_handler func,
-                         uint64_t* cpu_kernel_stack) {
-
-    ASSERT(state_fp != NULL);
-    ASSERT(func != NULL);
-
-    uint64_t task_tid;
-    read_sys_reg(tpidr_el0, task_tid);
-
-    task_t* task = &s_task_list[s_active_task_idx];
-    assert(task_tid == task->tid);
-
-    task->run_state = TASK_RUNABLE_KERNEL;
-    task->kernel_wait_sp = kernel_sp;
-
-    switch_to_kernel_stack_asm()
-
-    schedule();
-}
-*/
-
 void restore_context(uint64_t tid) {
 
     task_t* task = get_task_for_tid(tid);
@@ -157,6 +133,39 @@ void restore_context(uint64_t tid) {
     restore_context_asm(&task->reg, sp0t, cpu_stack_base, currSP);
 
     ASSERT(1); // Should not reach
+}
+
+void idle_task(void) {
+
+    while (true) {
+        asm ("wfi");
+        schedule();
+    }
+}
+
+void restore_context_idle(void) {
+
+    uint64_t tid = 0;
+    WRITE_SYS_REG(TPIDR_EL0, tid);
+
+    uint64_t sp0t = (uint64_t)&_stack_base;
+    uint64_t spsr = TASK_SPSR_M(4);
+    task_reg_t reg = {
+        .spsr = spsr,
+        .sp = sp0t,
+        .elr = (uint64_t)idle_task,
+        .gp = {0}
+    };
+
+    uint64_t currSP = 0;
+    READ_SYS_REG(SPSel, currSP);
+
+    vmem_set_user_table(KSPACE_TO_PHY_PTR(s_dummy_user_table), 0);
+
+    restore_context_asm(&reg, sp0t, sp0t, currSP);
+
+    ASSERT(1);
+
 }
 
 void restore_context_kernel(uint64_t tid, uint64_t x0, void* sp) {
@@ -560,11 +569,14 @@ void wait_timer_setup(uint64_t now_us, uint64_t max_sleep_time) {
 
 void schedule(void) {
 
-    ASSERT(s_active_task_idx < MAX_NUM_TASKS);
+    ASSERT(s_active_task_idx < MAX_NUM_TASKS ||
+           s_active_task_idx == UINT64_MAX);
     uint64_t task_count;
     uint64_t task_idx;
 
-    elapsedtimer_stop(&s_task_list[s_active_task_idx].profile_time);
+    if (s_active_task_idx < MAX_NUM_TASKS) {
+        elapsedtimer_stop(&s_task_list[s_active_task_idx].profile_time);
+    }
 
 
     //while (gic_try_irq_handler());
@@ -573,65 +585,57 @@ void schedule(void) {
 
     uint64_t now_us = gtimer_get_count_us();
 
-    do { // TODO: Poor man's idle task
-        // Round Robin
-        for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
-            task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
-            if (s_task_list[task_idx].tid != 0) {
+    // Round Robin
+    for (task_count = 0; task_count < MAX_NUM_TASKS; task_count++) {
+        task_idx = (task_count + s_active_task_idx + 1) % MAX_NUM_TASKS;
+        if (s_task_list[task_idx].tid != 0) {
 
-                if (s_task_list[task_idx].run_state == TASK_RUNABLE ||
-                    s_task_list[task_idx].run_state == TASK_AWAKE) {
-                        break;
-                } else if (s_task_list[task_idx].run_state == TASK_WAIT &&
-                        s_task_list[task_idx].wait_canwakeup_fn != NULL) {
-                            
-                    if (s_task_list[task_idx].wait_canwakeup_fn(&s_task_list[task_idx].wait_ctx)) {
-                        s_task_list[task_idx].run_state = TASK_AWAKE;
-                        break;
-                    }
+            if (s_task_list[task_idx].run_state == TASK_RUNABLE ||
+                s_task_list[task_idx].run_state == TASK_AWAKE) {
+                    break;
+            } else if (s_task_list[task_idx].run_state == TASK_WAIT &&
+                    s_task_list[task_idx].wait_canwakeup_fn != NULL) {
+
+                if (s_task_list[task_idx].wait_canwakeup_fn(&s_task_list[task_idx].wait_ctx)) {
+                    s_task_list[task_idx].run_state = TASK_AWAKE;
+                    break;
                 }
             }
         }
-        if (task_count == MAX_NUM_TASKS) {
-            elapsedtimer_stop(&s_idletime);
-            wait_timer_setup(now_us, TASK_MAX_WFI_TIME_US);
-            ENABLE_IRQ();
-            asm volatile ("wfi");
-            //asm volatile ("nop");
-            DISABLE_IRQ();
-            now_us = gtimer_get_count_us();
-            elapsedtimer_start(&s_idletime);
-        }
-
-    } while (task_count == MAX_NUM_TASKS);
-
-    ASSERT(task_count < MAX_NUM_TASKS);
+    }
 
     wait_timer_setup(now_us, TASK_MAX_PROC_TIME_US);
     (void)now_us;
 
-    s_active_task_idx = task_idx;
 
-    // console_log(LOG_DEBUG, "Scheduling %d (%s)", s_task_list[s_active_task_idx].tid, s_task_list[s_active_task_idx].name);
+    if (task_count < MAX_NUM_TASKS) {
+        s_active_task_idx = task_idx;
 
-    elapsedtimer_stop(&s_idletime);
-    elapsedtimer_start(&s_task_list[s_active_task_idx].profile_time);
+        // console_log(LOG_DEBUG, "Scheduling %d (%s)", s_task_list[s_active_task_idx].tid, s_task_list[s_active_task_idx].name);
 
-    int64_t reg_x0 = 0;
-    switch (s_task_list[task_idx].run_state) {
-        case TASK_RUNABLE:
-            restore_context(s_task_list[task_idx].tid);
-            break;
-        case TASK_AWAKE:
-            if (s_task_list[task_idx].wait_wakeup_fn != NULL) {
-                reg_x0 = s_task_list[task_idx].wait_wakeup_fn(&s_task_list[task_idx]);
-            }
-            s_task_list[task_idx].run_state = TASK_RUNABLE;
-            restore_context_kernel(s_task_list[task_idx].tid, reg_x0, s_task_list[task_idx].kernel_wait_sp);
-            break;
-        default:
-            ASSERT(0);
-            break;
+        elapsedtimer_stop(&s_idletime);
+        elapsedtimer_start(&s_task_list[s_active_task_idx].profile_time);
+
+        int64_t reg_x0 = 0;
+        switch (s_task_list[task_idx].run_state) {
+            case TASK_RUNABLE:
+                restore_context(s_task_list[task_idx].tid);
+                break;
+            case TASK_AWAKE:
+                if (s_task_list[task_idx].wait_wakeup_fn != NULL) {
+                    reg_x0 = s_task_list[task_idx].wait_wakeup_fn(&s_task_list[task_idx]);
+                }
+                s_task_list[task_idx].run_state = TASK_RUNABLE;
+                restore_context_kernel(s_task_list[task_idx].tid, reg_x0, s_task_list[task_idx].kernel_wait_sp);
+                break;
+            default:
+                ASSERT(0);
+                break;
+        }
+    } else {
+        // Schedule idle task
+        s_active_task_idx = UINT64_MAX;
+        restore_context_idle();
     }
 
     ASSERT(0);

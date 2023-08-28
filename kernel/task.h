@@ -38,6 +38,7 @@
 #define IS_USER_TASK(tid) (!((tid) & TASK_TID_KERNEL))
 
 #define TASK_MAX_PROC_TIME_US 5000
+// #define TASK_MAX_PROC_TIME_US 500000
 #define TASK_MAX_WFI_TIME_US 1000000
 
 struct task_t_;

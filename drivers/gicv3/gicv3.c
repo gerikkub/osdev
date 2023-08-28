@@ -156,6 +156,57 @@ static intc_funcs_t intc_funcs = {
     .irq_handler = gic_irq_handler
 };
 
+static void gicv3_dtb_get_intid_list(void* ctx, dt_prop_ints_t* ints_prop, uint64_t* intids) {
+    ASSERT(intids != NULL);
+
+    for (uint64_t idx = 0; idx < ints_prop->num_ints; idx++) {
+        uint64_t intid = 0;
+        if (ints_prop->int_entries[idx].data[0] == 0) {
+            // SPI interrupt. Add SPI offset
+            intid = GIC_INTID_SPI_BASE;
+        } else {
+            // PPI interrupt. Add PPi offset
+            intid = GIC_INTID_PPI_BASE;
+        }
+
+        intid += ints_prop->int_entries[idx].data[1];
+
+        intids[idx] = intid;
+    }
+}
+
+static void gicv3_dtb_setup_intids(void* ctx, dt_prop_ints_t* ints_prop) {
+    gicv3_ctx_t* gic = ctx;
+
+    for (uint64_t idx = 0; idx < ints_prop->num_ints; idx++) {
+        uint64_t intid = 0;
+        if (ints_prop->int_entries[idx].data[0] == 0) {
+            // SPI interrupt. Add SPI offset
+            intid = GIC_INTID_SPI_BASE;
+        } else {
+            // PPI interrupt. Add PPI offset
+            intid = GIC_INTID_PPI_BASE;
+        }
+
+        intid += ints_prop->int_entries[idx].data[1];
+
+        uint32_t trigger = ints_prop->int_entries[idx].data[2];
+
+        ASSERT(trigger != 0);
+
+        if ((trigger & 0x3) != 0) {
+            gicv3_set_spi_trigger(gic, intid, INTERRUPT_TRIGGER_EDGE);
+        } else {
+            gicv3_set_spi_trigger(gic, intid, INTERRUPT_TRIGGER_LEVEL);
+        }
+    }
+}
+
+static intc_dtb_funcs_t intc_dtb_funcs = {
+    .get_intid_list = gicv3_dtb_get_intid_list,
+    .setup_intids = gicv3_dtb_setup_intids
+};
+
 void gicv3_discover(void* ctx) {
 
     dt_node_t* dt_node = ((discovery_dtb_ctx_t*)ctx)->dt_node;
@@ -197,11 +248,13 @@ void gicv3_discover(void* ctx) {
     console_log(LOG_DEBUG, " GICD_TYPER: %8x", s_gicv3_ctx.gicr->typer);
 
     bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE, GIC_INTID_SPI_LIMIT, vmalloc);
-    //bitalloc_init(&s_gicv3_ctx.intid_alloc, GIC_INTID_SPI_BASE + 500, GIC_INTID_SPI_LIMIT, vmalloc);
 
     for (uint64_t idx = 0; idx < NUM_FAKE_MSI_PORTS; idx++) {
         s_gicv3_msi_words[idx] = 0;
     }
+
+    dt_node->dtb_ctx = &s_gicv3_ctx;
+    dt_node->dtb_funcs = &intc_dtb_funcs;
 
     interrupt_register_controller(&intc_funcs, NULL, GIC_INTID_SPI_LIMIT);
 }

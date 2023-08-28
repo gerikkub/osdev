@@ -69,9 +69,6 @@ void kernel_init_lower_thread(void* ctx);
 
 void main() {
 
-    volatile uint8_t* uart_tx_ptr = (volatile uint8_t*)0x47E215040;
-    *uart_tx_ptr = 'A';
-    
     board_init_main_early();
 
     console_write("Kernel Main\n");

@@ -405,8 +405,6 @@ void vmem_set_tables(_vmem_table* kernel_ptr, _vmem_table* user_ptr) {
 
     WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
     WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
-
-    asm volatile ("tlbi VMALLE1");
 }
 
 void vmem_set_kernel_table(_vmem_table* kernel_table) {
@@ -418,8 +416,6 @@ void vmem_set_kernel_table(_vmem_table* kernel_table) {
     asm ("DSB SY");
 
     WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
-
-    asm volatile ("tlbi VMALLE1");
 }
 
 void vmem_set_user_table(_vmem_table* user_ptr, uint8_t asid) {
@@ -432,8 +428,6 @@ void vmem_set_user_table(_vmem_table* user_ptr, uint8_t asid) {
     asm ("DSB SY");
 
     WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
-
-    asm volatile ("tlbi VMALLE1");
 }
 
 void vmem_initialize(void) { 

@@ -172,7 +172,6 @@ void interrupt_notify_awaiters(uint64_t irq) {
  * IRQ Context
  */
 void interrupt_handle_irq_entry(uint64_t vector) {
-    console_log(LOG_DEBUG, "IRQ vector %d", vector);
     s_interrupt_ctx.intc_fn.irq_handler(s_interrupt_ctx.intc_ctx);
 
 }
