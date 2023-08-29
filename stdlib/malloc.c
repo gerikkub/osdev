@@ -80,6 +80,7 @@ void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void
     first_entry->chunk_start = first_entry + 1;
 
     state->first_entry = first_entry;
+    state->last_checked_entry = first_entry;
     state->add_mem_func = add_mem_func;
     state->num_malloc_ops = 0;
     state->magic = MALLOC_MAGIC;
@@ -94,7 +95,7 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
     uint64_t size_align = (size + sizeof(uint64_t) - 1) & (~(sizeof(uint64_t) - 1));
 
     malloc_check_structure_p(state);
-    malloc_entry_t* curr_entry = state->first_entry;
+    malloc_entry_t* curr_entry = state->last_checked_entry;
 
     do {
         // Basic protection from buffer overflow
@@ -107,6 +108,24 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
 
         curr_entry = curr_entry->next;
     } while (curr_entry != NULL);
+
+    if (curr_entry == NULL) {
+        curr_entry = state->first_entry;
+        do {
+            // Basic protection from buffer overflow
+            SYS_ASSERT(curr_entry->magic == MALLOC_MAGIC);
+
+            if ((!curr_entry->inuse) &&
+                (curr_entry->size >= size_align)) {
+                break;
+            }
+
+            curr_entry = curr_entry->next;
+            if (curr_entry == state->last_checked_entry) {
+                curr_entry = NULL;
+            }
+        } while (curr_entry != NULL);
+    }
 
     if (curr_entry == NULL) {
         // Add memory
@@ -157,6 +176,8 @@ void* malloc_p(uint64_t size, malloc_state_t* state) {
             curr_entry->size = size_align;
             curr_entry->next = new_entry;
         }
+
+        state->last_checked_entry = curr_entry;
 
         malloc_check_structure_p(state);
         return curr_entry->chunk_start;
