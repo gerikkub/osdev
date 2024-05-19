@@ -452,8 +452,9 @@ void vmem_initialize(void) {
     WRITE_SYS_REG(TCR_EL1, tcr_el1);
 
 
-    uint64_t mair_el1 = ((0x3 << 4) | 0x4) | // Attr 0. Normal memory Non-cacheable
-                        (0 << 8); // Attr 1. Device Memory
+    uint64_t mair_el1 = 0x44 | // Attr 0. Normal memory Non-cacheable
+                        (0 << 8)           | // Attr 1. nGnRnE Device Memory
+                        (0x44 << 16);        // Attr 2. Normal Non-cacheable memory
 
     WRITE_SYS_REG(MAIR_EL1, mair_el1);
 

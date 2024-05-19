@@ -107,7 +107,8 @@ enum {
 
 typedef enum {
     VMEM_ATTR_MEM = 0,
-    VMEM_ADDR_DEVICE
+    VMEM_ADDR_DEVICE,
+    VMEM_ATTR_MEM_NOCACHE
 } vmem_attr_t;
 
 

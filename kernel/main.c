@@ -46,6 +46,8 @@
 #include "kernel/lib/libpci.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_gpio.h"
+#include "include/k_spi.h"
 
 #include "drivers/aarch64/aarch64.h"
 
@@ -155,16 +157,19 @@ void kernel_init_lower_thread(void* ctx) {
 
     net_tcp_conn_start_timeout_thread();
 
+    int64_t open_res;
     /*
     int64_t open_res;
     open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                                        "home");
     ASSERT(open_res >= 0);
+    */
 
     fd_ops_t nic_ops;
     void* nic_ctx;
     open_res = vfs_open_device("sys",
-                               "virtio-pci-net0",
+                               //"virtio-pci-net0",
+                               "genet0",
                                0,
                                &nic_ops,
                                &nic_ctx,
@@ -172,17 +177,18 @@ void kernel_init_lower_thread(void* ctx) {
     if (open_res < 0) {
         console_log(LOG_INFO, "virtio-pci-net0 not available. Skipping IP set");
     } else {
-        uint64_t ip = 10 << 24 |
-                      0 << 16 |
-                      2 << 8 |
-                      15;
+        uint64_t ip = 192 << 24 |
+                      168 << 16 |
+                      0 << 8 |
+                    //   210;
+                      211;
         int64_t res;
         res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_IP, &ip, 1);
         ASSERT(res == 0);
 
-        uint64_t ip_net = 10 << 24 |
-                          0 << 16 |
-                          2 << 8 |
+        uint64_t ip_net = 192 << 24 |
+                          168 << 16 |
+                          0 << 8 |
                           0;
 
         uint64_t args[2] = {
@@ -191,20 +197,19 @@ void kernel_init_lower_thread(void* ctx) {
 
         res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_ROUTE, args, 2);
 
-        uint64_t ip_route = 10 << 24 |
-                            0 << 16 |
-                            2 << 8 |
-                            1;
+        uint64_t ip_route = 192 << 24 |
+                            168 << 16 |
+                            0 << 8 |
+                            207;
 
         uint64_t args_default[2] = {
             ip_route, 24
         };
         res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_DEFAULT_ROUTE, args_default, 2);
     }
-    */
 
     /*
-    uint64_t addline_tid;
+    uint64_t setgpio_tid;
     char* addline_argv[] = {
         "home",
         "hello.txt",
@@ -313,6 +318,84 @@ void kernel_init_lower_thread(void* ctx) {
     (void)tcp_cat_tid;
     */
 
+    fd_ops_t gpio_ops;
+    void* gpio_ctx;
+    open_res = vfs_open_device("sys",
+                               "bcm2711_gpio",
+                               0,
+                               &gpio_ops,
+                               &gpio_ctx,
+                               NULL);
+    ASSERT(open_res >= 0);
+
+    k_gpio_config_t gpio_config = {
+        .gpio_num = 42,
+        .flags = GPIO_CONFIG_FLAG_OUT_PP |
+                 GPIO_CONFIG_FLAG_PULL_NONE |
+                 GPIO_CONFIG_FLAG_EV_NONE
+    };
+
+    uint64_t config_args = (uint64_t)&gpio_config;
+
+    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+
+    gpio_config.gpio_num = 17;
+    gpio_config.flags = GPIO_CONFIG_FLAG_IN |
+                        GPIO_CONFIG_FLAG_PULL_DOWN |
+                        GPIO_CONFIG_FLAG_EV_RISING;
+    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+
+    k_gpio_level_t gpio_level = {
+        .gpio_num = 42,
+        .level = 1
+    };
+
+    k_gpio_config_t spi_gpio_config = {
+        .gpio_num = 8,
+        .flags = GPIO_CONFIG_FLAG_AF_EN,
+        .af = 0
+    };
+    config_args = (uint64_t)&spi_gpio_config;
+    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+
+    spi_gpio_config.gpio_num = 10;
+    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+
+    spi_gpio_config.gpio_num = 11;
+    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+
+    spi_gpio_config.gpio_num = 9;
+    spi_gpio_config.flags |= GPIO_CONFIG_FLAG_PULL_DOWN;
+    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+
+
+    console_log(LOG_INFO, "Pre Open SPI");
+
+    fd_ops_t spi_ops;
+    void* spi_ctx;
+    open_res = vfs_open_device("sys",
+                               "spi0",
+                               0,
+                               &spi_ops,
+                               &spi_ctx,
+                               NULL);
+    ASSERT(open_res >= 0);
+    console_log(LOG_INFO, "Open SPI");
+
+    k_spi_device_t loop_device = {
+        .clk_hz = 1000000,
+        .flags = 0
+    };
+
+    config_args = (uint64_t)&loop_device;
+    int64_t spi_dev_fd_num = spi_ops.ioctl(spi_ctx, SPI_IOCTL_CREATE_DEVICE, &config_args, 1);
+    ASSERT(spi_dev_fd_num >= 0);
+    task_t* task = get_active_task();
+    fd_ctx_t* spi_dev_fd = &task->fds[spi_dev_fd_num];
+
+    uint8_t send_arr[256];
+    uint8_t recv_arr[256];
+
     console_log(LOG_DEBUG, "Starting Timer\n");
 
     uint64_t freq = gtimer_get_frequency();
@@ -324,7 +407,33 @@ void kernel_init_lower_thread(void* ctx) {
 
         ticknum++;
 
-        console_log(LOG_DEBUG, "Tick %d", ticknum);
+        for (int i = 0; i < 256; i++) {
+            send_arr[i] = i;
+            recv_arr[i] = 0;
+        }
+
+        spi_dev_fd->ops.write(spi_dev_fd->ctx,
+                            send_arr, 256, 0);
+
+        spi_dev_fd->ops.read(spi_dev_fd->ctx,
+                            recv_arr, 256, 0);
+
+        if (memcmp(send_arr, recv_arr, 256) == 0) {
+            console_log(LOG_INFO, "SPI Recv OK");
+        } else {
+            console_log(LOG_INFO, "SPI Recv BAD");
+        }
+
+        console_log(LOG_DEBUG, "SPI Recv: %d %d %d %d",
+                    recv_arr[0], recv_arr[1],
+                    recv_arr[2], recv_arr[3]);
+
+        uint64_t level_args = (uint64_t)&gpio_level;
+        gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_SET, &level_args, 1);
+
+        gpio_level.level = !gpio_level.level;
+
+        // console_log(LOG_DEBUG, "Tick %d", ticknum);
 
         ipv4_t dest_ip = {
             .d = {10, 0, 2, 1}

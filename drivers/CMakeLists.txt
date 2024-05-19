@@ -14,5 +14,10 @@ add_library(kernel_drivers OBJECT
             pl011_uart.c
             qemu_fw_cfg.c
             timer/bcm2835_systemtimer.c
+            # net/bcm2711_genet/bcm2711_genet.c
+            net/enc28j60/enc28j60.c
+            spi/spi.c
+            spi/bcm2835_spi/bcm2835_spi.c
+            gpio/bcm2711_gpio/bcm2711_gpio.c
 )
 target_include_directories(kernel_drivers PRIVATE ${KERNEL_INCLUDE_DIRS})

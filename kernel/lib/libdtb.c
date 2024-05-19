@@ -8,6 +8,7 @@
 #include "kernel/kernelspace.h"
 #include "kernel/lib/libdtb.h"
 
+#include "stdlib/printf.h"
 
 uintptr_t dt_map_addr_to_phy(dt_node_t* node, uintptr_t addr, bool* valid) {
 
@@ -71,3 +72,111 @@ uintptr_t dt_map_addr_to_phy(dt_node_t* node, uintptr_t addr, bool* valid) {
         return dt_map_addr_to_phy(node->parent, new_addr, valid);
     }
 }
+
+void dt_print_node_padding(uint64_t padding) {
+    for (uint64_t idx = 0; idx < padding; idx++) {
+        console_putc(' ');
+    }
+}
+
+void dt_print_node(dt_ctx_t* ctx, dt_node_t* node, uint64_t padding, bool children) {
+
+    ASSERT(ctx != NULL);
+    ASSERT(node != NULL);
+
+    dt_print_node_padding(padding);
+    console_printf("%s", node->name);
+    if (node->address != 0) {
+        console_printf("@%x", node->address);
+    }
+    console_printf(" {\n");
+
+    // Print all properties
+    uint64_t sub_padding = padding + 2;
+
+    dt_print_node_padding(sub_padding);
+    console_printf("#address-cells: %d\n", node->prop_addr_cells->val);
+    dt_print_node_padding(sub_padding);
+    console_printf("#size-cells: %d\n", node->prop_size_cells->val);
+    
+    if (node->prop_compat) {
+        dt_print_node_padding(sub_padding);
+        console_printf("compatible: ");
+        console_write_len(node->prop_compat->str, node->prop_compat->len);
+        console_printf("\n");
+    }
+
+    if (node->prop_model) {
+        dt_print_node_padding(sub_padding);
+        console_printf("model: %s\n", node->prop_model->str);
+    }
+
+    if (node->prop_phandle) {
+        dt_print_node_padding(sub_padding);
+        console_printf("phandle: 0x%x\n", node->prop_phandle->val);
+    }
+
+    if (node->prop_reg) {
+        dt_print_node_padding(sub_padding);
+        console_printf("reg: <");
+        for (uint64_t regs = 0; regs < node->prop_reg->num_regs; regs++) {
+            for (uint64_t idx = 0; idx < node->prop_reg->reg_entries[regs].addr_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_reg->reg_entries[regs].addr_ptr[idx]);
+            }
+            for (uint64_t idx = 0; idx < node->prop_reg->reg_entries[regs].size_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_reg->reg_entries[regs].size_ptr[idx]);
+            }
+        }
+        console_printf(" >\n");
+    }
+
+    if (node->prop_ranges) {
+        dt_print_node_padding(sub_padding);
+        console_printf("ranges: <");
+        for (uint64_t ranges = 0; ranges < node->prop_ranges->num_ranges; ranges++) {
+            for (uint64_t idx = 0; idx < node->prop_ranges->range_entries[ranges].addr_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_ranges->range_entries[ranges].addr_ptr[idx]);
+            }
+            for (uint64_t idx = 0; idx < node->prop_ranges->range_entries[ranges].paddr_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_ranges->range_entries[ranges].paddr_ptr[idx]);
+            }
+            for (uint64_t idx = 0; idx < node->prop_ranges->range_entries[ranges].size_size; idx++) {
+                console_printf(" 0x%x", (uint64_t)node->prop_ranges->range_entries[ranges].size_ptr[idx]);
+            }
+        }
+        console_printf(" >\n");
+    }
+
+    dt_prop_generic_t* prop;
+    FOR_LLIST(node->properties, prop)
+        dt_print_node_padding(sub_padding);
+        console_printf("%s", prop->name);
+        if (prop->data_len > 0) {
+            console_printf(": <");
+            if (prop->data_len % 4 == 0) {
+                for (uint64_t idx = 0; idx < prop->data_len/4; idx++) {
+                    console_printf(" 0x%8x", (uint64_t)en_swap_32(prop->data[idx]));
+                }
+            } else {
+                uint8_t* data8 = (uint8_t*)prop->data;
+                for (uint64_t idx = 0; idx < prop->data_len; idx++) {
+                    console_printf(" 0x%8x", (uint64_t)data8[idx]);
+                }
+            }
+            console_printf(" >\n");
+        } else {
+            console_printf(";\n");
+        }
+    END_FOR_LLIST()
+
+    if (children) {
+        dt_node_t* child_node;
+        FOR_LLIST(node->children, child_node)
+            dt_print_node(ctx, child_node, sub_padding, true);
+        END_FOR_LLIST()
+    }
+
+    dt_print_node_padding(padding);
+    console_printf("}\n");
+}
+

@@ -87,11 +87,19 @@ static int64_t net_arp_parse_packet(net_packet_t* packet, ethernet_l2_frame_t* f
     memcpy(&tmp, &frame->payload[6], sizeof(uint16_t));
     arp_out->oper = en_swap_16(tmp);
 
+    console_log(LOG_DEBUG, "ARP:");
+    console_log(LOG_DEBUG, " htype: %4x", arp_out->htype);
+    console_log(LOG_DEBUG, " ptype: %4x", arp_out->ptype);
+    console_log(LOG_DEBUG, " hlen: %4x", arp_out->hlen);
+    console_log(LOG_DEBUG, " plen: %4x", arp_out->plen);
+    console_log(LOG_DEBUG, " oper: %4x", arp_out->oper);
+
     if (arp_out->htype == NET_ARP_HTYPE_ETHERNET &&
         arp_out->ptype == NET_ETHERTYPE_IPV4) {
 
         if (arp_out->hlen != 6 &&
             arp_out->plen != 4) {
+            console_log(LOG_DEBUG, "Ignoring 2");
             return -1;
         }
 
@@ -102,6 +110,8 @@ static int64_t net_arp_parse_packet(net_packet_t* packet, ethernet_l2_frame_t* f
 
         return 0;
     }
+
+    console_log(LOG_DEBUG, "Ignoring");
 
     return -1;
 }
@@ -121,6 +131,11 @@ static void net_arp_handle_ipv4_packet(net_packet_t* packet, ethernet_l2_frame_t
         net_arp_handle_ipv4_reply(packet, arp_packet);
         return;
     }
+
+    console_log(LOG_DEBUG, " Req IP: %d.%d.%d.%d",
+                LOG_IPV4_ADDR(arp_packet->ipv4.tpa));
+    console_log(LOG_DEBUG, " Our IP: %d.%d.%d.%d",
+                LOG_IPV4_ADDR(packet->dev->ipv4));
 
     if (memcmp(&arp_packet->ipv4.tpa, &packet->dev->ipv4, sizeof(ipv4_t)) != 0) {
         return;

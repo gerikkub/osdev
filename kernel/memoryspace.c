@@ -109,7 +109,7 @@ static bool memspace_vmem_add_phy(_vmem_table* table, memory_entry_phy_t* entry)
                            len,
                            vmem_flags,
                            VMEM_ATTR_MEM,
-                           true);
+                           !(entry->flags & MEMSPACE_FLAG_IGNORE_DUPS));
 
     return true;
 }
@@ -135,7 +135,7 @@ static bool memspace_vmem_add_device(_vmem_table* table, memory_entry_device_t* 
                            len,
                            vmem_flags,
                            VMEM_ATTR_DEVICE,
-                           true);
+                           !(entry->flags & MEMSPACE_FLAG_IGNORE_DUPS));
 
     return true;
 }
@@ -164,7 +164,7 @@ static bool memspace_vmem_add_stack(_vmem_table* table, memory_entry_stack_t* en
                            len,
                            vmem_flags,
                            VMEM_ATTR_MEM,
-                           true);
+                           !(entry->flags & MEMSPACE_FLAG_IGNORE_DUPS));
                         
     return true;
 }

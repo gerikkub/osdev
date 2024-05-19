@@ -13,10 +13,10 @@ set (KERNEL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}
 
 #set (CMAKE_ASM_FLAGS "-x assembler-with-cpp -Wall -fdata-sections -ffunction-sections")
 set (CMAKE_ASM_FLAGS "-x assembler-with-cpp")
-set (CMAKE_C_FLAGS "-ffreestanding -Wall -Werror -mno-pc-relative-literal-loads")
+set (CMAKE_C_FLAGS "-ffreestanding -Wall -Werror -mno-pc-relative-literal-loads ")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mgeneral-regs-only -march=armv8.2-a")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -g -gdwarf-2 -Og")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function -Wno-unused-but-set-variable")
 
 set (KERNEL_LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/kernel.ld")
 set (CMAKE_EXE_LINKER_FLAGS "-ffreestanding -nostdlib -Wl,-z -Wl,max-page-size=4096")

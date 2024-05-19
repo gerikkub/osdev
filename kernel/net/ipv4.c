@@ -197,10 +197,10 @@ void net_ipv4_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame
             net_ipv4_handle_icmp(packet, frame, &ipv4_header);
             break;
         case NET_IPV4_PROTO_UDP:
-            net_udp_handle_packet(packet, frame, &ipv4_header);
+            //net_udp_handle_packet(packet, frame, &ipv4_header);
             break;
         case NET_IPV4_PROTO_TCP:
-            net_tcp_handle_packet(packet, frame, &ipv4_header);
+            //net_tcp_handle_packet(packet, frame, &ipv4_header);
             break;
     }
 }

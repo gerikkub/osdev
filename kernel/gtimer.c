@@ -80,7 +80,7 @@ bool gtimer_downtimer_triggered(void) {
 }
 
 uint64_t gtimer_downtimer_get_count(void) {
-    int32_t tval;
+    volatile int32_t tval;
 
     READ_SYS_REG(CNTP_TVAL_EL0, tval);
 
@@ -92,7 +92,7 @@ void gtimer_wait_for_trigger(void) {
 }
 
 uint64_t gtimer_get_count(void) {
-    uint64_t cnt;
+    volatile uint64_t cnt;
 
     READ_SYS_REG(CNTPCT_EL0, cnt);
 
@@ -104,3 +104,11 @@ uint64_t gtimer_get_count_us(void) {
     return gtimer_get_count() / ticks_per_us;
 }
 
+void gtimer_busywait(uint32_t us) {
+    uint64_t start_time_us = gtimer_get_count_us();
+
+    volatile uint64_t end_time_us;
+    do {
+        end_time_us = gtimer_get_count_us();
+    } while (end_time_us < (start_time_us + us));
+}

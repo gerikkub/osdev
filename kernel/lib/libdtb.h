@@ -175,4 +175,8 @@ typedef struct {
 
 uintptr_t dt_map_addr_to_phy(dt_node_t* node, uintptr_t addr, bool* valid);
 
+void dt_print_node_padding(uint64_t padding);
+void dt_print_node(dt_ctx_t* ctx, dt_node_t* node, uint64_t padding, bool children);
+
+
 #endif

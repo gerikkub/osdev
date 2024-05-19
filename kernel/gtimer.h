@@ -28,5 +28,7 @@ void gtimer_wait_for_trigger(void);
 uint64_t gtimer_get_count(void);
 uint64_t gtimer_get_count_us(void);
 
+void gtimer_busywait(uint32_t us);
+
 
 #endif

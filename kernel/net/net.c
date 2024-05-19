@@ -118,9 +118,18 @@ void net_recv_packet(net_packet_t* packet) {
         return;
     }
 
+    if (memcmp("\xff\xff\xff\xff\xff\xff", &frame_ptr->dest, sizeof(mac_t)) == 0) {
+        console_log(LOG_DEBUG, "Got a broadcast packet!");
+    } else {
+        console_log(LOG_DEBUG, "Got a packet for us!");
+    }
+
     ASSERT(s_ethertype_handlers);
 
     uint64_t ethertype = frame_ptr->ethertype;
+
+    console_log(LOG_DEBUG, "Ethertype: %4x", ethertype);
+
     net_l2_packet_fn l2_packet_handler = hashmap_get(s_ethertype_handlers, &ethertype);
     
     if (l2_packet_handler == NULL) {

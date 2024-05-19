@@ -101,11 +101,11 @@ int64_t ethernet_parse_l2_frame(net_packet_t* packet, ethernet_l2_frame_t* frame
 
 void ethernet_get_packet_overhead(uint64_t* overhead_out, uint64_t* offset_out) {
     if (overhead_out != NULL) {
-        *overhead_out = 2*sizeof(mac_t) + 2;
+        *overhead_out = 2*sizeof(mac_t) + 2 + 4;
     }
 
     if (offset_out != NULL) {
-        *offset_out = 2*sizeof(mac_t) + 2;
+        *offset_out = 2*sizeof(mac_t) + 2 + 4;
     }
 }
 
@@ -118,8 +118,8 @@ void ethernet_send_packet(net_dev_t* net_dev, net_send_buffer_t* send_buffer, ma
     memcpy(send_buffer->data + (2*sizeof(mac_t)), &tmp, sizeof(uint16_t));
 
     // TODO: Don't generate ethernet CRCs
-    //uint32_t crc32 = ethernet_calc_crc32(send_buffer->data, send_buffer->len);
-    //memcpy(&send_buffer->data[send_buffer->len - 4], &crc32, sizeof(uint32_t));
+    uint32_t crc32 = ethernet_calc_crc32(send_buffer->data, send_buffer->len);
+    memcpy(&send_buffer->data[send_buffer->len - 4], &crc32, sizeof(uint32_t));
 
     net_dev->ops->send_buffer(net_dev, send_buffer);
 }

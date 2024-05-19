@@ -133,6 +133,7 @@ typedef struct {
 #define MEMSPACE_FLAG_PERM_KRW (4)
 // User No Permission. Kernel Read Execute
 #define MEMSPACE_FLAG_PERM_KRE (5)
+#define MEMSPACE_FLAG_IGNORE_DUPS BIT(4)
 
 memory_entry_t* memspace_get_entry_at_addr(memory_space_t* space, void* addr_ptr);
 bool memspace_add_entry_to_memory(memory_space_t* space, memory_entry_t* entry);

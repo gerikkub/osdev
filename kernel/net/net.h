@@ -6,6 +6,8 @@
 
 #define NET_MTU 1514
 
+#define LOG_IPV4_ADDR(x) (uint64_t)(x).d[0], (uint64_t)(x).d[1], (uint64_t)(x).d[2], (uint64_t)(x).d[3]
+
 typedef struct {
     uint8_t d[6];
 } mac_t;
