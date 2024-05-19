@@ -42,8 +42,6 @@ typedef struct {
 static void bcm2835_spi_irq_handler(uint32_t intid, void* ctx) {
     bcm2835_spi_ctx_t* spi_ctx = ctx;
 
-    console_log(LOG_INFO, "SPI IRQ");
-
     uint32_t status = READ_MEM32(spi_ctx->mem + BCM2711_SPI_CS);
     while (status & BCM2711_SPI_CS_RXD &&
            spi_ctx->active_txn->read_pos < spi_ctx->active_txn->len) {
@@ -106,32 +104,7 @@ static int64_t bcm2835_spi_execute_txn(void* ctx, k_spi_device_t* device_cfg, sp
     spi_txn_complete(spi_ctx->active_txn);
     spi_ctx->active_txn = NULL;
 
-    /*
-    uint64_t idx = 0;
-    while (idx < txn->len) {
-        uint32_t w = txn->mem_out[idx];
-        WRITE_MEM32(spi_ctx->mem + BCM2711_SPI_FIFO, w);
-
-        uint32_t status;
-        do {
-            status = READ_MEM32(spi_ctx->mem + BCM2711_SPI_CS);
-
-        } while (!(status & BCM2711_SPI_CS_DONE));
-
-        uint32_t r = READ_MEM32(spi_ctx->mem + BCM2711_SPI_FIFO);
-        txn->mem_in[idx] = r & 0xFF;
-        break;
-
-        idx++;
-    }
-
-    spi_config &= ~BCM2711_SPI_CS_TA;
-    WRITE_MEM32(spi_ctx->mem + BCM2711_SPI_CS, spi_config);
-
-    spi_txn_complete(txn);
-    */
-
-    return 0;
+    return txn->len;
 }
 
 static spi_ops_t s_spi_ops = {

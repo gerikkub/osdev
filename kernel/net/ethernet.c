@@ -105,7 +105,7 @@ void ethernet_get_packet_overhead(uint64_t* overhead_out, uint64_t* offset_out) 
     }
 
     if (offset_out != NULL) {
-        *offset_out = 2*sizeof(mac_t) + 2 + 4;
+        *offset_out = 2*sizeof(mac_t) + 2;
     }
 }
 

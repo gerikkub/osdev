@@ -14,7 +14,7 @@
 #include "kernel/lock/lock.h"
 #include "kernel/lib/elapsedtimer.h"
 
-#include "k_syscall.h"
+#include "include/k_syscall.h"
 
 #define MAX_NUM_TASKS 128
 
@@ -24,6 +24,7 @@
 #define MAX_TASK_NAME_LEN 16
 
 #define MAX_TASK_FDS 64
+#define MAX_KERN_TASK_FDS 4096
 
 #define GET_CURR_TID(x) \
     do { \
@@ -145,7 +146,10 @@ typedef struct task_t_ {
     int64_t ret_val;
     llist_head_t waiters;
 
-    fd_ctx_t fds[MAX_TASK_FDS];
+    union {
+        fd_ctx_t fds[MAX_TASK_FDS];
+        fd_ctx_t* kfds;
+    };
 
     uint64_t* user_stack_base;
     uint64_t user_stack_size;
@@ -220,6 +224,8 @@ int64_t task_wait_kernel(task_t* task,
                          task_canwakeup_f canwakeup_f);
 
 int64_t find_open_fd(task_t* task);
+fd_ctx_t* get_kernel_fd(int64_t fd_num);
+fd_ctx_t* get_task_fd(int64_t fd_num, task_t* task);
 
 bool signal_canwakeup_fn(wait_ctx_t* wait_ctx);
 

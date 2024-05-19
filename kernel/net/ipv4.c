@@ -185,10 +185,13 @@ void net_ipv4_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame
         return;
     }
 
-    if (ipv4_header.fragment_offset != 0 ||
-        ipv4_header.total_len != frame->payload_len) {
+    // TODO: Detect first part of fragmented packet
+    if (ipv4_header.fragment_offset != 0) {
 
-        console_log(LOG_WARN, "Net IP dropping fragmented packet");
+        console_log(LOG_WARN, "Net IP dropping fragmented packet (%d %d %d)",
+                    ipv4_header.fragment_offset,
+                    ipv4_header.total_len,
+                    frame->payload_len);
         return;
     }
 

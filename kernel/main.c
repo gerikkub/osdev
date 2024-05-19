@@ -142,7 +142,7 @@ void main() {
     DISABLE_IRQ();
 
     task_init((uint64_t*)exstack_entry.base);
-    create_kernel_task(8192, kernel_init_lower_thread, NULL, "kernel");
+    create_kernel_task(0x10000, kernel_init_lower_thread, NULL, "kernel");
 
     schedule();
 
@@ -154,6 +154,8 @@ void kernel_init_lower_thread(void* ctx) {
 
     driver_run_late_init();
     interrupt_enable();
+
+    board_discover_devices();
 
     net_tcp_conn_start_timeout_thread();
 
@@ -169,7 +171,7 @@ void kernel_init_lower_thread(void* ctx) {
     void* nic_ctx;
     open_res = vfs_open_device("sys",
                                //"virtio-pci-net0",
-                               "genet0",
+                               "enc28j60",
                                0,
                                &nic_ops,
                                &nic_ctx,
@@ -350,53 +352,6 @@ void kernel_init_lower_thread(void* ctx) {
         .level = 1
     };
 
-    k_gpio_config_t spi_gpio_config = {
-        .gpio_num = 8,
-        .flags = GPIO_CONFIG_FLAG_AF_EN,
-        .af = 0
-    };
-    config_args = (uint64_t)&spi_gpio_config;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
-
-    spi_gpio_config.gpio_num = 10;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
-
-    spi_gpio_config.gpio_num = 11;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
-
-    spi_gpio_config.gpio_num = 9;
-    spi_gpio_config.flags |= GPIO_CONFIG_FLAG_PULL_DOWN;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
-
-
-    console_log(LOG_INFO, "Pre Open SPI");
-
-    fd_ops_t spi_ops;
-    void* spi_ctx;
-    open_res = vfs_open_device("sys",
-                               "spi0",
-                               0,
-                               &spi_ops,
-                               &spi_ctx,
-                               NULL);
-    ASSERT(open_res >= 0);
-    console_log(LOG_INFO, "Open SPI");
-
-    k_spi_device_t loop_device = {
-        .clk_hz = 1000000,
-        .flags = 0
-    };
-
-    config_args = (uint64_t)&loop_device;
-    int64_t spi_dev_fd_num = spi_ops.ioctl(spi_ctx, SPI_IOCTL_CREATE_DEVICE, &config_args, 1);
-    ASSERT(spi_dev_fd_num >= 0);
-    task_t* task = get_active_task();
-    fd_ctx_t* spi_dev_fd = &task->fds[spi_dev_fd_num];
-
-    uint8_t send_arr[256];
-    uint8_t recv_arr[256];
-
-    console_log(LOG_DEBUG, "Starting Timer\n");
 
     uint64_t freq = gtimer_get_frequency();
     uint64_t ticknum = 0;
@@ -406,27 +361,6 @@ void kernel_init_lower_thread(void* ctx) {
         task_wait_timer_in(1000*1000);
 
         ticknum++;
-
-        for (int i = 0; i < 256; i++) {
-            send_arr[i] = i;
-            recv_arr[i] = 0;
-        }
-
-        spi_dev_fd->ops.write(spi_dev_fd->ctx,
-                            send_arr, 256, 0);
-
-        spi_dev_fd->ops.read(spi_dev_fd->ctx,
-                            recv_arr, 256, 0);
-
-        if (memcmp(send_arr, recv_arr, 256) == 0) {
-            console_log(LOG_INFO, "SPI Recv OK");
-        } else {
-            console_log(LOG_INFO, "SPI Recv BAD");
-        }
-
-        console_log(LOG_DEBUG, "SPI Recv: %d %d %d %d",
-                    recv_arr[0], recv_arr[1],
-                    recv_arr[2], recv_arr[3]);
 
         uint64_t level_args = (uint64_t)&gpio_level;
         gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_SET, &level_args, 1);

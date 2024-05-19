@@ -71,6 +71,9 @@ static int64_t get_driver_idx(discovery_register_t* discovery) {
                     found = candidate->pci.vendor_id == discovery->pci.vendor_id &&
                             candidate->pci.device_id == discovery->pci.device_id;
                     break;
+                case DRIVER_DISCOVERY_MANUAL:
+                    found = strncmp(candidate->manual.name, discovery->manual.name, MAX_DRIVER_NAME) == 0;
+                    break;
                 default:
                     ASSERT(0);
             }
@@ -100,6 +103,16 @@ void discover_driver(discovery_register_t* discovery, void* ctx) {
         s_driver_registers[driver_idx].enabled) {
         s_driver_registers[driver_idx].ctxfunc(ctx);
     }
+}
+
+void discover_driver_manual(char* name, void* ctx) {
+    discovery_register_t t = {
+        .type = DRIVER_DISCOVERY_MANUAL,
+        .manual = {
+            .name = name
+        }
+    };
+    discover_driver(&t, ctx);
 }
 
 void driver_disable(discovery_register_t* discovery) {

@@ -45,8 +45,6 @@ static void spi_cleanup_txn(spi_txn_t* txn) {
 int64_t spi_device_read(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
     spi_device_ctx_t* spi_ctx = ctx;
 
-    console_log(LOG_INFO, "SPI Read Txn Len %d", size);
-
     if (spi_ctx->active_txn == NULL ||
         spi_ctx->active_txn->len != size) {
         return -1;
@@ -66,8 +64,6 @@ int64_t spi_device_read(void* ctx, uint8_t* buffer, const int64_t size, const ui
 
 int64_t spi_device_write(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
     spi_device_ctx_t* spi_ctx = ctx;
-
-    console_log(LOG_INFO, "SPI Start Txn Len %d", size);
 
     if (spi_ctx->active_txn != NULL) {
         if (!spi_ctx->txn_complete) {
@@ -137,10 +133,10 @@ int64_t spi_create_device(void* driver_ctx,
     device_ctx->spi_ops = ops;
     device_ctx->device_args = *new_device;
 
-    fd_ctx_t* fd = &task->fds[fd_num];
+    fd_ctx_t* fd = get_task_fd(fd_num, task);
     fd->ctx = device_ctx;
     fd->ops = s_spi_device_ops;
-    fd->ready = false;
+    fd->ready = 0;
     fd->valid = true;
 
     return fd_num;

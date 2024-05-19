@@ -22,6 +22,8 @@ static task_t s_task_list[MAX_NUM_TASKS] = {0};
 
 static volatile uint64_t s_active_task_idx;
 
+static fd_ctx_t s_kfds[MAX_KERN_TASK_FDS] = {0};
+
 static uint64_t s_max_tid;
 
 static _vmem_table* s_dummy_user_table;
@@ -265,6 +267,11 @@ uint64_t create_task(uint64_t* user_stack_base,
         task->reg.gp[TASK_REG_FP] = (uint64_t)&user_stack_base[-2];
 
         task->run_state = TASK_RUNABLE;
+
+        for (int idx = 0; idx < MAX_TASK_FDS; idx++) {
+            task->fds[idx].valid = false;
+        }
+
     } else {
         task->wait_canwakeup_fn = create_task_canwakeup_f;
         task->wait_wakeup_fn = create_task_wakeup_f;
@@ -279,15 +286,13 @@ uint64_t create_task(uint64_t* user_stack_base,
         ((uint64_t*)task->kernel_wait_sp)[24] = task->reg.elr;
         // Set frame pointer to bad kernel frame
         ((uint64_t*)task->kernel_wait_sp)[25] = (uint64_t)&kernel_stack_base[-2];
+
+        task->kfds = s_kfds;
     }
     kernel_stack_base[-1] = (uint64_t)bad_task_return;
     kernel_stack_base[-2] = (uint64_t)&kernel_stack_base[-2];
 
     strncpy(task->name, name, MAX_TASK_NAME_LEN);
-
-    for (int idx = 0; idx < MAX_TASK_FDS; idx++) {
-        task->fds[idx].valid = false;
-    }
 
     // Populate x0 with the task's tid
     task->reg.gp[TASK_REG(0)] = task->tid;
@@ -435,11 +440,13 @@ void task_wakeup(task_t* task, wait_reason_t reason) {
 void task_cleanup(task_t* task, int64_t ret_val) {
 
     int idx;
-    for (idx = 0; idx < MAX_TASK_FDS; idx++) {
-        if (task->fds[idx].valid &&
-            task->fds[idx].ops.close != NULL) {
+    if (!(task->tid & TASK_TID_KERNEL)) {
+        for (idx = 0; idx < MAX_TASK_FDS; idx++) {
+            if (task->fds[idx].valid &&
+                task->fds[idx].ops.close != NULL) {
 
-            task->fds[idx].ops.close(task->fds[idx].ctx);
+                task->fds[idx].ops.close(task->fds[idx].ctx);
+            }
         }
     }
 
@@ -643,14 +650,46 @@ void schedule(void) {
 
 int64_t find_open_fd(task_t* task) {
 
-    for (int idx = 0; idx < MAX_TASK_FDS; idx++) {
-        if (!task->fds[idx].valid) {
-            return idx;
+    console_log(LOG_INFO, "Find FD to TID %16x", task->tid);
+    if (task->tid & TASK_TID_KERNEL) {
+        console_log(LOG_INFO, "Kernel Task");
+        for (int idx = 0; idx < MAX_KERN_TASK_FDS; idx++) {
+            if (!s_kfds[idx].valid) {
+                return idx;
+            }
+        }
+    } else {
+        console_log(LOG_INFO, "User Task");
+        for (int idx = 0; idx < MAX_TASK_FDS; idx++) {
+            if (!task->fds[idx].valid) {
+                return idx;
+            }
         }
     }
 
     return -1;
 }
+
+fd_ctx_t* get_kernel_fd(int64_t fd_num) {
+    ASSERT(fd_num >= 0);
+    ASSERT(fd_num < MAX_KERN_TASK_FDS);
+
+    return &s_kfds[fd_num];
+}
+
+fd_ctx_t* get_task_fd(int64_t fd_num, task_t* task) {
+    if (task->tid & TASK_TID_KERNEL) {
+        if (fd_num >= 0 && fd_num < MAX_KERN_TASK_FDS) {
+            return &s_kfds[fd_num];
+        }
+    } else {
+        if (fd_num >= 0 && fd_num < MAX_TASK_FDS) {
+            return &task->fds[fd_num];
+        }
+    }
+    return NULL;
+}
+
 
 bool signal_canwakeup_fn(wait_ctx_t* wait_ctx) {
     return *wait_ctx->signal.trywake;

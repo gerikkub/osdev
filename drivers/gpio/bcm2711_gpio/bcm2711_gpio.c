@@ -138,9 +138,6 @@ static int64_t bcm2711_gpio_set(bcm2711_gpio_ctx_t* gpio_ctx, k_gpio_level_t* le
         WRITE_MEM32(gpio_ctx->mem + BCM2711_GPIO_CLR(level->gpio_num / 32), pin);
     }
 
-    console_log(LOG_INFO, "GPIO FSEL0: %8x", READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_FSET(0)));
-    console_log(LOG_INFO, "GPIO FSEL1: %8x", READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_FSET(1)));
-
     return 0;
 }
 
@@ -213,6 +210,7 @@ void bcm2711_gpio_irq_handler(uint32_t intid, void* ctx) {
     gpeds0 = READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(0));
     gpeds1 = READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(1));
 
+    /*
     for (int i = 0; i < 32; i++) {
         if (gpeds0 & (1 << i)) {
             console_log(LOG_INFO, "GPIO int on %d", i);
@@ -224,6 +222,7 @@ void bcm2711_gpio_irq_handler(uint32_t intid, void* ctx) {
             console_log(LOG_INFO, "GPIO int on %d", i);
         }
     }
+    */
 
     WRITE_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(0), gpeds0);
     WRITE_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(1), gpeds1);
