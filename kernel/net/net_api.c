@@ -46,10 +46,10 @@ int64_t syscall_socket(uint64_t socket_struct_ptr,
 
     switch (create_socket_ctx->socket_type) {
         case SYSCALL_SOCKET_UDP4:
-            ret = net_udp_create_socket(create_socket_ctx, &task->fds[fd_num].ops, &task->fds[fd_num].ctx, &task->fds[fd_num]);
+            ret = net_udp_create_socket(create_socket_ctx);
             break;
         case SYSCALL_SOCKET_TCP4:
-            ret = net_tcp_create_socket(create_socket_ctx, &task->fds[fd_num].ops, &task->fds[fd_num].ctx, &task->fds[fd_num]);
+            ret = net_tcp_create_socket(create_socket_ctx);
             break;
         default:
             ret = -1;

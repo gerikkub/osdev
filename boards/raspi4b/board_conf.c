@@ -74,16 +74,14 @@ void board_init_devices(void) {
 
 void board_discover_devices(void) {
 
-    fd_ops_t gpio_ops;
-    void* gpio_ctx;
-    int64_t open_res;
-    open_res = vfs_open_device("sys",
-                               "bcm2711_gpio",
-                               0,
-                               &gpio_ops,
-                               &gpio_ctx,
-                               NULL);
-    ASSERT(open_res >= 0);
+    int64_t gpio_fd;
+    gpio_fd = vfs_open_device_fd("sys",
+                                 "bcm2711_gpio",
+                                 0);
+    ASSERT(gpio_fd >= 0);
+
+    fd_ctx_t* gpio_fd_ctx = get_kernel_fd(gpio_fd);
+    ASSERT(gpio_fd_ctx != NULL);
 
     k_gpio_config_t spi_gpio_config = {
         .gpio_num = 8,
@@ -91,27 +89,29 @@ void board_discover_devices(void) {
         .af = 0
     };
     uint64_t config_args = (uint64_t)&spi_gpio_config;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+    gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
 
     spi_gpio_config.gpio_num = 10;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+    gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
 
     spi_gpio_config.gpio_num = 11;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+    gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
 
     spi_gpio_config.gpio_num = 9;
     spi_gpio_config.flags |= GPIO_CONFIG_FLAG_PULL_DOWN;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+    gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
 
-    fd_ops_t spi_ops;
-    void* spi_ctx;
-    open_res = vfs_open_device("sys",
-                               "spi0",
-                               0,
-                               &spi_ops,
-                               &spi_ctx,
-                               NULL);
-    ASSERT(open_res >= 0);
+    spi_gpio_config.gpio_num = 25;
+    spi_gpio_config.flags = GPIO_CONFIG_FLAG_IN |
+                            GPIO_CONFIG_FLAG_EV_FALLING;
+    gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+
+    int64_t spi_fd;
+    spi_fd = vfs_open_device_fd("sys", "spi0", 0);
+    ASSERT(spi_fd >= 0);
+
+    fd_ctx_t* spi_fd_ctx = get_kernel_fd(spi_fd);
+    ASSERT(spi_fd_ctx != NULL);
 
     k_spi_device_t enc28j60_device = {
         .clk_hz = 1000000,
@@ -119,11 +119,13 @@ void board_discover_devices(void) {
     };
 
     config_args = (uint64_t)&enc28j60_device;
-    int64_t spi_dev_fd_num = spi_ops.ioctl(spi_ctx, SPI_IOCTL_CREATE_DEVICE, &config_args, 1);
+    int64_t spi_dev_fd_num = spi_fd_ctx->ops.ioctl(spi_fd_ctx->ctx, SPI_IOCTL_CREATE_DEVICE, &config_args, 1);
     ASSERT(spi_dev_fd_num >= 0);
 
     enc28j60_discover_t enc28j60_disc = {
-        .spi_fd = spi_dev_fd_num
+        .spi_fd = spi_dev_fd_num,
+        .gpio_int_fd_ctx = gpio_fd_ctx,
+        .gpio_int_num = 25
     };
     discover_driver_manual("enc28j60", &enc28j60_disc);
 }

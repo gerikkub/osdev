@@ -20,6 +20,7 @@
 #include "kernel/interrupt/interrupt.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_select.h"
 #include "include/k_gpio.h"
 
 #include "stdlib/bitutils.h"
@@ -33,11 +34,19 @@ typedef struct {
     int64_t num;
     int64_t offset;
     uint64_t intids[2];
+
+    hashmap_ctx_t* listener_map;
 } bcm2711_gpio_ctx_t;
 
 typedef struct {
     bcm2711_gpio_ctx_t* gpio_ctx;
 } bcm2711_gpio_fd_ctx_t;
+
+typedef struct {
+    bcm2711_gpio_ctx_t* gpio_ctx;
+    uint64_t gpio_num;
+    fd_ctx_t* fd_ctx;
+} bcm2711_gpio_listener_ctx_t;
 
 static int64_t bcm2711_gpio_configure(bcm2711_gpio_ctx_t* gpio_ctx, k_gpio_config_t* config) {
     if (config->gpio_num < gpio_ctx->offset ||
@@ -147,8 +156,8 @@ static int64_t bcm2711_gpio_get(bcm2711_gpio_ctx_t* gpio_ctx, k_gpio_level_t* le
         return -1;
     }
     
-    uint32_t lev = READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_LEV(level->gpio_num % 32));
-    level->level = (lev & (level->gpio_num % 32)) != 0;
+    uint32_t lev = READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_LEV(level->gpio_num / 32));
+    level->level = (lev & (1 << (level->gpio_num % 32))) != 0;
 
     return 0;
 }
@@ -158,6 +167,15 @@ static int64_t bcm2711_gpio_open_op(void* ctx, const char* path, const uint64_t 
 
     gpio_fd_ctx->gpio_ctx = ctx;
     *ctx_out = gpio_fd_ctx;
+
+    return 0;
+}
+
+static int64_t bcm2711_gpio_listener_close_op(void* ctx) {
+    bcm2711_gpio_listener_ctx_t* l_ctx = ctx;
+
+    hashmap_del(l_ctx->gpio_ctx->listener_map, &l_ctx->gpio_num);
+    vfree(l_ctx);
 
     return 0;
 }
@@ -186,6 +204,42 @@ static int64_t bcm2711_gpio_ioctl_op(void* ctx, const uint64_t ioctl, const uint
             if (arg_count != 1) return -1;
 
             return bcm2711_gpio_get(gpio_ctx, (k_gpio_level_t*)args[0]);
+        case GPIO_IOCTL_LISTENER:
+            if (arg_count != 1) return -1;
+
+            k_gpio_listener_t* listener_info = get_kptr_for_ptr(args[0]);
+            if (listener_info == NULL) return -1;
+
+            if (listener_info->gpio_num < gpio_ctx->offset ||
+                listener_info->gpio_num >= (gpio_ctx->offset + gpio_ctx->num)) return -1;
+            
+            // TODO: Support multiple listeners on a GPIO
+            if (hashmap_contains(gpio_ctx->listener_map, &listener_info->gpio_num)) return -1;
+
+            task_t* task = get_active_task();
+            int64_t fd_num = find_open_fd(task);
+            if (fd_num < 0) return -1;
+
+            fd_ctx_t* fd_ctx = get_task_fd(fd_num, task);
+            ASSERT(fd_ctx != NULL);
+
+            bcm2711_gpio_listener_ctx_t* l_ctx = vmalloc(sizeof(bcm2711_gpio_listener_ctx_t));
+            l_ctx->gpio_ctx = gpio_ctx;
+            l_ctx->gpio_num = listener_info->gpio_num;
+            l_ctx->fd_ctx = fd_ctx;
+
+            fd_ctx->valid = true;
+            fd_ctx->ctx = l_ctx;
+            fd_ctx->ops.read = NULL;
+            fd_ctx->ops.write = NULL;
+            fd_ctx->ops.ioctl = NULL;
+            fd_ctx->ops.close = bcm2711_gpio_listener_close_op;
+            fd_ctx->ready = 0;
+            fd_ctx->task = task;
+
+            hashmap_add(gpio_ctx->listener_map, &l_ctx->gpio_num, fd_ctx);
+
+            return fd_num;
     }
 
     return -1;
@@ -203,6 +257,16 @@ static fd_ops_t s_gpio_file_ops = {
     .close = bcm2711_gpio_close_op,
 };
 
+void bcm2711_gpio_irq_notify_listener(bcm2711_gpio_ctx_t* gpio_ctx, int64_t gpio_num) {
+
+    fd_ctx_t* fd_ctx = hashmap_get(gpio_ctx->listener_map, &gpio_num);
+    if (fd_ctx != NULL) {
+        fd_ctx->ready |= FD_READY_GPIO_EVENT;
+
+        task_wakeup(fd_ctx->task, WAIT_SELECT);
+    }
+}
+
 void bcm2711_gpio_irq_handler(uint32_t intid, void* ctx) {
     bcm2711_gpio_ctx_t* gpio_ctx = ctx;
 
@@ -210,19 +274,17 @@ void bcm2711_gpio_irq_handler(uint32_t intid, void* ctx) {
     gpeds0 = READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(0));
     gpeds1 = READ_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(1));
 
-    /*
     for (int i = 0; i < 32; i++) {
         if (gpeds0 & (1 << i)) {
-            console_log(LOG_INFO, "GPIO int on %d", i);
+            bcm2711_gpio_irq_notify_listener(gpio_ctx, i);
         }
     }
 
     for (int i = 32; i < 58; i++) {
         if (gpeds1 & (1 << (i-32))) {
-            console_log(LOG_INFO, "GPIO int on %d", i);
+            bcm2711_gpio_irq_notify_listener(gpio_ctx, i);
         }
     }
-    */
 
     WRITE_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(0), gpeds0);
     WRITE_MEM32(gpio_ctx->mem + BCM2711_GPIO_EDS(1), gpeds1);
@@ -281,6 +343,7 @@ void bcm2711_gpio_discover(void* ctx) {
     gpio_ctx->mem = PHY_TO_KSPACE_PTR(gpio_ctx_phy);
     gpio_ctx->num = 58;
     gpio_ctx->offset = 0;
+    gpio_ctx->listener_map = uintmap_alloc(8);
 
     console_log(LOG_INFO, "BCM2711 GPIO @ %16x", gpio_ctx_phy);
 

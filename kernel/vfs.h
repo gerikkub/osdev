@@ -27,4 +27,8 @@ int64_t vfs_open_device(const char* device_name,
                         void** ctx_out,
                         fd_ctx_t* fd_ctx);
 
+int64_t vfs_open_device_fd(const char* device_name,
+                           const char* path,
+                           uint64_t flags);
+
 #endif

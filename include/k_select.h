@@ -14,6 +14,10 @@
 // task_ops fds
 #define FD_READY_TASKOPS_WAIT BIT(8)
 
+// gpio fds
+#define FD_READY_GPIO_EVENT BIT(32)
+
+
 #define FD_READY_ALL (UINT64_MAX)
 
 

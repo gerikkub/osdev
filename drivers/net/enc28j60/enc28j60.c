@@ -18,10 +18,13 @@
 #include "kernel/gtimer.h"
 #include "kernel/interrupt/interrupt.h"
 #include "kernel/net/net.h"
+#include "kernel/select.h"
 
 #include "drivers/spi/spi.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_gpio.h"
+#include "include/k_select.h"
 
 #include "stdlib/bitutils.h"
 #include "stdlib/printf.h"
@@ -174,6 +177,9 @@ enum {
 
 typedef struct {
     int64_t spi_fd;
+    fd_ctx_t* gpio_int_fd_ctx;
+    int64_t gpio_int_num;
+    int64_t gpio_listener_fd;
     
     uint8_t reg_bank;
 
@@ -330,63 +336,88 @@ static void enc_cmd_softreset(enc_ctx_t* enc_ctx) {
 void enc28j60_read_thread(void* ctx) {
     enc_ctx_t* enc_ctx = ctx;
 
+    // Setup GPIO for active low interrupts
+    fd_ctx_t* gpio_int = enc_ctx->gpio_int_fd_ctx;
+    
+    k_gpio_listener_t gpio_listener = {
+        .gpio_num = enc_ctx->gpio_int_num
+    };
+    uint64_t ioctl_args = (uint64_t)&gpio_listener;
+    enc_ctx->gpio_listener_fd = gpio_int->ops.ioctl(gpio_int->ctx, GPIO_IOCTL_LISTENER, &ioctl_args, 1);
+    ASSERT(enc_ctx->gpio_listener_fd >= 0);
+
     uint64_t read_off = 0x1000;
+
+    // Enable PKTIF Interrupt
+    // Enable INTIE
+    enc_cmd_write(enc_ctx, ENC_REG_EIE, BIT(7) | // INTIE
+                                        BIT(6)); // PKTIE
 
     console_log(LOG_INFO, "ENC Start Receive");
     while (true) {
-        task_wait_timer_in(1000);
+        syscall_select_ctx_t enc_irq_select = {
+            .fd = enc_ctx->gpio_listener_fd,
+            .ready_mask = FD_READY_GPIO_EVENT
+        };
+        uint64_t gpio_mask_out;
+        int64_t fd = select_wait(&enc_irq_select, 1, 10000, &gpio_mask_out);
 
-        while (true) {
-            uint32_t eir = enc_cmd_read(enc_ctx, ENC_REG_EIR, ENC_REG_ETH);
+        if (fd == enc_ctx->gpio_listener_fd) {
+            enc_cmd_bitclr(enc_ctx, ENC_REG_EIE, BIT(7)); // INTIE
+            while (true) {
+                uint32_t eir = enc_cmd_read(enc_ctx, ENC_REG_EIR, ENC_REG_ETH);
 
-            // If a new packet exists
-            if (!(eir & BIT(6))) {
-                break;
+                // If a new packet exists
+                if (!(eir & BIT(6))) {
+                    break;
+                }
+
+                uint8_t recv_status[6+1];
+                enc_cmd_write(enc_ctx, ENC_REG_ERDPTL, read_off);
+                enc_cmd_write(enc_ctx, ENC_REG_ERDPTH, read_off >> 8);
+                enc_cmd_read_buffer(enc_ctx, recv_status, 7);
+
+                uint64_t next_packet_off = (recv_status[2] << 8) | recv_status[1];
+                uint64_t packet_len = (recv_status[4] << 8) | recv_status[3];
+
+                bool packet_ok = (recv_status[5] & BIT(7)) != 0;
+
+                if (packet_ok) {
+                    uint8_t* packet_buffer = vmalloc(packet_len+1);
+                    enc_cmd_read_buffer(enc_ctx, packet_buffer, packet_len+1);
+
+                    net_packet_t pkt = {
+                        .dev = &enc_ctx->nic,
+                        .data = &packet_buffer[1],
+                        .len = packet_len,
+                        .nic_pkt_ctx = packet_buffer
+                    };
+
+                    net_recv_packet(&pkt);
+                } else {
+                    console_log(LOG_INFO, "ENC Invalid Packet");
+                    console_log(LOG_INFO, "%2x %2x %2x %2x",
+                                recv_status[6], recv_status[5], 
+                                recv_status[4], recv_status[3]);
+
+                }
+
+                read_off = next_packet_off;
+
+                enc_cmd_write(enc_ctx, ENC_REG_ERXRDPTL, read_off-1);
+                enc_cmd_write(enc_ctx, ENC_REG_ERXRDPTH, (read_off-1) >> 8);
+
+                enc_cmd_bitset(enc_ctx, ENC_REG_ECON2, BIT(6));
             }
 
-            uint8_t recv_status[6+1];
-            enc_cmd_write(enc_ctx, ENC_REG_ERDPTL, read_off);
-            enc_cmd_write(enc_ctx, ENC_REG_ERDPTH, read_off >> 8);
-            enc_cmd_read_buffer(enc_ctx, recv_status, 7);
-
-            uint64_t next_packet_off = (recv_status[2] << 8) | recv_status[1];
-            uint64_t packet_len = (recv_status[4] << 8) | recv_status[3];
-
-            bool packet_ok = (recv_status[5] & BIT(7)) != 0;
-
-            if (packet_ok) {
-                uint8_t* packet_buffer = vmalloc(packet_len+1);
-                enc_cmd_read_buffer(enc_ctx, packet_buffer, packet_len+1);
-
-                net_packet_t pkt = {
-                    .dev = &enc_ctx->nic,
-                    .data = &packet_buffer[1],
-                    .len = packet_len,
-                    .nic_pkt_ctx = packet_buffer
-                };
-
-                net_recv_packet(&pkt);
-            } else {
-                console_log(LOG_INFO, "ENC Invalid Packet");
-                console_log(LOG_INFO, "%2x %2x %2x %2x",
-                            recv_status[6], recv_status[5], 
-                            recv_status[4], recv_status[3]);
-
-            }
-
-            read_off = next_packet_off;
-
-            enc_cmd_write(enc_ctx, ENC_REG_ERXRDPTL, read_off-1);
-            enc_cmd_write(enc_ctx, ENC_REG_ERXRDPTH, (read_off-1) >> 8);
-
-            enc_cmd_bitset(enc_ctx, ENC_REG_ECON2, BIT(6));
+            enc_cmd_bitset(enc_ctx, ENC_REG_EIE, BIT(7)); // INTIE
         }
+
 
         while (!llist_empty(enc_ctx->send_buffers)) {
             net_send_buffer_t* send_buffer = llist_at(enc_ctx->send_buffers, 0);
             llist_delete_ptr(enc_ctx->send_buffers, send_buffer);
 
-            console_log(LOG_INFO, "ENC Sending Packet (%d)", send_buffer->len);
             enc_cmd_write(enc_ctx, ENC_REG_EWRPTL, 0);
             enc_cmd_write(enc_ctx, ENC_REG_EWRPTH, 0);
             enc_cmd_write(enc_ctx, ENC_REG_ETXSTL, 0);
@@ -414,16 +445,11 @@ void enc28j60_read_thread(void* ctx) {
             enc_cmd_write(enc_ctx, ENC_REG_ERDPTH, (write_len-1) >> 8);
 
             enc_cmd_read_buffer(enc_ctx, send_status, 8);
-            console_log(LOG_INFO, "Send Status: %2x %2x %2x %2x %2x %2x %2x",
-                        send_status[7], send_status[6], send_status[5],
-                        send_status[4], send_status[3], send_status[2],
-                        send_status[1]);
             // TODO: Do something with packet status ??
 
             vfree(send_buffer->nic_buffer_ctx);
             vfree(send_buffer);
 
-            console_log(LOG_INFO, "ENC Sent Packet");
         }
     }
 }
@@ -443,7 +469,6 @@ static net_send_buffer_t* enc_nic_get_buffer_fn(net_dev_t* ctx, const int64_t si
 static void enc_nic_send_buffer_fn(net_dev_t* ctx, net_send_buffer_t* buffer) {
     enc_ctx_t* enc_ctx = ctx->nic_ctx;
     
-    console_log(LOG_INFO, "ENC Request Send");
     llist_append_ptr(enc_ctx->send_buffers, buffer);
 }
 
@@ -474,6 +499,8 @@ void enc28j60_discover(void* ctx) {
 
     enc_ctx_t* enc_ctx = vmalloc(sizeof(enc_ctx_t));
     enc_ctx->spi_fd = discover_ctx->spi_fd;
+    enc_ctx->gpio_int_fd_ctx = discover_ctx->gpio_int_fd_ctx;
+    enc_ctx->gpio_int_num = discover_ctx->gpio_int_num;
 
     console_log(LOG_INFO, "ENC28J60 found");
 
@@ -486,11 +513,13 @@ void enc28j60_discover(void* ctx) {
 
     enc_cmd_softreset(enc_ctx);
 
+    /*
     uint8_t status;
     do {
         // Wait for oscillator startup
         status = enc_cmd_read_raw(enc_ctx, ENC_REG_ESTAT, ENC_REG_MAC);
     } while (!(status & BIT(0)));
+    */
 
     enc_cmd_write(enc_ctx, ENC_REG_ECON1, 0);
     enc_ctx->reg_bank = 0;
@@ -521,6 +550,7 @@ void enc28j60_discover(void* ctx) {
     enc_cmd_write(enc_ctx, ENC_REG_MAADR4, enc_ctx->nic.mac.d[3]);
     enc_cmd_write(enc_ctx, ENC_REG_MAADR5, enc_ctx->nic.mac.d[4]);
     enc_cmd_write(enc_ctx, ENC_REG_MAADR6, enc_ctx->nic.mac.d[5]);
+
 
     //uint16_t read_buffer_size = 4096;
     uint16_t write_buffer_size = 0x1000;

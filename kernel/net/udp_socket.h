@@ -13,7 +13,7 @@
 
 #define UDP_EPHIMERAL_START 32768
 
-int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx, fd_ctx_t* fd_ctx);
+int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx);
 void net_udp_socket_recv_packet(net_packet_t* packet, net_ipv4_hdr_t* ipv4_header, net_udp_hdr_t* udp_msg);
 
 #endif

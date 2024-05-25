@@ -204,8 +204,15 @@ void* net_tcp_socket_create_from_conn(task_t* task, void* tcp_ctx, ipv4_t* our_i
     return socket_ctx;
 }
 
-int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out, fd_ctx_t* fd_ctx) {
+int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx) {
     
+    task_t* task = get_active_task();
+    int64_t fd_num = find_open_fd(task);
+    if (fd_num < 0) {
+        return -1;
+    }
+    fd_ctx_t* fd_ctx = get_task_fd(fd_num, task);
+
     if (create_socket_ctx->tcp4.dest_port == 0) {
         console_log(LOG_WARN, "Net TCP cannot create socket. Invalid dest port");
         return -1;
@@ -262,8 +269,8 @@ int64_t net_tcp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* op
     *hashmap_key = listen_port;
     hashmap_add(s_tcp_socket_map, hashmap_key, socket_ctx);
 
-    *ops = s_net_tcp_socket_ops;
-    *ctx_out = socket_ctx;
+    fd_ctx->ops = s_net_tcp_socket_ops;
+    fd_ctx->ctx = socket_ctx;
 
     return 0;
 }

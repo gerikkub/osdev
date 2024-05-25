@@ -19,6 +19,7 @@
 #include "kernel/net/udp_socket.h"
 #include "kernel/net/ethernet.h"
 
+#include "include/k_ioctl_common.h"
 #include "include/k_net_api.h"
 #include "include/k_select.h"
 
@@ -115,7 +116,26 @@ static int64_t net_udp_socket_write_fn(void* ctx, const uint8_t* buffer, const i
 static int64_t net_udp_socket_ioctl_fn(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
     net_udp_socket_ctx_t* socket_ctx = ctx;
 
-    (void)socket_ctx;
+    switch (ioctl) {
+        case SOCKET_IOCTL_GET_INFO:
+            if (arg_count != 1) {
+                return -1;
+            }
+            uint64_t info_raw_ptr = args[0];
+            k_socket_info_t* socket_info = get_kptr_for_ptr(info_raw_ptr);
+            if (socket_info == NULL) {
+                return -1;
+            }
+
+            socket_info->socket_type = SYSCALL_SOCKET_UDP4;
+            *(ipv4_t*)&socket_info->udp4.dest_ip = socket_ctx->dest_ip;
+            socket_info->udp4.source_port = socket_ctx->source_port;
+            socket_info->udp4.dest_port = socket_ctx->dest_port;
+
+            return 0;
+        break;
+    }
+
     return -1;
 }
 
@@ -147,7 +167,14 @@ static const fd_ops_t s_net_udp_socket_ops = {
     .close = net_udp_socket_close_fn
 };
 
-int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* ops, void** ctx_out, fd_ctx_t* fd_ctx) {
+int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx) {
+
+    task_t* task = get_active_task();
+    int64_t fd_num = find_open_fd(task);
+    if (fd_num < 0) {
+        return -1;
+    }
+    fd_ctx_t* fd_ctx = get_task_fd(fd_num, task);
 
     if (s_udp_source_port_map == NULL) {
         uint64_t* dummy = vmalloc(sizeof(uint64_t));
@@ -175,7 +202,7 @@ int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* op
 
     net_udp_socket_ctx_t* socket_ctx = vmalloc(sizeof(net_udp_socket_ctx_t));
 
-    socket_ctx->task = get_active_task();
+    socket_ctx->task = task;
     memcpy(&socket_ctx->dest_ip, &create_socket_ctx->udp4.dest_ip, sizeof(ipv4_t));
     socket_ctx->source_port = source_port64;
     socket_ctx->dest_port = create_socket_ctx->udp4.dest_port;
@@ -192,8 +219,8 @@ int64_t net_udp_create_socket(k_create_socket_t* create_socket_ctx, fd_ops_t* op
 
     hashmap_add(s_udp_source_port_map, hashmap_key, socket_ctx);
 
-    *ops = s_net_udp_socket_ops;
-    *ctx_out = socket_ctx;
+    fd_ctx->ops = s_net_udp_socket_ops;
+    fd_ctx->ctx = socket_ctx;
 
     return 0;
 }

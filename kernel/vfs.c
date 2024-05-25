@@ -6,6 +6,7 @@
 #include "kernel/console.h"
 #include "kernel/vfs.h"
 #include "kernel/panic.h"
+#include "kernel/task.h"
 
 #include "stdlib/bitutils.h"
 
@@ -54,4 +55,24 @@ int64_t vfs_open_device(const char* device_name, const char* path, uint64_t flag
     }
 
     return -1;
+}
+
+int64_t vfs_open_device_fd(const char* device_name, const char* path, uint64_t flags) {
+    task_t* task = get_active_task();
+
+    int64_t fd = find_open_fd(task);
+    if (fd < 0) {
+        return -1;
+    }
+
+    fd_ctx_t* fd_ctx = get_task_fd(fd, task);
+    fd_ctx->valid = true;
+
+    int64_t stat = vfs_open_device(device_name, path, flags,
+                                   &fd_ctx->ops,
+                                   &fd_ctx->ctx,
+                                   fd_ctx);
+
+    fd_ctx->valid = stat >= 0;
+    return fd;
 }

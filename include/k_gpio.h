@@ -34,4 +34,8 @@ typedef struct {
     int64_t level;
 } k_gpio_level_t;
 
+typedef struct {
+    int64_t gpio_num;
+} k_gpio_listener_t;
+
 #endif

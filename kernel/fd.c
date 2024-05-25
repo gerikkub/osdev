@@ -69,7 +69,11 @@ int64_t syscall_read(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags)
     }
     buffer_kptr = PHY_TO_KSPACE_PTR(buffer_phy);
 
-    return task->fds[fd].ops.read(task->fds[fd].ctx, buffer_kptr, len, flags);
+    if (task->fds[fd].ops.read != NULL) {
+        return task->fds[fd].ops.read(task->fds[fd].ctx, buffer_kptr, len, flags);
+    } else {
+        return -1;
+    }
 }
 
 int64_t syscall_write(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags) {
@@ -94,7 +98,11 @@ int64_t syscall_write(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags
     }
     buffer_kptr = PHY_TO_KSPACE_PTR(buffer_phy);
 
-    return task->fds[fd].ops.write(task->fds[fd].ctx, buffer_kptr, len, flags);
+    if (task->fds[fd].ops.write != NULL) {
+        return task->fds[fd].ops.write(task->fds[fd].ctx, buffer_kptr, len, flags);
+    } else {
+        return -1;
+    }
 
 }
 
@@ -107,6 +115,10 @@ int64_t syscall_ioctl(uint64_t fd, uint64_t ioctl, uint64_t args, uint64_t arg_c
 
     if ((!task->fds[fd].valid) ||
          task->fds[fd].ops.ioctl == NULL) {
+        return -1;
+    }
+
+    if (task->fds[fd].ops.ioctl == NULL) {
         return -1;
     }
 
@@ -139,7 +151,12 @@ int64_t syscall_close(uint64_t fd, uint64_t arg1, uint64_t arg2, uint64_t arg3) 
         return -1;
     }
 
-    int64_t ret = task->fds[fd].ops.close(task->fds[fd].ctx);
-    task->fds[fd].valid = false;
-    return ret;
+    if (task->fds[fd].ops.close == NULL) {
+        task->fds[fd].valid = false;
+        return 0;
+    } else {
+        int64_t ret = task->fds[fd].ops.close(task->fds[fd].ctx);
+        task->fds[fd].valid = false;
+        return ret;
+    }
 }

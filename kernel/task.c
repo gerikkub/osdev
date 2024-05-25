@@ -418,6 +418,10 @@ void task_wait_kernel_c(task_t* task,
     task->wait_canwakeup_fn = canwakeup_fn;
     task->kernel_wait_sp = kernel_sp;
 
+    if (canwakeup_fn(ctx)) {
+        task->run_state = TASK_RUNABLE;
+    }
+
     schedule();
 }
 
@@ -654,6 +658,7 @@ int64_t find_open_fd(task_t* task) {
     if (task->tid & TASK_TID_KERNEL) {
         console_log(LOG_INFO, "Kernel Task");
         for (int idx = 0; idx < MAX_KERN_TASK_FDS; idx++) {
+            console_log(LOG_INFO, "Fd %d (%16x) %d", idx, &s_kfds[idx], s_kfds[idx].valid);
             if (!s_kfds[idx].valid) {
                 return idx;
             }
@@ -719,4 +724,22 @@ void task_wait_timer_at(uint64_t wake_time_us) {
 
 void task_wait_timer_in(uint64_t delay_us) {
     task_wait_timer_at(gtimer_get_count_us() + delay_us);
+}
+
+void* get_kptr_for_task_ptr(uint64_t raw_ptr, task_t* task) {
+    if (task->tid & TASK_TID_KERNEL) {
+        return (void*)raw_ptr;
+    } else {
+        uint64_t args_phy;
+        bool walk_ok;
+        walk_ok = vmem_walk_table(task->low_vm_table, raw_ptr, &args_phy);
+        if (!walk_ok) {
+            return NULL;
+        }
+        return PHY_TO_KSPACE_PTR(args_phy);
+    }
+}
+
+void* get_kptr_for_ptr(uint64_t raw_ptr) {
+    return get_kptr_for_task_ptr(raw_ptr, get_active_task());
 }

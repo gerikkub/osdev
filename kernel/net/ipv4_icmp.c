@@ -71,9 +71,11 @@ static void net_ipv4_handle_icmp_echo_reply(net_packet_t* packet, ethernet_l2_fr
 
 static void net_ipv4_handle_icmp_echo_request(net_packet_t* packet, ethernet_l2_frame_t* frame, net_ipv4_hdr_t* ipv4_header, net_ipv4_icmp_hdr_t* icmp_header) {
 
+/*
     console_log(LOG_DEBUG, "Net ICMP recevied echo REQUEST from %d.%d.%d.%d (%d %d)",
                 LOG_IPV4_ADDR(ipv4_header->dst_ip),
                 icmp_header->echo.id, icmp_header->echo.seq);
+*/
 
 
     net_ipv4_icmp_hdr_t icmp_response = {

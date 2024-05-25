@@ -32,6 +32,7 @@
 #include "kernel/fs/ext2/ext2.h"
 #include "kernel/fs/sysfs/sysfs.h"
 #include "kernel/exec.h"
+#include "kernel/select.h"
 
 #include "kernel/net/arp.h"
 #include "kernel/net/ipv4.h"
@@ -48,6 +49,8 @@
 #include "include/k_ioctl_common.h"
 #include "include/k_gpio.h"
 #include "include/k_spi.h"
+#include "include/k_syscall.h"
+#include "include/k_select.h"
 
 #include "drivers/aarch64/aarch64.h"
 
@@ -149,6 +152,9 @@ void main() {
     PANIC("Schedule Returned");
     while (1);
 }
+
+bool select_canwakeup(wait_ctx_t* wait_ctx);
+int64_t select_wakeup(task_t* task);
 
 void kernel_init_lower_thread(void* ctx) {
 
@@ -341,17 +347,10 @@ void kernel_init_lower_thread(void* ctx) {
 
     gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
 
-    gpio_config.gpio_num = 17;
-    gpio_config.flags = GPIO_CONFIG_FLAG_IN |
-                        GPIO_CONFIG_FLAG_PULL_DOWN |
-                        GPIO_CONFIG_FLAG_EV_RISING;
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
-
     k_gpio_level_t gpio_level = {
         .gpio_num = 42,
         .level = 1
     };
-
 
     uint64_t freq = gtimer_get_frequency();
     uint64_t ticknum = 0;

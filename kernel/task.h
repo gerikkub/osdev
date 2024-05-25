@@ -232,6 +232,9 @@ bool signal_canwakeup_fn(wait_ctx_t* wait_ctx);
 void task_wait_timer_at(uint64_t wake_time_us);
 void task_wait_timer_in(uint64_t delay_us);
 
+void* get_kptr_for_task_ptr(uint64_t raw_ptr, task_t* task);
+void* get_kptr_for_ptr(uint64_t raw_ptr);
+
 #define TASK_SPSR_N BIT(31)
 #define TASK_SPSR_Z BIT(30)
 #define TASK_SPSR_C BIT(29)

@@ -17,12 +17,15 @@ typedef struct {
     fd_close_op close;
 } fd_ops_t;
 
+struct task_t_;
+
 typedef struct {
     bool valid;
     void* ctx;
     fd_ops_t ops;
 
     uint64_t ready;
+    struct task_t_* task;
 } fd_ctx_t;
 
 
