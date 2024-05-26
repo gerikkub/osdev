@@ -37,8 +37,13 @@
           : [out] "=r" (x))
 
 #define MEM_ISB() asm volatile ("isb SY")
+#define MEM_DMB() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+#define MEM_DSB() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+
+/*
 #define MEM_DMB() asm volatile ("dmb SY")
 #define MEM_DSB() asm volatile ("dsb SY")
+*/
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
