@@ -2,10 +2,13 @@
 #include "kernel/task.h"
 #include "kernel/console.h"
 #include "kernel/assert.h"
+#include "kernel/interrupt/interrupt.h"
 
 #include "stdlib/printf.h"
 
 void panic(char* file, uint64_t line, char* msg, ...) {
+    DISABLE_IRQ();
+
     console_log(LOG_CRIT, "Panic: %s:%u %s\n", file, line, msg);
 
     console_log(LOG_CRIT, "Backtrace");

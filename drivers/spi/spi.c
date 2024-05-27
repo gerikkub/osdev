@@ -15,6 +15,7 @@
 #include "drivers/spi/spi.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_select.h"
 #include "include/k_spi.h"
 
 #include "stdlib/bitutils.h"
@@ -26,7 +27,7 @@ typedef struct spi_device_ctx_ {
 
     k_spi_device_t device_args;
 
-    uint64_t* fd_ready;
+    fd_ctx_t* fd_ctx;
 
     spi_txn_t* active_txn;
     bool txn_complete;
@@ -34,12 +35,17 @@ typedef struct spi_device_ctx_ {
 
 void spi_txn_complete(spi_txn_t* txn) {
     txn->device_ctx->txn_complete = true;
+
+    txn->device_ctx->fd_ctx->ready |= FD_READY_GEN_READ;
+    task_wakeup(txn->device_ctx->fd_ctx->task, WAIT_SELECT);
 }
 
 static void spi_cleanup_txn(spi_txn_t* txn) {
     vfree(txn->write_mem);
     vfree(txn->read_mem);
     vfree(txn);
+
+    txn->device_ctx->fd_ctx->ready &= ~FD_READY_GEN_READ;
 }
 
 int64_t spi_device_read(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
@@ -58,6 +64,8 @@ int64_t spi_device_read(void* ctx, uint8_t* buffer, const int64_t size, const ui
 
     spi_cleanup_txn(spi_ctx->active_txn);
     spi_ctx->active_txn = NULL;
+
+    spi_ctx->fd_ctx->ready |= FD_READY_GEN_WRITE;
 
     return size;
 }
@@ -85,10 +93,13 @@ int64_t spi_device_write(void* ctx, const uint8_t* buffer, const int64_t size, c
     txn->write_mem = write_mem;
     txn->read_pos = 0;
     txn->read_mem = read_mem;
+    txn->complete = false;
     txn->device_ctx = spi_ctx;
 
     spi_ctx->txn_complete = false;
     spi_ctx->active_txn = txn;
+
+    spi_ctx->fd_ctx->ready &= ~FD_READY_GEN_WRITE;
 
     return spi_ctx->spi_ops->execute_fn(spi_ctx->driver_ctx, &spi_ctx->device_args, txn);
 }
@@ -137,7 +148,12 @@ int64_t spi_create_device(void* driver_ctx,
     fd->ctx = device_ctx;
     fd->ops = s_spi_device_ops;
     fd->ready = 0;
+    fd->task = task;
     fd->valid = true;
+
+    device_ctx->fd_ctx = fd;
+
+    device_ctx->fd_ctx->ready |= FD_READY_GEN_WRITE;
 
     return fd_num;
 }

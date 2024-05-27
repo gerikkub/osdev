@@ -17,6 +17,8 @@ typedef struct spi_txn {
     uint64_t read_pos;
     uint8_t* read_mem;
 
+    bool complete;
+
     struct spi_device_ctx_* device_ctx;
 } spi_txn_t;
 

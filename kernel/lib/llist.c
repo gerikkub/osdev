@@ -6,6 +6,7 @@
 #include "kernel/kmalloc.h"
 #include "kernel/kernelspace.h"
 #include "kernel/assert.h"
+#include "kernel/console.h"
 #include "kernel/lib/vmalloc.h"
 
 #include "kernel/lib/llist.h"

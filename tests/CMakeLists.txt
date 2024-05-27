@@ -10,4 +10,4 @@ set(CMAKE_C_FLAGS "-g3")
 include_directories("${CMAKE_CURRENT_LIST_DIR}/..")
 include_directories("${CMAKE_CURRENT_LIST_DIR}/../stdlib")
 
-add_executable(lstruct_test lstruct_test.c ../kernel/lib/lstruct.c)
+add_executable(lstruct_test lstruct_test.c test_helpers.c ../kernel/lib/lstruct.c)

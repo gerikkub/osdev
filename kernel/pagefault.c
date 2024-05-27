@@ -59,10 +59,10 @@ void pagefault_print_kernel_backtrace(task_t* task, irq_stackframe_t* frame) {
     uint64_t depth = 0;
     while (depth < 10) {
         uint64_t phy_addr;
-        bool walk_ok;
+        bool walk_ok = false;
         if (IS_KSPACE_PTR(frame_addr)) {
             walk_ok = kspace_vmem_walk_table(frame_addr, &phy_addr);
-        } else {
+        } else if (task->low_vm_table != NULL) {
             walk_ok = vmem_walk_table(task->low_vm_table, frame_addr, &phy_addr);
         }
         if (walk_ok) {

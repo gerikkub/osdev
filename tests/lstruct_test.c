@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "test_helpers.h"
+
 #include "kernel/lib/lstruct.h"
 
 typedef struct {
@@ -24,34 +26,20 @@ int main(int argc, char** argv) {
     const int N = 10;
 
     test_type_t* items = malloc(sizeof(test_type_t) * N);
-    lstruct_head_t head = malloc(sizeof(lstruct_t));
-    lstruct_head_t head2 = malloc(sizeof(lstruct_t));
+    lstruct_head_t head, head2;
     lstruct_init_head(&head);
     lstruct_init_head(&head2);
 
+    assert(lstruct_empty(head));
+    assert(lstruct_empty(head2));
+    assert(lstruct_len(head) == 0);
+
     for (int idx = 0; idx < N; idx++) {
         items[idx].a = idx;
-        lstruct_append(&head, &items[idx].list);
+        lstruct_append(head, &items[idx].list);
     }
     const int check1[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     int check1_idx = 0;
-
-    /*
-    test_type_t* ptr, *ptr_a, *ptr_b, *ptr_c;
-    ptr = (((void*)head) - offsetof(typeof(*ptr), list)); \
-    ptr_a = ptr;
-    ptr_b = (void*)(((lstruct_t*) (((uintptr_t)ptr) + offsetof(typeof(*ptr), list)))->n);
-    ptr_c = ptr_b - offsetof(typeof(*ptr), list);
-    while ( ptr = (void*)(((uintptr_t)(((lstruct_t*) (((uintptr_t)ptr) + offsetof(typeof(*ptr), list)))->n)) - offsetof(typeof(*ptr), list)), ((uintptr_t)ptr) + offsetof(typeof(*ptr), list))
-    {
-
-        assert(ptr != NULL);
-        assert(ptr == &items[check1_idx]);
-        assert(ptr->a == check1[check1_idx]);
-        check1_idx++;
-    }
-    assert(check1_idx == 10);
-    */
 
     check1_idx = 0;
     test_type_t* entry;
@@ -62,6 +50,13 @@ int main(int argc, char** argv) {
         check1_idx++;
     }
     assert(check1_idx == 10);
+
+    assert(LSTRUCT_AT(head, 0, test_type_t, list)->a == 0);
+    assert(LSTRUCT_AT(head, 4, test_type_t, list)->a == 4);
+    assert(LSTRUCT_AT(head, 10, test_type_t, list) == NULL);
+
+    assert(!lstruct_empty(head));
+    assert(lstruct_len(head) == 10);
 
     for (int idx = 0; idx < N; idx++) {
         if (idx % 2 == 0) {
@@ -82,7 +77,7 @@ int main(int argc, char** argv) {
 
     for (int idx = 0; idx < N; idx++) {
         if (idx % 2 == 0) {
-            lstruct_prepend(&head, &items[idx].list);
+            lstruct_prepend(head, &items[idx].list);
         }
     }
 
@@ -117,7 +112,7 @@ int main(int argc, char** argv) {
         assert(entry != NULL);
         if (entry->a % 3 != 0) {
             lstruct_remove(&entry->list);
-            lstruct_append(&head2, &entry->list);
+            lstruct_append(head2, &entry->list);
         }
         idx++;
     }
@@ -132,6 +127,7 @@ int main(int argc, char** argv) {
         check5_idx++;
     }
     assert(check5_idx == 4);
+    assert(lstruct_len(head) == 4);
 
     const int check6[] = {8, 4, 2, 1, 5, 7};
     int check6_idx = 0;

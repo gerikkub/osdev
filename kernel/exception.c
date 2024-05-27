@@ -7,6 +7,8 @@
 #include "kernel/panic.h"
 #include "kernel/interrupt/interrupt.h"
 #include "kernel/task.h"
+#include "kernel/schedule.h"
+#include "kernel/console.h"
 #include "stdlib/printf.h"
 
 void unhandled_exception(uint64_t exception_num) {
@@ -32,6 +34,9 @@ void unhandled_exception(uint64_t exception_num) {
 
 void exception_handler_sync(uint64_t vector) {
 
+    uint32_t* gpio_clr = (uint32_t*)(0xffff00047e200000 + 0x28);
+    *gpio_clr = (1 << 27);
+
     uint32_t esr;
 
     READ_SYS_REG(ESR_EL1, esr);
@@ -54,9 +59,14 @@ void exception_handler_sync_lower(uint64_t vector) {
 
 uint64_t exception_handler_irq(uint64_t vector, irq_stackframe_t* frame) {
 
+    uint32_t* gpio_clr = (uint32_t*)(0xffff00047e200000 + 0x28);
+    *gpio_clr = (1 << 27);
+
     interrupt_handle_irq_entry(vector);
 
-    schedule();
+    if (get_active_task() == NULL) {
+        schedule_from_irq();
+    }
 
     return 0;
 }
@@ -70,6 +80,9 @@ void panic_exception_handler(uint64_t vector) {
 }
 
 uint64_t exception_handler_sync_kernel(uint64_t vector, irq_stackframe_t* frame) {
+
+    uint32_t* gpio_clr = (uint32_t*)(0xffff00047e200000 + 0x28);
+    *gpio_clr = (1 << 27);
 
     uint32_t esr;
 

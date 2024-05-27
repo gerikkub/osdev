@@ -41,10 +41,15 @@ typedef struct {
 
 static void bcm2835_spi_irq_handler(uint32_t intid, void* ctx) {
     bcm2835_spi_ctx_t* spi_ctx = ctx;
+    uint32_t* gpio_set = (uint32_t*)(0xffff00047e200000 + 0x1c);
+    uint32_t* gpio_clr = (uint32_t*)(0xffff00047e200000 + 0x28);
+    *gpio_clr = (1 << 3);
+
 
     uint32_t status = READ_MEM32(spi_ctx->mem + BCM2711_SPI_CS);
+
     while (status & BCM2711_SPI_CS_RXD &&
-           spi_ctx->active_txn->read_pos < spi_ctx->active_txn->len) {
+        spi_ctx->active_txn->read_pos < spi_ctx->active_txn->len) {
 
         uint32_t r = READ_MEM32(spi_ctx->mem + BCM2711_SPI_FIFO);
         spi_ctx->active_txn->read_mem[spi_ctx->active_txn->read_pos] = r;
@@ -55,7 +60,7 @@ static void bcm2835_spi_irq_handler(uint32_t intid, void* ctx) {
 
     status = READ_MEM32(spi_ctx->mem + BCM2711_SPI_CS);
     while (status & BCM2711_SPI_CS_TXD &&
-           spi_ctx->active_txn->write_pos < spi_ctx->active_txn->len) {
+        spi_ctx->active_txn->write_pos < spi_ctx->active_txn->len) {
 
         uint32_t w = spi_ctx->active_txn->write_mem[spi_ctx->active_txn->write_pos];
         WRITE_MEM32(spi_ctx->mem + BCM2711_SPI_FIFO, w);
@@ -63,6 +68,18 @@ static void bcm2835_spi_irq_handler(uint32_t intid, void* ctx) {
 
         status = READ_MEM32(spi_ctx->mem + BCM2711_SPI_CS);
     }
+
+    if (status & BCM2711_SPI_CS_DONE &&
+        (spi_ctx->active_txn->read_pos == spi_ctx->active_txn->len) &&
+        (spi_ctx->active_txn->write_pos == spi_ctx->active_txn->len)) {
+
+        status &= ~(BCM2711_SPI_CS_TA);
+        WRITE_MEM32(spi_ctx->mem + BCM2711_SPI_CS, status);
+
+        spi_ctx->active_txn->complete = true;
+    }
+
+    *gpio_set = (1 << 3);
 }
 
 static int64_t bcm2835_spi_execute_txn(void* ctx, k_spi_device_t* device_cfg, spi_txn_t* txn) {
@@ -89,17 +106,11 @@ static int64_t bcm2835_spi_execute_txn(void* ctx, k_spi_device_t* device_cfg, sp
 
     while (true) {
         interrupt_await_reset(spi_ctx->intid);
-        uint32_t status = READ_MEM32(spi_ctx->mem + BCM2711_SPI_CS);
-        if (spi_ctx->active_txn->read_pos == spi_ctx->active_txn->len &&
-            spi_ctx->active_txn->write_pos == spi_ctx->active_txn->len &&
-            status & BCM2711_SPI_CS_DONE) {
+        if (spi_ctx->active_txn->complete) {
             break;
         }
         interrupt_await(spi_ctx->intid);
     }
-
-    spi_config &= ~BCM2711_SPI_CS_TA;
-    WRITE_MEM32(spi_ctx->mem + BCM2711_SPI_CS, spi_config);
 
     spi_txn_complete(spi_ctx->active_txn);
     spi_ctx->active_txn = NULL;

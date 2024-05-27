@@ -444,7 +444,7 @@ static void virtio_console_late_init(void* ctx) {
     dev_ctx->recv_buf = NULL;
     open_ctx->dev_ctx = dev_ctx;
     open_ctx->fd_ctx = NULL;
-    console_add_driver(&s_virtio_pci_console_file_ops, open_ctx);
+    // console_add_driver(&s_virtio_pci_console_file_ops, open_ctx);
 
     sys_device_register(&s_virtio_pci_console_file_ops, virtio_pci_console_open_op, dev_ctx, "con0");
     console_log(LOG_INFO, "Hello from serial driver!");

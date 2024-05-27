@@ -19,6 +19,7 @@
 #include "kernel/gtimer.h"
 #include "kernel/interrupt/interrupt.h"
 #include "kernel/task.h"
+#include "kernel/schedule.h"
 #include "kernel/syscall.h"
 #include "kernel/memoryspace.h"
 #include "kernel/kernelspace.h"
@@ -70,6 +71,8 @@ uint32_t read32(void* ptr) {
     return *(volatile uint32_t*)ptr;
 }
 
+static uint64_t dummy_val;
+
 void kernel_init_lower_thread(void* ctx);
 
 void main() {
@@ -120,6 +123,7 @@ void main() {
 
     assert_aarch64_support();
 
+    schedule_init();
     syscall_init();
     interrupt_init();
 
@@ -145,7 +149,7 @@ void main() {
     DISABLE_IRQ();
 
     task_init((uint64_t*)exstack_entry.base);
-    create_kernel_task(0x10000, kernel_init_lower_thread, NULL, "kernel");
+    create_kernel_task(0x10000, kernel_init_lower_thread, &dummy_val, "kernel");
 
     schedule();
 
@@ -153,10 +157,11 @@ void main() {
     while (1);
 }
 
-bool select_canwakeup(wait_ctx_t* wait_ctx);
-int64_t select_wakeup(task_t* task);
-
 void kernel_init_lower_thread(void* ctx) {
+
+    console_log(LOG_INFO, "Kernel Main Lower");
+
+    ASSERT(ctx == &dummy_val)
 
     driver_run_late_init();
     interrupt_enable();
@@ -165,297 +170,7 @@ void kernel_init_lower_thread(void* ctx) {
 
     net_tcp_conn_start_timeout_thread();
 
-    int64_t open_res;
-    /*
-    int64_t open_res;
-    open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
-                                       "home");
-    ASSERT(open_res >= 0);
-    */
-
-    fd_ops_t nic_ops;
-    void* nic_ctx;
-    open_res = vfs_open_device("sys",
-                               //"virtio-pci-net0",
-                               "enc28j60",
-                               0,
-                               &nic_ops,
-                               &nic_ctx,
-                               NULL);
-    if (open_res < 0) {
-        console_log(LOG_INFO, "virtio-pci-net0 not available. Skipping IP set");
-    } else {
-        uint64_t ip = 192 << 24 |
-                      168 << 16 |
-                      0 << 8 |
-                    //   210;
-                      211;
-        int64_t res;
-        res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_IP, &ip, 1);
-        ASSERT(res == 0);
-
-        uint64_t ip_net = 192 << 24 |
-                          168 << 16 |
-                          0 << 8 |
-                          0;
-
-        uint64_t args[2] = {
-            ip_net, 24
-        };
-
-        res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_ROUTE, args, 2);
-
-        uint64_t ip_route = 192 << 24 |
-                            168 << 16 |
-                            0 << 8 |
-                            207;
-
-        uint64_t args_default[2] = {
-            ip_route, 24
-        };
-        res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_DEFAULT_ROUTE, args_default, 2);
-    }
-
-    /*
-    uint64_t setgpio_tid;
-    char* addline_argv[] = {
-        "home",
-        "hello.txt",
-        "newline",
-        NULL
-    };
-    addline_tid = exec_user_task("home", "bin/addline.elf", "newline", addline_argv);
-    (void)addline_tid;
-
-    uint64_t cat_tid;
-    char* cat_argv[] = {
-        "home",
-        "hello.txt",
-        NULL
-    };
-    cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
-    (void)cat_tid;
-
-    uint64_t touch_tid;
-    char* touch_argv[] = {
-        "home",
-        "new.txt",
-        "This is a new file!",
-        NULL
-    };
-    touch_tid = exec_user_task("home", "bin/touch.elf", "touch", touch_argv);
-    (void)touch_tid;
-
-    uint64_t cat2_tid;
-    char* cat2_argv[] = {
-        "home",
-        "new.txt",
-        NULL
-    };
-    cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
-    (void)cat2_tid;
-    */
-
-    /*
-    uint64_t gsh_tid;
-    char* gsh_argv[] = {
-        NULL
-    };
-    gsh_tid = exec_user_task("home", "bin/gsh.elf", "gsh", gsh_argv);
-    (void)gsh_tid;
-    */
-
-   /*
-    uint64_t udp_recv_tid;
-    char* udp_recv_argv[] = {
-        "10.0.2.1",
-        "4455",
-        NULL
-    };
-    (void)udp_recv_argv;
-    udp_recv_tid = exec_user_task("home", "bin/udp_recv.elf", "udp_recv", udp_recv_argv);
-    (void)udp_recv_tid;
-    */
-
-   /*
-   uint64_t echo_tid;
-   char* echo_argv[] = {
-        "Hello"
-   };
-   (void)echo_argv;
-   echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
-   (void)echo_tid;
-
-    uint64_t tcp_listen_tid;
-    char* tcp_listen_argv[] = {
-        "10.0.2.15",
-        "4455",
-        NULL
-    };
-    (void)tcp_listen_argv;
-    tcp_listen_tid = exec_user_task("home", "bin/tcp_listen.elf", "tcp_listen", tcp_listen_argv);
-    (void)tcp_listen_tid;
-
-    uint64_t http_server_tid;
-    char* http_server_argv[] = {
-        "10.0.2.15",
-        "8088",
-        NULL
-    };
-    (void)http_server_argv;
-    http_server_tid = exec_user_task("home", "bin/http_server.elf", "http_server", http_server_argv);
-    (void)http_server_tid;
-    */
-
-    uint64_t count_a_tid;
-    uint64_t count_b_tid;
-    //count_a_tid = exec_user_task("home", "bin/count.elf", "count_a", NULL);
-    //count_b_tid = exec_user_task("home", "bin/count.elf", "count_a", NULL);
-    (void)count_a_tid;
-    (void)count_b_tid;
-
-    /*
-    uint64_t tcp_cat_tid;
-    char* tcp_cat_argv[] = {
-        "10.0.2.15",
-        "5555",
-        NULL
-    };
-    (void)tcp_cat_argv;
-    tcp_cat_tid = exec_user_task("home", "bin/tcp_cat.elf", "tcp_cat", tcp_cat_argv);
-    (void)tcp_cat_tid;
-    */
-
-    fd_ops_t gpio_ops;
-    void* gpio_ctx;
-    open_res = vfs_open_device("sys",
-                               "bcm2711_gpio",
-                               0,
-                               &gpio_ops,
-                               &gpio_ctx,
-                               NULL);
-    ASSERT(open_res >= 0);
-
-    k_gpio_config_t gpio_config = {
-        .gpio_num = 42,
-        .flags = GPIO_CONFIG_FLAG_OUT_PP |
-                 GPIO_CONFIG_FLAG_PULL_NONE |
-                 GPIO_CONFIG_FLAG_EV_NONE
-    };
-
-    uint64_t config_args = (uint64_t)&gpio_config;
-
-    gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
-
-    k_gpio_level_t gpio_level = {
-        .gpio_num = 42,
-        .level = 1
-    };
-
-    uint64_t freq = gtimer_get_frequency();
-    uint64_t ticknum = 0;
-    //int64_t lastmem = 0;
-    uint64_t tcp_tid = 0;
-    while (1) {
-        task_wait_timer_in(1000*1000);
-
-        ticknum++;
-
-        uint64_t level_args = (uint64_t)&gpio_level;
-        gpio_ops.ioctl(gpio_ctx, GPIO_IOCTL_SET, &level_args, 1);
-
-        gpio_level.level = !gpio_level.level;
-
-        // console_log(LOG_DEBUG, "Tick %d", ticknum);
-
-        ipv4_t dest_ip = {
-            .d = {10, 0, 2, 1}
-        };
-        (void)dest_ip;
-
-        /*
-        net_ipv4_icmp_hdr_t ping_request = {
-            .type = NET_IPV4_ICMP_ECHO_REQUEST,
-            .code = 0,
-            .checksum = 0,
-            .echo.id = 1,
-            .echo.seq = ticknum,
-            .payload = (uint8_t*)"Gerik!",
-            .payload_len = 6
-        };
-
-        net_ipv4_icmp_send_packet(&dest_ip, &ping_request);
-        */
-
-        //net_udp_send_packet(&dest_ip, 5555, 2233, (uint8_t*)"Hello!\n", 7);
-
-        /*
-        char buffer[5] = {0};
-        char* wait_task_argv[] = {
-            buffer,
-            NULL
-        };
-        snprintf(wait_task_argv[0], 5, "%d", echo_tid);
-        uint64_t wait_task_tid;
-        if (ticknum == 20) {
-            wait_task_tid = exec_user_task("home", "bin/wait_task.elf", "wait_task", wait_task_argv);
-        }
-        (void)wait_task_tid;
-        */
-
-        char* tcp_argv[] = {
-            "10.0.2.1",
-            "6666",
-            "test\n",
-            "5",
-            NULL
-        };
-        (void)tcp_argv;
-        if ((gtimer_get_count() / freq) > 15 && tcp_tid == 0) {
-            //tcp_tid = exec_user_task("home", "bin/tcp_test.elf", "tcp_test", tcp_argv);
-        }
-        (void)tcp_tid;
-
-/*
-        uint64_t time_tid;
-        time_tid = exec_user_task("home", "bin/time.elf", "time", NULL);
-        (void)time_tid;
-        */
-
-        uint64_t cat2_tid;
-        char* cat2_argv[] = {
-            "sysfs",
-            "profile",
-            NULL
-        };
-        //cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
-        (void)cat2_argv;
-        (void)cat2_tid;
-/*
-        uint64_t cat2_tid;
-        char* cat2_argv[] = {
-            "sysfs",
-            "vmalloc_stat",
-            NULL
-        };
-        cat2_tid = exec_user_task("home", "bin/cat.elf", "cat", cat2_argv);
-        (void)cat2_tid;
-
-        malloc_stat_t stat;
-        int64_t deltamem = 0;
-        vmalloc_calc_stat(&stat);
-        if (lastmem != 0) {
-            deltamem = lastmem - stat.avail_mem;
-        }
-        lastmem = stat.avail_mem;
-        console_printf("%u %u %u %d",
-                       stat.total_mem,
-                       stat.avail_mem,
-                       stat.largest_chunk,
-                       deltamem);
-        console_printf("\n");
-        */
-    }
+    board_loop();
 
     while (1) {
         asm volatile ("svc #0");

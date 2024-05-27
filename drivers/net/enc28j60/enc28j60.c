@@ -14,6 +14,7 @@
 #include "kernel/memoryspace.h"
 #include "kernel/vmem.h"
 #include "kernel/task.h"
+#include "kernel/select.h"
 #include "kernel/kmalloc.h"
 #include "kernel/gtimer.h"
 #include "kernel/interrupt/interrupt.h"
@@ -194,13 +195,15 @@ static void enc_cmd_spi_txn(enc_ctx_t* enc_ctx, uint8_t* write_buf, uint8_t* rea
     int64_t wrote = spi_fd_ctx->ops.write(spi_fd_ctx->ctx, write_buf, len, 0);
     ASSERT(wrote == len);
 
-    uint64_t done;
-    do {
-        done = spi_fd_ctx->ops.read(spi_fd_ctx->ctx, read_buf, len, 0);
-        ASSERT(done >= 0);
-        // TODO: Can I use select and block inside the kernel?
-        task_wait_timer_in(100);
-    } while(!done);
+    syscall_select_ctx_t spi_txn_select = {
+        .fd = enc_ctx->spi_fd,
+        .ready_mask = FD_READY_GEN_READ
+    };
+    uint64_t spi_mask_out;
+    select_wait(&spi_txn_select, 1, UINT64_MAX, &spi_mask_out);
+
+    uint64_t ok = spi_fd_ctx->ops.read(spi_fd_ctx->ctx, read_buf, len, 0);
+    ASSERT(ok == len);
 }
 
 static uint8_t enc_cmd_read_raw(enc_ctx_t* enc_ctx, uint8_t addr, int64_t reg_type) {
@@ -362,6 +365,7 @@ void enc28j60_read_thread(void* ctx) {
         uint64_t gpio_mask_out;
         int64_t fd = select_wait(&enc_irq_select, 1, 10000, &gpio_mask_out);
 
+        //if (1) {
         if (fd == enc_ctx->gpio_listener_fd) {
             enc_cmd_bitclr(enc_ctx, ENC_REG_EIE, BIT(7)); // INTIE
             while (true) {

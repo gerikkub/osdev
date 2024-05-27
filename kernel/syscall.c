@@ -6,6 +6,7 @@
 #include "kernel/syscall.h"
 #include "kernel/exception.h"
 #include "kernel/task.h"
+#include "kernel/schedule.h"
 #include "kernel/assert.h"
 #include "kernel/console.h"
 #include "kernel/vmem.h"

@@ -128,7 +128,7 @@ static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t 
                 }
 
                 socket_ctx->canwake = false;
-                task_wait_kernel(get_active_task(), WAIT_SIGNAL, &wake_ctx, NULL, signal_canwakeup_fn);
+                task_wait_kernel(get_active_task(), WAIT_SIGNAL, &wake_ctx, TASK_WAIT_WAKEUP, signal_wakeup_fn);
                 bytes_avail = circbuffer_len(socket_ctx->recv_buffer);
                 bytes_read = (bytes_avail < size) ? bytes_avail : size;
             } while (bytes_read == 0);

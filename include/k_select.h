@@ -2,7 +2,9 @@
 #ifndef __K_SELECT_H__
 #define __K_SELECT_H__
 
-#include "bitutils.h"
+#include <stdint.h>
+
+#include "stdlib/bitutils.h"
 
 #define FD_READY_GEN_READ BIT(0)
 #define FD_READY_GEN_WRITE BIT(1)

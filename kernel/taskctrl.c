@@ -39,13 +39,12 @@ void task_ops_waited(task_t* task, task_t* target_task, void* ctx) {
     task_ctx->fd_ctx->ready = task_ops_calculate_ready(target_task);
 }
 
-bool task_ops_wait_canwakeup_fn(wait_ctx_t* wait_ctx) {
-    return wait_ctx->wait.complete;
-}
-
-int64_t task_ops_wait_wakeup_fn(task_t* task) {
-    task_ops_ctx_t* task_ctx = task->wait_ctx.wait.ctx;
-    return task_await(task, get_task_for_tid(task_ctx->tid));
+bool task_ops_wait_wakeup_fn(task_t* task, int64_t* ret) {
+    if (task->wait_ctx.wait.complete) {
+        task_ops_ctx_t* task_ctx = task->wait_ctx.wait.ctx;
+        *ret = task_await(task, get_task_for_tid(task_ctx->tid));
+    }
+    return task->wait_ctx.wait.complete;
 }
 
 int64_t task_ops_ioctl_fn(void* ctx, const uint64_t ioctl, const uint64_t* args, const uint64_t arg_count) {
@@ -75,8 +74,8 @@ int64_t task_ops_ioctl_fn(void* ctx, const uint64_t ioctl, const uint64_t* args,
             ret_val = task_wait_kernel(task,
                                        WAIT_WAIT,
                                        &wait_ctx,
-                                       task_ops_wait_wakeup_fn,
-                                       task_ops_wait_canwakeup_fn);
+                                       TASK_WAIT_WAKEUP,
+                                       task_ops_wait_wakeup_fn);
         }
         break;
     default:

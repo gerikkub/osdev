@@ -6,7 +6,7 @@
 
 .global exception_init
 .global switch_to_kernel_task_stack_asm
-.global task_wait_kernel_c
+.global task_wait_kernel_final
 
 .macro dummy_exception name num
 .align 7
@@ -345,15 +345,15 @@ switch_to_kernel_task_stack_asm:
     # Should not get here
     ret
 
-.global task_wait_kernel
+.global task_wait_kernel_asm
 
 # Wait a task inside a kernel context.
 # x0: Task pointer
 # x1: Wait Type
 # x2: Wait Context Ptr
-# x3: Wakeup Function
-# x4: Canwakeup Function
-task_wait_kernel:
+# x3: Runstate
+# x4: Wakeup Function
+task_wait_kernel_asm:
 
     // Setup the frame pointer
     stp lr, fp, [sp, #-16]!
@@ -374,7 +374,7 @@ task_wait_kernel:
     stp x30, xzr, [sp, #-16]!
 
     mov x5, sp
-    bl task_wait_kernel_c
+    bl task_wait_kernel_final
 
 .global restore_context_kernel_asm
 

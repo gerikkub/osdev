@@ -274,23 +274,14 @@ uint64_t create_elf_task(uint8_t* elf_data,
     ((char**)argv_base_kptr)[argc] = 0;
 
     uint64_t tid = 0;
-    if (system_task) {
-        tid = create_system_task(KERNEL_STD_STACK_SIZE,
-                                 stack_base,
-                                 USER_STACK_SIZE,
-                                 &elf_space,
-                                 (task_f)header->e_entry,
-                                 (void*)USER_ADDRSPACE_ARGV,
-                                 name);
-    } else {
-        tid = create_user_task(KERNEL_STD_STACK_SIZE,
-                               stack_base,
-                               USER_STACK_SIZE,
-                               &elf_space,
-                               (task_f)header->e_entry,
-                               (void*)USER_ADDRSPACE_ARGV,
-                               name);
-    }
+    (void)system_task;
+    tid = create_user_task(KERNEL_STD_STACK_SIZE,
+                            stack_base,
+                            USER_STACK_SIZE,
+                            &elf_space,
+                            (task_f)header->e_entry,
+                            (void*)USER_ADDRSPACE_ARGV,
+                            name);
 
     if (tid == 0) {
         memspace_deallocate(&elf_space);

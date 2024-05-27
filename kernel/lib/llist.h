@@ -40,6 +40,8 @@ do {
 
 llist_t* llist_find_helper(llist_head_t head, void* x, uint64_t len);
 
+void llist_prepend_ptr(llist_head_t head, void* newitem);
+
 void llist_append_ptr(llist_head_t head, void* newitem);
 
 void llist_delete_ptr(llist_head_t head, void* delitem);

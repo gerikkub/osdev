@@ -34,34 +34,16 @@ int64_t poll_select(task_t* task, syscall_select_ctx_t* select_arr, uint64_t sel
     return -1;
 }
 
-bool select_canwakeup(wait_ctx_t* wait_ctx) {
-    int64_t stat = poll_select(wait_ctx->select.task,
-                               wait_ctx->select.select_arr,
-                               wait_ctx->select.select_len,
-                               wait_ctx->select.ready_mask_out);
-
-    if (stat >= 0) {
-        return true;
-    }
-
-    uint64_t now_us = gtimer_get_count_us();
-
-    if (wait_ctx->select.timeout_valid &&
-        now_us >= wait_ctx->select.timeout_end_us) {
-        return true;
-    }
-
-    return false;
-}
-
-int64_t select_wakeup(task_t* task) {
+bool select_wakeup(task_t* task, int64_t* ret) {
     int64_t fd = poll_select(task->wait_ctx.select.task,
                              task->wait_ctx.select.select_arr,
                              task->wait_ctx.select.select_len,
                              task->wait_ctx.select.ready_mask_out);
     
+    // Note: Timer expiration is handled in schedule.c
+    
     if (fd < 0) {
-        return fd;
+        return false;
     }
     
     fd_ctx_t* fd_ctx = get_task_fd(fd, task);
@@ -69,7 +51,8 @@ int64_t select_wakeup(task_t* task) {
 
     fd_ctx->ready = fd_ctx->ready ^ (SELECT_VOLATILE_BITS & *task->wait_ctx.select.ready_mask_out);
 
-    return fd;
+    *ret = fd;
+    return true;
 }
 
 
@@ -119,5 +102,5 @@ int64_t select_wait(syscall_select_ctx_t* select_arr, uint64_t select_len, uint6
         }
     };
 
-    return task_wait_kernel(task, WAIT_SELECT, &wait_ctx, select_wakeup, select_canwakeup);
+    return task_wait_kernel(task, WAIT_SELECT, &wait_ctx, TASK_WAIT_WAKEUP, select_wakeup);
 }

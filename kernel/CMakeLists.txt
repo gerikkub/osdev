@@ -20,6 +20,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/modules.c
             ${CMAKE_CURRENT_SOURCE_DIR}/pagefault.c
             ${CMAKE_CURRENT_SOURCE_DIR}/panic.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/schedule.c
             ${CMAKE_CURRENT_SOURCE_DIR}/select.c
             ${CMAKE_CURRENT_SOURCE_DIR}/syscall.c
             ${CMAKE_CURRENT_SOURCE_DIR}/sys_device.c
@@ -50,6 +51,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/libpci.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/libvirtio.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/llist.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/lib/lstruct.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/vmalloc.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/elapsedtimer.c
 

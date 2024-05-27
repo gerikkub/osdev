@@ -83,7 +83,7 @@ static int64_t net_tcp_bind_get_incoming(net_tcp_bind_ctx_t* bind_ctx) {
         };
         bind_ctx->canwake = false;
 
-        task_wait_kernel(get_active_task(), WAIT_SIGNAL, &wake_ctx, NULL, signal_canwakeup_fn);
+        task_wait_kernel(get_active_task(), WAIT_SIGNAL, &wake_ctx, TASK_WAIT_WAKEUP, signal_wakeup_fn);
     }
 
     int64_t fd_num = find_open_fd(bind_ctx->task);

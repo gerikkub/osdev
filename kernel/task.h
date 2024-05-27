@@ -13,6 +13,7 @@
 #include "kernel/fd.h"
 #include "kernel/lock/lock.h"
 #include "kernel/lib/elapsedtimer.h"
+#include "kernel/lib/lstruct.h"
 
 #include "include/k_syscall.h"
 
@@ -55,8 +56,8 @@ typedef struct __attribute__((packed)) {
 
 typedef enum {
     TASK_RUNABLE,
-    TASK_RUNABLE_KERNEL,
     TASK_WAIT,
+    TASK_WAIT_WAKEUP,
     TASK_AWAKE,
     TASK_COMPLETE
 } run_state_t;
@@ -127,8 +128,8 @@ typedef union {
     wait_wait_t wait;
 } wait_ctx_t;
 
-typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);
-typedef int64_t (*task_wakeup_f)(struct task_t_*);
+//typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);
+typedef bool (*task_wakeup_f)(struct task_t_*, int64_t* ret);
 
 
 typedef struct task_t_ {
@@ -137,11 +138,12 @@ typedef struct task_t_ {
     uint8_t asid;
     char name[MAX_TASK_NAME_LEN];
 
+    lstruct_t schedule_queue;
     run_state_t run_state;
     wait_reason_t wait_reason;
     wait_ctx_t wait_ctx;
     task_wakeup_f wait_wakeup_fn;
-    task_canwakeup_f wait_canwakeup_fn;
+    int64_t wait_return;
 
     int64_t ret_val;
     llist_head_t waiters;
@@ -174,8 +176,11 @@ task_t* get_task_at_idx(int64_t idx);
 task_t* get_task_for_tid(uint64_t tid);
 uint64_t get_schedule_profile_time(void);
 void restore_context(uint64_t tid);
+void restore_context_idle(void);
 void restore_context_kernel(uint64_t tid, uint64_t x0, void* sp);
 void restore_context_kernel_asm(uint64_t x0, void* sp);
+
+void schedule_from_irq(void);
 
 uint64_t create_task(uint64_t* user_stack_base,
                      uint64_t user_stack_size,
@@ -214,20 +219,27 @@ uint64_t task_await(task_t* task, task_t* target_task);
 void task_clear_waiter(task_t* task, task_t* target_task);
 void task_add_waiter(task_t* task, task_t* target_task);
 
-void schedule(void);
-
-// Implemented in exception_asm.s
 int64_t task_wait_kernel(task_t* task,
                          wait_reason_t reason,
                          wait_ctx_t* ctx,
-                         task_wakeup_f wakeup_fun,
-                         task_canwakeup_f canwakeup_f);
+                         run_state_t runstate,
+                         task_wakeup_f wakeup_fun);
+
+// Implemented in exception_asm.s
+int64_t task_wait_kernel_asm(task_t* task,
+                             wait_reason_t reason,
+                             wait_ctx_t* ctx,
+                             run_state_t runstate,
+                             task_wakeup_f wakeup_fun);
 
 int64_t find_open_fd(task_t* task);
 fd_ctx_t* get_kernel_fd(int64_t fd_num);
 fd_ctx_t* get_task_fd(int64_t fd_num, task_t* task);
 
-bool signal_canwakeup_fn(wait_ctx_t* wait_ctx);
+bool signal_wakeup_fn(task_t* task, int64_t* ret);
+
+void start_idle_timer(void);
+void stop_idle_timer(void);
 
 void task_wait_timer_at(uint64_t wake_time_us);
 void task_wait_timer_in(uint64_t delay_us);

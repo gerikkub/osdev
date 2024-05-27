@@ -10,7 +10,10 @@
 #include "kernel/kernelspace.h"
 #include "kernel/drivers.h"
 #include "kernel/dtb.h"
+#include "kernel/task.h"
+#include "kernel/console.h"
 #include "kernel/lib/libpci.h"
+#include "kernel/fs_manager.h"
 
 void board_init_main_early(void) {
 }
@@ -57,4 +60,26 @@ void board_init_devices(void) {
     driver_disable(&pl011_reg);
 
     dtb_init(DTB_VMEM);
+}
+
+void board_discover_devices(void) {
+
+}
+
+void board_loop() {
+
+    int64_t open_res;
+    open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
+                                       "home");
+    ASSERT(open_res >= 0);
+
+    while (true) {
+        task_wait_timer_in(1000*1000);
+
+        console_log(LOG_INFO, "Tick");
+        uint64_t daif;
+        READ_SYS_REG(DAIF, daif);
+        console_log(LOG_INFO, "DAIF: 0x%4x", daif);
+    }
+
 }

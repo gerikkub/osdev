@@ -28,7 +28,7 @@
     do { \
     volatile uint64_t _val; \
     READ_SYS_REG(DAIF, _val);  \
-    _val &= ~BIT(7); /* IRQ Mask */ \
+    _val &= ~(BIT(7) | BIT(6)); /* IRQ Mask */ \
     WRITE_SYS_REG(DAIF, _val); \
     (void)_val; \
     } while(0)
@@ -37,7 +37,7 @@
     do { \
     volatile uint64_t _val; \
     READ_SYS_REG(DAIF, _val);  \
-    _val |= BIT(7); /* IRQ Mask */ \
+    _val |= BIT(7) | BIT(6); /* IRQ Mask */ \
     WRITE_SYS_REG(DAIF, _val); \
     (void)_val; \
     } while(0)

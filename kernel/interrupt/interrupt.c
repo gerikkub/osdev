@@ -122,8 +122,8 @@ bool interrupt_await_reset(uint64_t irq) {
     return true;
 }
 
-static bool interrupt_await_canwakeup(wait_ctx_t* wait_ctx) {
-    uint64_t irq = wait_ctx->irqnotify.irq;
+static bool interrupt_await_wakeup(task_t* task, int64_t* ret) {
+    uint64_t irq = task->wait_ctx.irqnotify.irq;
     bool awaited = false;
 
     uint64_t irq_state;
@@ -132,6 +132,7 @@ static bool interrupt_await_canwakeup(wait_ctx_t* wait_ctx) {
     s_interrupt_ctx.handlers[irq].awaited = false;
     END_CRITICAL(irq_state);
 
+    *ret = 0;
     return awaited;
 }
 
@@ -156,7 +157,7 @@ bool interrupt_await(uint64_t irq) {
         }
     };
 
-    task_wait_kernel(get_active_task(), WAIT_IRQNOTIFY, &wait_ctx, NULL, interrupt_await_canwakeup);
+    task_wait_kernel(get_active_task(), WAIT_IRQNOTIFY, &wait_ctx, TASK_WAIT_WAKEUP, interrupt_await_wakeup);
 
     return true;
 }
