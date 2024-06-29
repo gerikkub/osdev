@@ -197,6 +197,7 @@ static int64_t syscall_sbrk(uint64_t amount_unsigned,
 
 void syscall_sync_handler(uint64_t vector, uint32_t esr) {
 
+
     uint64_t syscall_num = esr & 0xFFFF;
 
     // TODO: Maybe don't assert but end a task

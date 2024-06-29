@@ -47,6 +47,7 @@ void main_bootstrap(void) {
 
     setup_vmem_bootstrap();
 
+    //while (1);
     _high_start();
 
     while (1); // Should not reach

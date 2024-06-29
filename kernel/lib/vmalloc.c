@@ -96,4 +96,8 @@ void vmalloc_calc_stat(malloc_stat_t* stat_out) {
     malloc_calc_stat(&s_vmalloc_state, stat_out);
 }
 
+void vmalloc_check_structure(void) {
+    malloc_check_structure_p(&s_vmalloc_state);
+}
+
 #endif

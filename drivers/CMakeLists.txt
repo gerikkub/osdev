@@ -19,5 +19,7 @@ add_library(kernel_drivers OBJECT
             spi/spi.c
             spi/bcm2835_spi/bcm2835_spi.c
             gpio/bcm2711_gpio/bcm2711_gpio.c
+            loop/loop.c
 )
 target_include_directories(kernel_drivers PRIVATE ${KERNEL_INCLUDE_DIRS})
+target_compile_options(kernel_drivers PRIVATE "-DKERNEL_BUILD")

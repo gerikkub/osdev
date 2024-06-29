@@ -47,6 +47,13 @@ void console_write(const char* s) {
     console_write_len(s, len);
 }
 
+void console_write_raw(const char* s, uint64_t len) {
+    if (s_console_fd < 0) {
+        return;
+    }
+    SYSCALL_CALL(SYSCALL_WRITE, s_console_fd, (uintptr_t)s, len, 0);
+}
+
 void console_write_len(const char* s, uint64_t len) { 
     SYS_ASSERT(s_console_idx < CONSOLE_BUFFER_SIZE);
 
@@ -70,7 +77,10 @@ void console_write_len(const char* s, uint64_t len) {
 
 void console_flush(void) {
     SYS_ASSERT(s_console_idx <= CONSOLE_BUFFER_SIZE);
-    SYS_ASSERT(s_console_fd >= 0);
+    if (s_console_fd < 0) {
+        s_console_idx = 0;
+        return;
+    }
 
     s_console_buffer[s_console_idx] = '\0';
 
@@ -79,7 +89,9 @@ void console_flush(void) {
 }
 
 int64_t console_read(char* buffer, uint64_t len) {
-    SYS_ASSERT(s_console_fd >= 0);
+    if (s_console_fd < 0) {
+        return -1;
+    }
 
     int64_t ret;
     SYSCALL_CALL_RET(SYSCALL_READ, s_console_fd, (uintptr_t)buffer, len, 0, ret);

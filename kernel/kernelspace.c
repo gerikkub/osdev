@@ -6,6 +6,7 @@
 #include "kernel/memoryspace.h"
 #include "kernel/kmalloc.h"
 #include "kernel/assert.h"
+#include "kernel/console.h"
 #include "kernel/lib/vmalloc.h"
 
 static memory_space_t s_kernelspace;

@@ -30,8 +30,8 @@ typedef struct {
 
     hashmap_ctx_t* filecache;
 
-    void* disk_ctx;
-    fd_ops_t disk_ops;
+    int64_t disk_fd;
+    fd_ctx_t* disk_fd_ctx;
 
     lock_t fs_lock;
 

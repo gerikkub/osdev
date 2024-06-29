@@ -9,7 +9,7 @@
 if (!(X)) { \
     console_printf("panic: %s:%u %s\n", __FILE__, __LINE__, #X ); \
     console_flush(); \
-    while (1); \
 }
+
 
 #endif

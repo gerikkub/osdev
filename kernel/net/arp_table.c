@@ -14,6 +14,7 @@
 #include "stdlib/bitutils.h"
 
 static llist_head_t s_arp_table = NULL;
+static lstruct_head_t s_arp_waiters;
 
 static void net_arp_make_ipv4_request(net_dev_t* net_dev, ipv4_t* ipv4, mac_t* mac) {
 
@@ -30,8 +31,8 @@ static void net_arp_make_ipv4_request(net_dev_t* net_dev, ipv4_t* ipv4, mac_t* m
     memcpy(&req_packet.ipv4.tha, "\xFF\xFF\xFF\xFF\xFF\xFF", sizeof(mac_t));
     memcpy(&req_packet.ipv4.tpa, ipv4, sizeof(ipv4_t));
 
-    //console_log(LOG_DEBUG, "Net arp table sending request for %d.%d.%d.%d",
-                //ipv4->d[0], ipv4->d[1], ipv4->d[2], ipv4->d[3]);
+    // console_log(LOG_DEBUG, "Net arp table sending request for %d.%d.%d.%d",
+    //             ipv4->d[0], ipv4->d[1], ipv4->d[2], ipv4->d[3]);
 
     net_arp_send_packet(net_dev, &req_packet, &req_packet.ipv4.tha);
 }
@@ -60,6 +61,14 @@ void net_arp_update_table(ipv4_t* ipv4, mac_t* mac) {
                 ipv4->d[0], ipv4->d[1], ipv4->d[2], ipv4->d[3],
                 mac->d[0], mac->d[1], mac->d[2],
                 mac->d[3], mac->d[4], mac->d[5]);
+
+    net_send_buffer_t* pkt;
+    FOREACH_NETQUEUE_SEND(s_arp_waiters, pkt) {
+        if (memcmp(&pkt->arp_wait_ctx.via_ip, ipv4, sizeof(ipv4_t)) == 0) {
+            lstruct_remove(&pkt->queue);
+            ethernet_send_packet(pkt->dev, pkt, mac, pkt->arp_wait_ctx.ethertype);
+        }
+    }
 }
 
 bool net_arp_get_mac_for_ipv4(net_dev_t* net_dev, ipv4_t* ipv4, mac_t* dest_mac) {
@@ -77,6 +86,12 @@ bool net_arp_get_mac_for_ipv4(net_dev_t* net_dev, ipv4_t* ipv4, mac_t* dest_mac)
     return false;
 }
 
+void net_arp_queue_packet(net_send_buffer_t* send_buffer) {
+    lstruct_append(s_arp_waiters, &send_buffer->queue);
+}
+
 void net_arp_table_init(void) {
     s_arp_table = llist_create();
+
+    lstruct_init_head(&s_arp_waiters);
 }

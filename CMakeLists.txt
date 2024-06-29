@@ -73,6 +73,17 @@ function(create_diskimg NAME)
     set_target_properties(diskimg-${NAME} PROPERTIES OUTPUT_NUM "disk_image.img")
 endfunction()
 
+function(create_tarball NAME)
+    add_custom_target (disktar-${NAME}
+        COMMAND rm -rf diskdata
+        COMMAND mkdir -p diskdata/bin
+        COMMAND cp ${APP_BINARIES} diskdata/bin
+        COMMAND cp -r ${CMAKE_SOURCE_DIR}/diskextras/* diskdata/
+        COMMAND tar --no-acls --no-xattrs --no-selinux -H gnu -C diskdata -czf ${CMAKE_CURRENT_BINARY_DIR}/disk_image.tar .
+        DEPENDS kernel-${NAME} ${APP_TARGETS})
+    set_target_properties(disktar-${NAME} PROPERTIES OUTPUT_NUM "disk_image.tar")
+endfunction()
+
 set (QEMU_PATH /home/gerik/Downloads/qemu/build/)
 
 function(create_qemu_target NAME QEMU_FLAGS)

@@ -5,37 +5,35 @@
 #include "kernel/elf.h"
 #include "kernel/vfs.h"
 #include "kernel/fd.h"
+#include "kernel/assert.h"
+#include "kernel/task.h"
 #include "kernel/lib/vmalloc.h"
 
 #include "include/k_ioctl_common.h"
 
 uint64_t exec_user_task(const char* device, const char* path, const char* name, char** argv) {
 
-    int64_t open_res;
-    fd_ops_t file_ops;
-    void* file_ctx;
+    int64_t file_fd;
+    fd_ctx_t* file_fd_ctx;
 
-    open_res = vfs_open_device(device, path, 0, &file_ops, &file_ctx, NULL);
-    if (open_res < 0) {
+    file_fd = vfs_open_device_fd(device, path, 0);
+    if (file_fd < 0) {
         return 0;
     }
-    /*
-    file_ops.close(file_ctx);
-    return 0; // No Leak
-    */
+    file_fd_ctx = get_kernel_fd(file_fd);
+    ASSERT(file_fd_ctx != NULL);
 
-
-    int64_t file_size = file_ops.ioctl(file_ctx, BLK_IOCTL_SIZE, NULL, 0);
+    int64_t file_size = fd_call_ioctl(file_fd_ctx, BLK_IOCTL_SIZE, NULL, 0);
     if (file_size < 0) {
         return 0;
     }
 
     uint8_t* read_buffer = vmalloc(file_size);
 
-    int64_t size = file_ops.read(file_ctx, read_buffer, file_size, 0);
+    int64_t size = fd_call_read(file_fd_ctx, read_buffer, file_size, 0);
     if(size != file_size) {
         vfree(read_buffer);
-        file_ops.close(file_ctx);
+        fd_call_close(file_fd_ctx);
         return 0;
     }
 
@@ -44,7 +42,7 @@ uint64_t exec_user_task(const char* device, const char* path, const char* name, 
     tid = create_elf_task(read_buffer, size, &res, false, name, argv);
 
     vfree(read_buffer);
-    file_ops.close(file_ctx);
+    fd_call_close(file_fd_ctx);
 
     return res == ELF_VALID ? tid : 0;
 }

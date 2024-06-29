@@ -39,7 +39,8 @@ void task_ops_waited(task_t* task, task_t* target_task, void* ctx) {
     task_ctx->fd_ctx->ready = task_ops_calculate_ready(target_task);
 }
 
-bool task_ops_wait_wakeup_fn(task_t* task, int64_t* ret) {
+bool task_ops_wait_wakeup_fn(task_t* task, bool timeout, int64_t* ret) {
+    ASSERT(!timeout);
     if (task->wait_ctx.wait.complete) {
         task_ops_ctx_t* task_ctx = task->wait_ctx.wait.ctx;
         *ret = task_await(task, get_task_for_tid(task_ctx->tid));
@@ -69,7 +70,8 @@ int64_t task_ops_ioctl_fn(void* ctx, const uint64_t ioctl, const uint64_t* args,
             wait_ctx_t wait_ctx = {
                 .wait.task = task,
                 .wait.ctx = task_ctx,
-                .wait.complete = false
+                .wait.complete = false,
+                .wake_at = 0
             };
             ret_val = task_wait_kernel(task,
                                        WAIT_WAIT,

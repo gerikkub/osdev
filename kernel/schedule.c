@@ -88,17 +88,42 @@ void schedule(void) {
 
     uint64_t now_us = gtimer_get_count_us();
 
-    // Attempted to wakeup all tasks
+    // Check for task timeouts
+    // TODO: This could be done with a separate timeout list
     task_t* wait_task;
+    TASKQ_FOREACH(s_schedule_ctx.proc_wait, wait_task) {
+        ASSERT(wait_task->run_state == TASK_WAIT);
+
+        if (wait_task->wait_ctx.wake_at != 0 &&
+            wait_task->wait_ctx.wake_at <= now_us) {
+
+            int64_t task_ret;
+            bool awoke = wait_task->wait_wakeup_fn(wait_task, true, &task_ret);
+            ASSERT(awoke);
+            // console_log(LOG_DEBUG, "Wokeup WAIT %s", wait_task->name);
+            wait_task->run_state = TASK_AWAKE;
+            task_requeue(wait_task);
+            wait_task->wait_return = task_ret;
+        }
+    }
+
+    // Attempt to wakeup all tasks
     TASKQ_FOREACH(s_schedule_ctx.proc_wait_wakeup, wait_task) {
         ASSERT(wait_task->run_state == TASK_WAIT_WAKEUP);
 
+        bool timeout = wait_task->wait_ctx.wake_at != 0 &&
+                       wait_task->wait_ctx.wake_at <= now_us;
+
         int64_t task_ret;
-        bool awoke = wait_task->wait_wakeup_fn(wait_task, &task_ret);
+        bool awoke = wait_task->wait_wakeup_fn(wait_task, timeout, &task_ret);
+        if (timeout) {
+            ASSERT(awoke);
+        }
+
         if (awoke) {
-            lstruct_remove(&wait_task->schedule_queue);
-            lstruct_prepend(s_schedule_ctx.proc_runable, &wait_task->schedule_queue);
+            // console_log(LOG_DEBUG, "Wokeup WAIT_WAKEUP %s", wait_task->name);
             wait_task->run_state = TASK_AWAKE;
+            task_requeue(wait_task);
             wait_task->wait_return = task_ret;
         }
     }
@@ -148,27 +173,18 @@ static void wait_timer_setup(uint64_t now_us, uint64_t max_sleep_time) {
     TASKQ_FOREACH(s_schedule_ctx.proc_wait, check_task) {
         ASSERT (check_task->run_state == TASK_WAIT)
 
-        uint64_t wake_time_us;
-
-        switch (check_task->wait_reason) {
-        case WAIT_TIMER:
-            wake_time_us = check_task->wait_ctx.timer.wake_time_us;
-            break;
-        case WAIT_SELECT:
-            if (!check_task->wait_ctx.select.timeout_valid) {
-                continue;
-            }
-            wake_time_us = check_task->wait_ctx.select.timeout_end_us;
-            break;
-        default:
+        if (check_task->wait_ctx.wake_at == 0) {
             continue;
         }
+        uint64_t wake_time_us = check_task->wait_ctx.wake_at;
 
+        // Should be handled in the schedule function
         if (wake_time_us <= now_us) {
-            check_task->run_state = TASK_WAIT_WAKEUP;
-            task_requeue(check_task);
-            continue;
+            console_log(LOG_DEBUG, "Bad WAIT Task %s. %d <= %d",
+                                   check_task->name,
+                                   wake_time_us, now_us);
         }
+        ASSERT(wake_time_us > now_us);
 
         if (timer_fire_time == 0) {
             timer_fire_time = wake_time_us;
@@ -181,22 +197,11 @@ static void wait_timer_setup(uint64_t now_us, uint64_t max_sleep_time) {
 
         ASSERT (check_task->run_state == TASK_WAIT_WAKEUP);
 
-        uint64_t wake_time_us;
-
-        switch (check_task->wait_reason) {
-        case WAIT_SELECT:
-            if (!check_task->wait_ctx.select.timeout_valid) {
-                continue;
-            }
-            wake_time_us = check_task->wait_ctx.select.timeout_end_us;
-            break;
-        default:
+        if (check_task->wait_ctx.wake_at == 0) {
             continue;
         }
-
-        if (wake_time_us <= now_us) {
-            continue;
-        }
+        uint64_t wake_time_us = check_task->wait_ctx.wake_at;
+        ASSERT(wake_time_us > now_us);
 
         if (timer_fire_time == 0) {
             timer_fire_time = wake_time_us;

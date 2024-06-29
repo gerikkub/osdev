@@ -122,7 +122,8 @@ bool interrupt_await_reset(uint64_t irq) {
     return true;
 }
 
-static bool interrupt_await_wakeup(task_t* task, int64_t* ret) {
+static bool interrupt_await_wakeup(task_t* task, bool timeout, int64_t* ret) {
+    ASSERT(!timeout);
     uint64_t irq = task->wait_ctx.irqnotify.irq;
     bool awaited = false;
 
@@ -154,7 +155,8 @@ bool interrupt_await(uint64_t irq) {
     wait_ctx_t wait_ctx = {
         .irqnotify = {
             .irq = irq
-        }
+        },
+        .wake_at = 0
     };
 
     task_wait_kernel(get_active_task(), WAIT_IRQNOTIFY, &wait_ctx, TASK_WAIT_WAKEUP, interrupt_await_wakeup);

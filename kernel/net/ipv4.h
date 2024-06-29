@@ -43,7 +43,7 @@ typedef struct {
     uint64_t payload_len;
 } net_ipv4_hdr_t;
 
-void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uint64_t payload_len);
+int64_t net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uint64_t payload_len);
 
 void net_ipv4_init();
 

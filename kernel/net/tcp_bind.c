@@ -79,7 +79,8 @@ static int64_t net_tcp_bind_get_incoming(net_tcp_bind_ctx_t* bind_ctx) {
 
     while (llist_empty(bind_ctx->incoming_connections)) {
         wait_ctx_t wake_ctx = {
-            .signal.trywake = &bind_ctx->canwake
+            .signal.trywake = &bind_ctx->canwake,
+            .wake_at = 0
         };
         bind_ctx->canwake = false;
 

@@ -6,6 +6,7 @@
 #include "kernel/console.h"
 #include "kernel/fs_manager.h"
 #include "kernel/fd.h"
+#include "kernel/task.h"
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lock/lock.h"
 #include "kernel/lock/lock.h"
@@ -62,24 +63,26 @@ static void ext2_hash_free(void* ctx, void* key, void* dataptr) {
     ASSERT(true);
 }
 
-static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_out) {
+static int64_t ext2_mount(int64_t disk_fd, void** ctx_out) {
 
     ext2_fs_ctx_t* fs_ctx = vmalloc(sizeof(ext2_fs_ctx_t));
 
-    fs_ctx->disk_ctx = disk_ctx;
-    fs_ctx->disk_ops = disk_ops;
+    fs_ctx->disk_fd = disk_fd;
+    fs_ctx->disk_fd_ctx = get_kernel_fd(disk_fd);
 
     uint8_t sb[1024];
     int64_t sb_idx = 0;
     int64_t res;
     uint64_t seek_args[2] = {1024, 0};
-    res = disk_ops.ioctl(disk_ctx, IOCTL_SEEK, seek_args, 2);
+    res = fd_call_ioctl(fs_ctx->disk_fd_ctx, IOCTL_SEEK, seek_args, 2);
     if (res < 0) {
+        console_log(LOG_DEBUG, "Ext2 mount bad seek");
         goto ext2_mount_failure;
     }
 
-    res = disk_ops.read(disk_ctx, sb, 1024, 0);
+    res = fd_call_read(fs_ctx->disk_fd_ctx, sb, 1024, 0);
     if (res < 0) {
+        console_log(LOG_DEBUG, "Ext2 mount bad sb read");
         goto ext2_mount_failure;
     }
 
@@ -88,6 +91,7 @@ static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_ou
 
     if (fs_ctx->sb.magic != 0xEF53 ||
         fs_ctx->sb.rev_level != EXT2_DYNAMIC_REV) {
+        console_log(LOG_DEBUG, "Ext2 mount bad magic");
         goto ext2_mount_failure;
     }
 
@@ -133,6 +137,7 @@ static int64_t ext2_mount(void* disk_ctx, const fd_ops_t disk_ops, void** ctx_ou
     return 0;
 
 ext2_mount_failure:
+    console_log(LOG_DEBUG, "ext2 mount failure");
     vfree(fs_ctx);
     return -1;
 }

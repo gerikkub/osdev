@@ -42,6 +42,7 @@ int64_t sys_device_open(void* ctx, const char* path, const uint64_t flags, void*
                 sys_device_open_ctx_t* dev_ctx = vmalloc(sizeof(sys_device_open_ctx_t));
                 dev_ctx->sys_device_idx = idx;
                 dev_ctx->open_ctx = open_ctx;
+                fd_ctx->valid = true;
 
                 *ctx_out = (void*)dev_ctx;
             }

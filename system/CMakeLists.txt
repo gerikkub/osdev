@@ -9,7 +9,7 @@ function(create_system_target NAME SOURCES)
     target_include_directories(system_${NAME} PRIVATE ${APP_INCLUDE_DIRS})
 
     target_link_libraries(system_${NAME}
-                        kernel_stdlib
+                        userspace_stdlib
                         system_lib)
     
     set(APP_TARGETS "${APP_TARGETS};system_${NAME}" PARENT_SCOPE)

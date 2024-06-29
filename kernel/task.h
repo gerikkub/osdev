@@ -98,15 +98,13 @@ typedef struct {
 } wait_signal_t;
 
 typedef struct {
-    uint64_t wake_time_us;
+    uint64_t dummy;
 } wait_timer_t;
 
 typedef struct {
     struct task_t_* task;
     syscall_select_ctx_t* select_arr;
     uint64_t select_len;
-    bool timeout_valid;
-    int64_t timeout_end_us;
     uint64_t* ready_mask_out;
 } wait_select_t;
 
@@ -116,21 +114,22 @@ typedef struct {
     bool complete;
 } wait_wait_t;
 
-typedef union {
-    wait_lock_t lock;
-    wait_getmsgs_t getmsgs;
-    wait_irqnotify_t irqnotify;
-    wait_initthread_t init_thread;
-    wait_virtioirq_t virtioirq;
-    wait_signal_t signal;
-    wait_timer_t timer;
-    wait_select_t select;
-    wait_wait_t wait;
+typedef struct {
+    union {
+        wait_lock_t lock;
+        wait_getmsgs_t getmsgs;
+        wait_irqnotify_t irqnotify;
+        wait_initthread_t init_thread;
+        wait_virtioirq_t virtioirq;
+        wait_signal_t signal;
+        wait_timer_t timer;
+        wait_select_t select;
+        wait_wait_t wait;
+    };
+    uint64_t wake_at;
 } wait_ctx_t;
 
-//typedef bool (*task_canwakeup_f)(wait_ctx_t* wait_ctx);
-typedef bool (*task_wakeup_f)(struct task_t_*, int64_t* ret);
-
+typedef bool (*task_wakeup_f)(struct task_t_*, bool timeout, int64_t* ret);
 
 typedef struct task_t_ {
 
@@ -236,7 +235,7 @@ int64_t find_open_fd(task_t* task);
 fd_ctx_t* get_kernel_fd(int64_t fd_num);
 fd_ctx_t* get_task_fd(int64_t fd_num, task_t* task);
 
-bool signal_wakeup_fn(task_t* task, int64_t* ret);
+bool signal_wakeup_fn(task_t* task, bool timeout, int64_t* ret);
 
 void start_idle_timer(void);
 void stop_idle_timer(void);

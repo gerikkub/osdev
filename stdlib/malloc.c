@@ -5,9 +5,11 @@
 
 #ifdef KERNEL_BUILD
 #include "kernel/assert.h"
+#include "kernel/console.h"
 #define SYS_ASSERT(x) ASSERT(x)
 #else
 #include "system/lib/system_assert.h"
+#define console_log(...)
 #endif
 
 
@@ -206,6 +208,18 @@ void free_p(const void* mem, malloc_state_t* state) {
        }
     } else {
         // Something is wrong with the entry. Give up
+        console_log(LOG_DEBUG, "Bad malloc entry at free");
+        if (entry->magic != MALLOC_MAGIC) {
+            console_log(LOG_DEBUG, "Bad magic. %16x vs. %16x",
+                        entry->magic, MALLOC_MAGIC);
+        }
+        if (!entry->inuse) {
+            console_log(LOG_DEBUG, "Not inuse");
+        }
+        if (entry->chunk_start != mem) {
+            console_log(LOG_DEBUG, "Bad chunk start or mem. %16x vs. %16x",
+                        entry->chunk_start, mem);
+        }
         SYS_ASSERT(false);
     }
 

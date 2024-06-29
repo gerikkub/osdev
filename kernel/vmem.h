@@ -131,6 +131,7 @@ void vmem_flush_tlb(void);
 
 // Check if address is currently mapped with "AT S1E1R"
 uint64_t vmem_check_address(uint64_t addr);
+uint64_t vmem_check_address_user(uint64_t addr);
 
 
 #endif

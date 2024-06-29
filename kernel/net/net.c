@@ -13,6 +13,8 @@
 #include "kernel/sys_device.h"
 #include "kernel/kernelspace.h"
 #include "kernel/memoryspace.h"
+#include "kernel/select.h"
+#include "kernel/task.h"
 
 #include "kernel/net/net.h"
 #include "kernel/net/nic_ops.h"
@@ -23,6 +25,8 @@
 #include "stdlib/bitutils.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_select.h"
+#include "include/k_syscall.h"
 
 int64_t net_fd_read_op(void* ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
     return -1;
@@ -97,34 +101,45 @@ fd_ops_t s_net_fd_ops = {
     .close = net_fd_close_op
 };
 
-hashmap_ctx_t* s_ethertype_handlers = NULL;
+static hashmap_ctx_t* s_ethertype_handlers = NULL;
+
+static lstruct_head_t s_net_input_queue;
+static int64_t s_net_waiter_fd = -1;
+static fd_ctx_t* s_net_waiter_fd_ctx = NULL;
 
 void net_recv_packet(net_packet_t* packet) {
+
+    if (s_net_waiter_fd_ctx != NULL) {
+        // Assert alignment
+        ASSERT(((uintptr_t)packet->data & ~(0x7)) == (uintptr_t)packet->data);
+
+        // console_log(LOG_DEBUG, "NET appending to queue");
+
+        lstruct_append(s_net_input_queue, &packet->queue);
+
+        ASSERT(s_net_waiter_fd_ctx != NULL);
+
+        s_net_waiter_fd_ctx->ready = FD_READY_GEN_ATTENTION;
+        select_task_wakeup(s_net_waiter_fd_ctx->task);
+    }
+}
+
+static void net_process_packet(net_packet_t* packet) {
 
     int64_t res;
     ethernet_l2_frame_t* frame_ptr = vmalloc(sizeof(ethernet_l2_frame_t));
     res = ethernet_parse_l2_frame(packet, frame_ptr);
 
     if (res != 0) {
-        packet->dev->ops->return_packet(packet);
         vfree(frame_ptr);
         return;
     }
 
     if (memcmp(&packet->dev->mac, &frame_ptr->dest, sizeof(mac_t)) != 0 && 
         memcmp("\xff\xff\xff\xff\xff\xff", &frame_ptr->dest, sizeof(mac_t)) != 0) {
-        packet->dev->ops->return_packet(packet);
         vfree(frame_ptr);
         return;
     }
-
-    /*
-    if (memcmp("\xff\xff\xff\xff\xff\xff", &frame_ptr->dest, sizeof(mac_t)) == 0) {
-        console_log(LOG_DEBUG, "Got a broadcast packet!");
-    } else {
-        console_log(LOG_DEBUG, "Got a packet for us!");
-    }
-    */
 
     ASSERT(s_ethertype_handlers);
 
@@ -133,7 +148,6 @@ void net_recv_packet(net_packet_t* packet) {
     net_l2_packet_fn l2_packet_handler = hashmap_get(s_ethertype_handlers, &ethertype);
     
     if (l2_packet_handler == NULL) {
-        packet->dev->ops->return_packet(packet);
         vfree(frame_ptr);
         return;
     }
@@ -141,7 +155,40 @@ void net_recv_packet(net_packet_t* packet) {
     l2_packet_handler(packet, frame_ptr);
 
     vfree(frame_ptr);
-    packet->dev->ops->return_packet(packet);
+}
+
+static void net_task(void* ctx) {
+
+    s_net_waiter_fd = select_create_simple_waiter(get_active_task());
+    s_net_waiter_fd_ctx = get_kernel_fd(s_net_waiter_fd);
+
+    syscall_select_ctx_t packet_wait = {
+        .fd = s_net_waiter_fd,
+        .ready_mask = FD_READY_GEN_ATTENTION
+    };
+
+    while (true) {
+
+        int64_t ret = select_wait(&packet_wait, 1, UINT64_MAX, NULL);
+        if (ret < 0) {
+            console_log(LOG_WARN, "NET: Exiting task");
+            break;
+        }
+        // console_log(LOG_DEBUG, "NET woke up");
+
+        s_net_waiter_fd_ctx->ready = 0;
+
+        while (!lstruct_empty(s_net_input_queue)) {
+            net_packet_t* pkt;
+            pkt = NETQUEUE_AT(s_net_input_queue, 0);
+            lstruct_remove(&pkt->queue);
+
+            // console_log(LOG_DEBUG, "NET got packet");
+            net_process_packet(pkt);
+
+            pkt->dev->ops->return_packet(pkt);
+        }
+    }
 }
 
 void net_device_register(net_dev_t* dev) {
@@ -177,4 +224,12 @@ void net_register_l2_handler(uint64_t ethertype, net_l2_packet_fn handler) {
     hashmap_add(s_ethertype_handlers, key, handler);
 
     console_log(LOG_DEBUG, "Net created l2 handler for %u", ethertype);
+}
+
+void net_init(void) {
+    lstruct_init_head(&s_net_input_queue);
+}
+
+void net_start_task(void) {
+    create_kernel_task(4096, net_task, NULL, "net");
 }

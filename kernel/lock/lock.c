@@ -35,6 +35,7 @@ bool lock_acquire(lock_t* lock, bool should_wait) {
         if (!got_lock) {
             wait_ctx_t ctx;
             ctx.lock.lock_ptr = lock;
+            ctx.wake_at = 0;
             // TODO: Lock could be release here, before waiting the task
             task_wait_kernel(get_active_task(), WAIT_LOCK, &ctx, TASK_WAIT_WAKEUP, NULL);
             return true;

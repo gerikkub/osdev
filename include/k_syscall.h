@@ -43,7 +43,8 @@ typedef struct {
 } syscall_mapdev_ctx_t;
 
 enum {
-    SYSCALL_OPEN_CREATE = 1
+    SYSCALL_OPEN_CREATE = 1,
+    SYSCALL_OPEN_WRITE = 2
 };
 
 typedef struct {

@@ -134,6 +134,8 @@ void restore_context(uint64_t tid) {
 
     if (!(task->tid & TASK_TID_KERNEL)) {
         vmem_set_user_table((_vmem_table*)KSPACE_TO_PHY(task->low_vm_table), tid);
+        // uint64_t asid = tid << 48;
+        // asm("TLBI ASIDE1, %0\n" : : "r" (asid));
     }
 
     restore_context_asm(&task->reg, sp0t, cpu_stack_base, currSP);
@@ -201,7 +203,8 @@ void schedule_from_irq() {
                                     (exception_handler)schedule);
 }
 
-bool create_task_wakeup_f(task_t* task, int64_t* ret) {
+bool create_task_wakeup_f(task_t* task, bool timeout, int64_t* ret) {
+    ASSERT(!timeout);
     *ret = task->wait_ctx.init_thread.x0;
     return true;
 }
@@ -214,6 +217,8 @@ uint64_t create_task(uint64_t* user_stack_base,
                      memory_space_t* memspace,
                      bool kernel_task,
                      const char* name) {
+
+    console_log(LOG_DEBUG, "Creating task %s", name);
 
     ASSERT(kernel_stack_base != NULL);
     ASSERT(kernel_stack_size > 0);
@@ -288,6 +293,7 @@ uint64_t create_task(uint64_t* user_stack_base,
 
     } else {
         task->wait_wakeup_fn = create_task_wakeup_f;
+        task->wait_ctx.wake_at = 0;
         task->wait_ctx.init_thread.x0 = task->reg.gp[TASK_REG(1)];
         task->run_state = TASK_WAIT_WAKEUP;
 
@@ -511,6 +517,7 @@ int64_t find_open_fd(task_t* task) {
         }
     }
 
+    console_log(LOG_DEBUG, "No FDs for %s", task->name);
     return -1;
 }
 
@@ -535,14 +542,15 @@ fd_ctx_t* get_task_fd(int64_t fd_num, task_t* task) {
 }
 
 
-bool signal_wakeup_fn(task_t* task, int64_t* ret) {
+bool signal_wakeup_fn(task_t* task, bool timeout, int64_t* ret) {
+    ASSERT(!timeout);
     *ret = 0;
     return *task->wait_ctx.signal.trywake;
 }
 
-bool timer_wakeup_fn(task_t* task, int64_t* ret) {
+bool timer_wakeup_fn(task_t* task, bool timeout, int64_t* ret) {
     *ret = 0;
-    return gtimer_get_count_us() >= task->wait_ctx.timer.wake_time_us;
+    return timeout;
 }
 
 void task_wait_timer_at(uint64_t wake_time_us) {
@@ -551,8 +559,9 @@ void task_wait_timer_at(uint64_t wake_time_us) {
 
     wait_ctx_t timer_ctx = {
         .timer = {
-            .wake_time_us = wake_time_us
-        }
+            .dummy = 0
+        },
+        .wake_at = wake_time_us
     };
 
     task_wait_kernel(task,

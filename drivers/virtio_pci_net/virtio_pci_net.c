@@ -93,6 +93,9 @@ static void virtio_net_recv_thread(void* ctx) {
 }
 
 void virtio_pci_net_nic_return_packet(struct net_packet* packet) {
+    // TODO: Need to allocate packets on the heap
+    ASSERT(false);
+
     virtio_virtq_buffer_t* virtq_buffer = packet->nic_pkt_ctx;
     net_dev_t* net_dev = packet->dev;
     virtio_pci_net_ctx_t* nic_ctx = net_dev->nic_ctx;

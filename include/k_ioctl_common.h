@@ -32,5 +32,7 @@
 
 // Socket Ops
 #define SOCKET_IOCTL_GET_INFO 224
+#define SOCKET_IOCTL_GET_MSGINFO 225
+#define SOCKET_IOCTL_SET_CONFIG 226
 
 #endif

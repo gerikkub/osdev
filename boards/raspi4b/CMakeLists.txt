@@ -15,5 +15,7 @@ add_custom_command(OUTPUT kernel-raspi4b.bin
 
 add_custom_target(load-raspi4b
                   COMMAND cp kernel-raspi4b.bin /mnt/c/TFTP-Root/b55dbdaa/kernel8.img
+                  COMMAND cp disk_image.img /mnt/c/TFTP-Root/b55dbdaa/disk_image.img
                   DEPENDS kernel-raspi4b.bin
+                  DEPENDS diskimg-raspi4b
                   VERBATIM)

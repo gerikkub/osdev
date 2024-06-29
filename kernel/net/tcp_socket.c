@@ -119,7 +119,8 @@ static int64_t net_tcp_socket_read_fn(void* ctx, uint8_t* buffer, const int64_t 
         } else {
 
             wait_ctx_t wake_ctx = {
-                .signal.trywake = &socket_ctx->canwake
+                .signal.trywake = &socket_ctx->canwake,
+                .wake_at = 0
             };
 
             do {

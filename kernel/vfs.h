@@ -20,13 +20,6 @@ typedef struct {
 
 void vfs_register_device(vfs_device_ops_t* device);
 
-int64_t vfs_open_device(const char* device_name,
-                        const char* path,
-                        uint64_t flags,
-                        fd_ops_t* ops_out,
-                        void** ctx_out,
-                        fd_ctx_t* fd_ctx);
-
 int64_t vfs_open_device_fd(const char* device_name,
                            const char* path,
                            uint64_t flags);

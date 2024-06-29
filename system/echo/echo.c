@@ -19,8 +19,12 @@
 
 int32_t main(uint64_t tid, char** argv) {
 
+    console_write_raw("TEST\n", 5);
+
+    /*
     console_write(argv[0]);
     console_flush();
+    */
 
     return 3;
 }

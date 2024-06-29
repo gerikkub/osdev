@@ -32,6 +32,7 @@
 #include "kernel/fs_manager.h"
 #include "kernel/fs/ext2/ext2.h"
 #include "kernel/fs/sysfs/sysfs.h"
+#include "kernel/fs/ramfs/ramfs.h"
 #include "kernel/exec.h"
 #include "kernel/select.h"
 
@@ -88,7 +89,7 @@ void main() {
     pagefault_init();
     exception_init();
 
-    vmalloc_init(16 * 1024 * 1024);
+    vmalloc_init(48 * 1024 * 1024);
 
     memspace_init_kernelspace();
     memspace_init_systemspace();
@@ -120,6 +121,7 @@ void main() {
     board_init_early_console();
 
     console_log(LOG_DEBUG, "Hello!\n");
+    vmem_flush_tlb();
 
     assert_aarch64_support();
 
@@ -131,6 +133,7 @@ void main() {
 
     drivers_init();
 
+    net_init();
     net_arp_init();
     net_arp_table_init();
     net_ipv4_init();
@@ -141,6 +144,7 @@ void main() {
 
     ext2_register();
     sysfs_register();
+    ramfs_register();
 
     board_init_devices();
 
@@ -168,6 +172,7 @@ void kernel_init_lower_thread(void* ctx) {
 
     board_discover_devices();
 
+    net_start_task();
     net_tcp_conn_start_timeout_thread();
 
     board_loop();

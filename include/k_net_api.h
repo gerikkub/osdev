@@ -65,4 +65,30 @@ typedef struct {
     };
 } k_socket_info_t;
 
+typedef struct {
+    uint8_t socket_type;
+    uint64_t len;
+
+    union {
+        struct {
+            k_ipv4_t source_ip;
+            uint16_t source_port;
+        } udp4;
+    };
+} k_socket_msginfo_t;
+
+typedef struct {
+    uint8_t socket_type;
+
+    union {
+        struct {
+            k_ipv4_t dest_ip;
+            uint16_t dest_port;
+            uint64_t flags;
+#define K_SOCKET_CONFIG_DEST_IP BIT(0)
+#define K_SOCKET_CONFIG_DEST_PORT BIT(1)
+        } udp4;
+    };
+} k_socket_config_t;
+
 #endif

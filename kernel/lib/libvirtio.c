@@ -257,7 +257,8 @@ void virtio_add_irq_to_ctx(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_ir
     llist_append_ptr(irq_ctx->wait_queue, queue_ctx);
 }
 
-bool virtio_wakeup_irq(task_t* task, int64_t* ret) {
+bool virtio_wakeup_irq(task_t* task, bool timeout, int64_t* ret) {
+    ASSERT(!timeout);
     virtio_virtq_ctx_t* queue_ctx = task->wait_ctx.virtioirq.ctx;
 
     *ret = 0;
@@ -269,7 +270,8 @@ void virtio_wait_irq(virtio_virtq_ctx_t* queue_ctx, virtio_virtq_shared_irq_ctx_
     wait_ctx_t wait_ctx = {
         .virtioirq = {
             .ctx = irq_ctx
-        }
+        },
+        .wake_at = 0
     };
 
     if (llist_at(irq_ctx->wait_queue, 0) == queue_ctx) {

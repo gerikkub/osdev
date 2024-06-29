@@ -89,10 +89,11 @@ void bcm2835_irq_reg(void* ctx) {
     interrupt_register_irq_handler(timer_ctx->intids[1], bcm2835_systemtimer_irq_handler, ctx);
     interrupt_register_irq_handler(timer_ctx->intids[2], bcm2835_systemtimer_irq_handler, ctx);
     interrupt_register_irq_handler(timer_ctx->intids[3], bcm2835_systemtimer_irq_handler, ctx);
-    // interrupt_enable_irq(timer_ctx->intids[0]);
-    interrupt_enable_irq(timer_ctx->intids[1]);
-    // interrupt_enable_irq(timer_ctx->intids[2]);
-    interrupt_enable_irq(timer_ctx->intids[3]);
+
+    // Note: These are the valid irqs for the bcm2835.
+    // Commented out because they are unused for now
+    // interrupt_enable_irq(timer_ctx->intids[1]);
+    // interrupt_enable_irq(timer_ctx->intids[3]);
 }
 
 void bcm2835_systemtimer_discover(void* ctx) {
@@ -151,6 +152,7 @@ void bcm2835_systemtimer_register() {
         },
         .ctxfunc = bcm2835_systemtimer_discover
     };
+    (void)reg;
     register_driver(&reg);
 
 }

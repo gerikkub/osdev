@@ -31,10 +31,10 @@ void ext2_disk_read(ext2_fs_ctx_t* fs, uint64_t offset, void* buffer, uint64_t s
 
     int64_t res;
     uint64_t seek_args[2] = {offset, 0};
-    res = fs->disk_ops.ioctl(fs->disk_ctx, IOCTL_SEEK, seek_args, 2);
+    res = fd_call_ioctl(fs->disk_fd_ctx, IOCTL_SEEK, seek_args, 2);
     ASSERT(res >= 0);
 
-    res = fs->disk_ops.read(fs->disk_ctx, buffer, size, 0);
+    res = fd_call_read(fs->disk_fd_ctx, buffer, size, 0);
     ASSERT(res >= 0);
 }
 
@@ -290,10 +290,10 @@ void ext2_disk_write(ext2_fs_ctx_t* fs, const uint64_t offset, const void* buffe
 
     int64_t res;
     uint64_t seek_args[2] = {offset, 0};
-    res = fs->disk_ops.ioctl(fs->disk_ctx, IOCTL_SEEK, seek_args, 2);
+    res = fd_call_ioctl(fs->disk_fd_ctx, IOCTL_SEEK, seek_args, 2);
     ASSERT(res >= 0);
 
-    res = fs->disk_ops.write(fs->disk_ctx, buffer, size, 0);
+    res = fd_call_write(fs->disk_fd_ctx, buffer, size, 0);
     ASSERT(res >= 0);
 
 }
@@ -477,19 +477,19 @@ void ext2_flush_fs(ext2_fs_ctx_t* fs) {
         
         int64_t res;
         uint64_t seek_args[2] = {1024, 0};
-        res = fs->disk_ops.ioctl(fs->disk_ctx, IOCTL_SEEK, seek_args, 2);
+        res = fd_call_ioctl(fs->disk_fd_ctx, IOCTL_SEEK, seek_args, 2);
         ASSERT(res >= 0)
 
         uint8_t* sb_buffer = vmalloc(1024);
-        res = fs->disk_ops.read(fs->disk_ctx, sb_buffer, 1024, 0);
+        res = fd_call_read(fs->disk_fd_ctx, sb_buffer, 1024, 0);
         ASSERT(res >= 0)
 
         memcpy(sb_buffer, &fs->sb, sizeof(ext2_superblock_t));
 
-        res = fs->disk_ops.ioctl(fs->disk_ctx, IOCTL_SEEK, seek_args, 2);
+        res = fd_call_ioctl(fs->disk_fd_ctx, IOCTL_SEEK, seek_args, 2);
         ASSERT(res >= 0)
 
-        res = fs->disk_ops.write(fs->disk_ctx, sb_buffer, 1024, 0);
+        res = fd_call_write(fs->disk_fd_ctx, sb_buffer, 1024, 0);
         ASSERT(res >= 0);
 
         fs->sb_dirty = false;

@@ -37,6 +37,7 @@ typedef struct {
 void malloc_init_p(malloc_state_t* state, malloc_add_mem_func add_mem_func, void* ctx);
 void* malloc_p(uint64_t size, malloc_state_t* state);
 void free_p(const void* mem, malloc_state_t* state);
+void malloc_check_structure_p(malloc_state_t* state);
 
 void malloc_calc_stat(malloc_state_t* state, malloc_stat_t* stat_out);
 

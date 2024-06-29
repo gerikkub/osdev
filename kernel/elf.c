@@ -10,6 +10,7 @@
 #include "kernel/kernelspace.h"
 #include "kernel/assert.h"
 #include "kernel/kmalloc.h"
+#include "kernel/console.h"
 
 #define MAX_ARG_LEN 256
 

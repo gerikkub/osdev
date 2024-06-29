@@ -17,7 +17,7 @@
 
 #include "stdlib/bitutils.h"
 
-void net_udp_send_packet(ipv4_t* dest_ip, uint64_t dest_port, uint64_t source_port, const uint8_t* payload, uint64_t payload_len) {
+int64_t net_udp_send_packet(ipv4_t* dest_ip, uint64_t dest_port, uint64_t source_port, const uint8_t* payload, uint64_t payload_len) {
 
     const uint64_t udp_header_len = 8;
 
@@ -55,9 +55,12 @@ void net_udp_send_packet(ipv4_t* dest_ip, uint64_t dest_port, uint64_t source_po
 
     *(uint16_t*)&udp_buffer[6] = (uint16_t)checksum;
 
-    net_ipv4_send_packet(dest_ip, NET_IPV4_PROTO_UDP, udp_buffer, udp_header.len);
+    int64_t ip_ret;
+    ip_ret = net_ipv4_send_packet(dest_ip, NET_IPV4_PROTO_UDP, udp_buffer, udp_header.len);
 
     vfree(udp_buffer);
+
+    return ip_ret;
 }
 
 void net_udp_update_checksum(uint8_t* udp_payload, uint64_t pseudo_header_checksum) {
@@ -72,12 +75,16 @@ void net_udp_update_checksum(uint8_t* udp_payload, uint64_t pseudo_header_checks
         new_checksum = 0xFFFF;
     }
 
-    *(uint16_t*)&udp_payload[6] = en_swap_16(new_checksum);
+    // *(uint16_t*)&udp_payload[6] = en_swap_16(new_checksum);
+    *(uint16_t*)&udp_payload[6] = 0;
 }
 
 void net_udp_handle_packet(net_packet_t* packet, ethernet_l2_frame_t* frame, net_ipv4_hdr_t* ipv4_header) {
     
     net_udp_hdr_t udp_header;
+    if (ipv4_header->payload_len < 8) {
+        return;
+    }
 
     udp_header.source_port = en_swap_16(*(uint16_t*)&ipv4_header->payload[0]);
     udp_header.dest_port = en_swap_16(*(uint16_t*)&ipv4_header->payload[2]);
@@ -85,7 +92,7 @@ void net_udp_handle_packet(net_packet_t* packet, ethernet_l2_frame_t* frame, net
     udp_header.checksum = en_swap_16(*(uint16_t*)&ipv4_header->payload[6]);
 
     udp_header.payload = ipv4_header->payload + 8;
-    udp_header.payload_len = ipv4_header->payload_len - 8;
+    udp_header.payload_len = udp_header.len - 8;
 
     net_udp_socket_recv_packet(packet, ipv4_header, &udp_header);
 }

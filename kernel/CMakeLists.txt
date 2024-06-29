@@ -37,6 +37,7 @@ add_library(kernel_src OBJECT
 
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/ext2/ext2.c
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/ext2/ext2_helpers.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/fs/ramfs/ramfs.c
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/file.c
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/sysfs/sysfs.c
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/sysfs/sysfs_task.c
@@ -49,6 +50,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/intmap.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/libdtb.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/libpci.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/lib/libtftp.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/libvirtio.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/llist.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/lstruct.c
@@ -74,3 +76,4 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/net/udp_socket.c
             )
 target_include_directories(kernel_src PRIVATE ${KERNEL_INCLUDE_DIRS})
+target_compile_options(kernel_src PRIVATE "-DKERNEL_BUILD")

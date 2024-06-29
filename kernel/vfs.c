@@ -36,7 +36,7 @@ void vfs_register_device(vfs_device_ops_t* device) {
     }
 }
 
-int64_t vfs_open_device(const char* device_name, const char* path, uint64_t flags, fd_ops_t* ops_out, void** ctx_out, fd_ctx_t* fd_ctx) {
+static int64_t vfs_open_device(const char* device_name, const char* path, uint64_t flags, fd_ops_t* ops_out, void** ctx_out, fd_ctx_t* fd_ctx) {
     ASSERT(device_name != NULL);
     ASSERT(path != NULL);
     ASSERT(ops_out != NULL);
@@ -54,6 +54,7 @@ int64_t vfs_open_device(const char* device_name, const char* path, uint64_t flag
         }
     }
 
+    console_log(LOG_DEBUG, "VFS can not find %s:%s", device_name, path);
     return -1;
 }
 
@@ -67,6 +68,7 @@ int64_t vfs_open_device_fd(const char* device_name, const char* path, uint64_t f
 
     fd_ctx_t* fd_ctx = get_task_fd(fd, task);
     fd_ctx->valid = true;
+    fd_ctx->task = task;
 
     int64_t stat = vfs_open_device(device_name, path, flags,
                                    &fd_ctx->ops,
@@ -74,5 +76,5 @@ int64_t vfs_open_device_fd(const char* device_name, const char* path, uint64_t f
                                    fd_ctx);
 
     fd_ctx->valid = stat >= 0;
-    return fd;
+    return stat >= 0 ? fd : -1;
 }

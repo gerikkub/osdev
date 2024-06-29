@@ -6,9 +6,11 @@
 
 #include "drivers/pl011_uart.h"
 #include "drivers/net/enc28j60/enc28j60.h"
+#include "drivers/loop/loop.h"
 
 #include "kernel/memoryspace.h"
 #include "kernel/kernelspace.h"
+#include "kernel/exec.h"
 #include "kernel/drivers.h"
 #include "kernel/dtb.h"
 #include "kernel/lib/libpci.h"
@@ -19,16 +21,27 @@
 #include "kernel/task.h"
 #include "kernel/gtimer.h"
 #include "kernel/select.h"
+#include "kernel/sys_device.h"
+#include "kernel/fs_manager.h"
+#include "kernel/net/udp_socket.h"
+#include "kernel/lib/libtftp.h"
+
+#include "kernel/net/net.h"
+#include "kernel/net/arp.h"
+#include "kernel/net/ipv4_route.h"
 
 #include "include/k_ioctl_common.h"
+#include "include/k_syscall.h"
 #include "include/k_select.h"
 #include "include/k_gpio.h"
 #include "include/k_spi.h"
+#include "include/k_net_api.h"
 
+static uint8_t* s_uart_tx_ptr;
 
 int64_t raspi4b_uart_write_op(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
     int64_t size_copy = size;
-    volatile uint8_t* uart_tx_ptr = ctx;
+    volatile uint8_t* uart_tx_ptr = s_uart_tx_ptr;
     while (size_copy--) {
         *uart_tx_ptr = *buffer++;
         for (volatile int i = 500; i > 0; i--);
@@ -45,6 +58,7 @@ fd_ops_t early_uart_ops = {
 
 void board_init_main_early(void) {
     uint8_t* uart_tx_ptr = (uint8_t*)0x47E215040;
+    s_uart_tx_ptr = uart_tx_ptr;
     console_add_driver(&early_uart_ops, uart_tx_ptr);
 
 }
@@ -63,8 +77,10 @@ void board_init_mappings(void) {
 
 }
 
+
 void board_init_early_console(void) {
     uint8_t* uart_tx_ptr = (uint8_t*)0xFFFF00047E215040;
+    s_uart_tx_ptr = uart_tx_ptr;
     console_add_driver(&early_uart_ops, uart_tx_ptr);
 }
 
@@ -75,7 +91,15 @@ void board_init_devices(void) {
     dtb_init(init_reg_ptr[0]);
 }
 
+int64_t raspi4b_uart_open_op(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx) {
+    *ctx_out = ctx;
+    return 0;
+}
+
 void board_discover_devices(void) {
+
+    uint8_t* uart_tx_ptr = (uint8_t*)0x47E215040;
+    sys_device_register(&early_uart_ops, raspi4b_uart_open_op, uart_tx_ptr, "con0");
 
     int64_t gpio_fd;
     gpio_fd = vfs_open_device_fd("sys",
@@ -123,7 +147,7 @@ void board_discover_devices(void) {
     spi_gpio_config.flags |= GPIO_CONFIG_FLAG_PULL_DOWN;
     gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
 
-    spi_gpio_config.gpio_num = 25;
+    spi_gpio_config.gpio_num = 7;
     spi_gpio_config.flags = GPIO_CONFIG_FLAG_IN |
                             GPIO_CONFIG_FLAG_EV_FALLING;
     gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
@@ -148,7 +172,7 @@ void board_discover_devices(void) {
     enc28j60_discover_t enc28j60_disc = {
         .spi_fd = spi_dev_fd_num,
         .gpio_int_fd_ctx = gpio_fd_ctx,
-        .gpio_int_num = 25
+        .gpio_int_num =7 
     };
     (void)enc28j60_disc;
     discover_driver_manual("enc28j60", &enc28j60_disc);
@@ -185,18 +209,12 @@ void kernel_gpio_irq_thread(void* ctx) {
 
 void board_loop() {
 
-    fd_ops_t nic_ops;
-    void* nic_ctx;
-    int64_t open_res;
-    open_res = vfs_open_device("sys",
-                               //"virtio-pci-net0",
-                               "enc28j60",
-                               0,
-                               &nic_ops,
-                               &nic_ctx,
-                               NULL);
-    if (open_res < 0) {
-        console_log(LOG_INFO, "virtio-pci-net0 not available. Skipping IP set");
+    int64_t nic_fd;
+    nic_fd = vfs_open_device_fd("sys", "enc28j60", 0);
+    fd_ctx_t* nic_fd_ctx = get_kernel_fd(nic_fd);
+
+    if (nic_fd < 0) {
+        console_log(LOG_INFO, "enc28j60 not available. Skipping IP set");
     } else {
         uint64_t ip = 192 << 24 |
                       168 << 16 |
@@ -204,7 +222,7 @@ void board_loop() {
                     //   210;
                       211;
         int64_t res;
-        res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_IP, &ip, 1);
+        res = fd_call_ioctl(nic_fd_ctx, NET_IOCTL_SET_IP, &ip, 1);
         ASSERT(res == 0);
 
         uint64_t ip_net = 192 << 24 |
@@ -216,7 +234,7 @@ void board_loop() {
             ip_net, 24
         };
 
-        res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_ROUTE, args, 2);
+        res = fd_call_ioctl(nic_fd_ctx, NET_IOCTL_SET_ROUTE, args, 2);
 
         uint64_t ip_route = 192 << 24 |
                             168 << 16 |
@@ -226,7 +244,7 @@ void board_loop() {
         uint64_t args_default[2] = {
             ip_route, 24
         };
-        res = nic_ops.ioctl(nic_ctx, NET_IOCTL_SET_DEFAULT_ROUTE, args_default, 2);
+        res = fd_call_ioctl(nic_fd_ctx, NET_IOCTL_SET_DEFAULT_ROUTE, args_default, 2);
     }
 
     int64_t gpio_fd = vfs_open_device_fd("sys", "bcm2711_gpio", 0);
@@ -241,24 +259,65 @@ void board_loop() {
                  GPIO_CONFIG_FLAG_EV_NONE
     };
 
-    uint64_t config_args = (uint64_t)&gpio_config;
-
-    gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+    fd_call_ioctl_ptr(gpio_fd_ctx, GPIO_IOCTL_CONFIGURE, &gpio_config);
 
     gpio_config.gpio_num = 2;
     gpio_config.flags = GPIO_CONFIG_FLAG_OUT_PP |
                         GPIO_CONFIG_FLAG_EV_FALLING;
-    gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_CONFIGURE, &config_args, 1);
+    fd_call_ioctl_ptr(gpio_fd_ctx, GPIO_IOCTL_CONFIGURE, &gpio_config);
 
+
+    create_kernel_task(0x10000, kernel_gpio_irq_thread, gpio_fd_ctx, "gpio-test");
+
+
+    k_create_socket_t udp_create_socket = {
+        .socket_type = SYSCALL_SOCKET_UDP4,
+        .udp4.dest_ip.d = {192,168,0,207},
+        .udp4.source_port = 0,
+        .udp4.dest_port = 69
+    };
+    int64_t tftp_udp_fd = net_udp_create_socket(&udp_create_socket);
+    ASSERT(tftp_udp_fd >= 0);
+
+    void* tftp_ctx = tftp_create_client(tftp_udp_fd);
+
+    void* file_data;
+    int64_t file_len;
+    int64_t ok = tftp_recv_file(tftp_ctx, "/b55dbdaa/disk_image.img", &file_data, &file_len);
+    ASSERT(ok == 0);
+
+    console_log(LOG_INFO, "Read file %d", file_len);
+
+    loopback_create_raw_device(file_data, file_len, "loop0");
+
+    ok = fs_manager_mount_device("sys", "loop0", FS_TYPE_EXT2, "home");
+
+    if (ok == 0) {
+        /*
+        uint64_t echo_tid;
+        char* echo_argv[] = {
+            "Echo in userspace",
+            NULL
+        };
+        echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
+        (void)echo_tid;
+        */
+        uint64_t cat_tid;
+        char* cat_argv[] = {
+            "home",
+            "hello.txt",
+            NULL
+        };
+        cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
+        (void)cat_tid;
+    } else {
+        console_log(LOG_DEBUG, "Mount failed");
+    }
 
     k_gpio_level_t gpio_level = {
         .gpio_num = 42,
         .level = 1
     };
-    uint64_t level_args = (uint64_t)&gpio_level;
-
-
-    create_kernel_task(0x10000, kernel_gpio_irq_thread, gpio_fd_ctx, "gpio-test");
 
     uint64_t ticknum = 0;
     while (1) {
@@ -267,10 +326,10 @@ void board_loop() {
         ticknum++;
 
         gpio_level.gpio_num = 42;
-        gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_SET, &level_args, 1);
+        fd_call_ioctl_ptr(gpio_fd_ctx, GPIO_IOCTL_CONFIGURE, &gpio_level);
 
         gpio_level.gpio_num = 2;
-        gpio_fd_ctx->ops.ioctl(gpio_fd_ctx->ctx, GPIO_IOCTL_SET, &level_args, 1);
+        fd_call_ioctl_ptr(gpio_fd_ctx, GPIO_IOCTL_CONFIGURE, &gpio_level);
 
         gpio_level.level = !gpio_level.level;
     }

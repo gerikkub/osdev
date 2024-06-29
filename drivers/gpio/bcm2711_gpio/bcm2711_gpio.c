@@ -17,6 +17,7 @@
 #include "kernel/task.h"
 #include "kernel/kmalloc.h"
 #include "kernel/gtimer.h"
+#include "kernel/select.h"
 #include "kernel/interrupt/interrupt.h"
 
 #include "include/k_ioctl_common.h"
@@ -263,7 +264,7 @@ void bcm2711_gpio_irq_notify_listener(bcm2711_gpio_ctx_t* gpio_ctx, int64_t gpio
     if (fd_ctx != NULL) {
         fd_ctx->ready |= FD_READY_GPIO_EVENT;
 
-        task_wakeup(fd_ctx->task, WAIT_SELECT);
+        select_task_wakeup(fd_ctx->task);
     }
 }
 

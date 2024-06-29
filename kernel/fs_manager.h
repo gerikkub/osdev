@@ -7,7 +7,7 @@
 #include "kernel/fs_manager.h"
 #include "kernel/fd.h"
 
-typedef int64_t (*fs_mount_op)(void* disk_ctx, const fd_ops_t disk_opts, void** ctx_out);
+typedef int64_t (*fs_mount_op)(int64_t disk_fd, void** ctx_out);
 typedef int64_t (*fs_open_op)(void* ctx, const char* path, const uint64_t flags, void** ctx_out, fd_ctx_t* fd_ctx);
 
 typedef struct {
@@ -20,6 +20,7 @@ enum {
     FS_TYPE_UNKNOWN = 0,
     FS_TYPE_EXT2 = 1,
     FS_TYPE_SYSFS = 2,
+    FS_TYPE_RAMFS = 3,
     MAX_NUM_FS_TYPE
 };
 

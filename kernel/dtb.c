@@ -326,6 +326,8 @@ dt_node_t* fdt_create_node(void) {
 }
 
 uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt_node_t* node, bool is_root) {
+
+    
     ASSERT(dtb_ptr != NULL);
     ASSERT(node != NULL);
 
@@ -351,8 +353,6 @@ uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt
 
         token_ptr = (uint32_t*)((uint8_t*)token_ptr + name_len);
     }
-
-    // console_log(LOG_DEBUG, "Created DTB Node %s", node->name);
 
     // Optionally skip over padding added to the name
     // to align the next token to a uint32_t
@@ -523,6 +523,7 @@ void dtb_init(uintptr_t dtb_init_phy_addr) {
     get_fdt_header(devicetree, &header);
 
     // Remap the entire DTB
+
     memory_entry_t* old_entry = memspace_get_entry_at_addr_kernel(devicetree);
     memspace_unmap_kernel(old_entry);
     memspace_update_kernel_vmem();

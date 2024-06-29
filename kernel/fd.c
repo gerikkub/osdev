@@ -31,20 +31,7 @@ int64_t syscall_open(uint64_t device, uint64_t path, uint64_t flags, uint64_t du
     }
     void* path_kptr = PHY_TO_KSPACE_PTR(path_phy);
 
-    int64_t ret;
-    int64_t fd_num = find_open_fd(task);
-    if (fd_num < 0) {
-        return -1;
-    }
-
-    ret = vfs_open_device(device_kptr, path_kptr, flags, &task->fds[fd_num].ops, &task->fds[fd_num].ctx, &task->fds[fd_num]);
-    if (ret >= 0) {
-        task->fds[fd_num].valid = true;
-        return fd_num;
-    } else {
-        return -1;
-    }
-
+    return vfs_open_device_fd(device_kptr, path_kptr, flags);
 }
 
 int64_t syscall_read(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags) {
@@ -70,7 +57,7 @@ int64_t syscall_read(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags)
     buffer_kptr = PHY_TO_KSPACE_PTR(buffer_phy);
 
     if (task->fds[fd].ops.read != NULL) {
-        return task->fds[fd].ops.read(task->fds[fd].ctx, buffer_kptr, len, flags);
+        return fd_call_read(&task->fds[fd], buffer_kptr, len, flags);
     } else {
         return -1;
     }
@@ -99,7 +86,7 @@ int64_t syscall_write(uint64_t fd, uint64_t buffer, uint64_t len, uint64_t flags
     buffer_kptr = PHY_TO_KSPACE_PTR(buffer_phy);
 
     if (task->fds[fd].ops.write != NULL) {
-        return task->fds[fd].ops.write(task->fds[fd].ctx, buffer_kptr, len, flags);
+        return fd_call_write(&task->fds[fd], buffer_kptr, len, flags);
     } else {
         return -1;
     }
@@ -132,9 +119,9 @@ int64_t syscall_ioctl(uint64_t fd, uint64_t ioctl, uint64_t args, uint64_t arg_c
         }
         args_kptr = PHY_TO_KSPACE_PTR(args_phy);
 
-        return task->fds[fd].ops.ioctl(task->fds[fd].ctx, ioctl, args_kptr, arg_count);
+        return fd_call_ioctl(&task->fds[fd], ioctl, args_kptr, arg_count);
     } else {
-        return task->fds[fd].ops.ioctl(task->fds[fd].ctx, ioctl, NULL, 0);
+        return fd_call_ioctl(&task->fds[fd], ioctl, NULL, 0);
     }
 }
 
@@ -155,8 +142,45 @@ int64_t syscall_close(uint64_t fd, uint64_t arg1, uint64_t arg2, uint64_t arg3) 
         task->fds[fd].valid = false;
         return 0;
     } else {
-        int64_t ret = task->fds[fd].ops.close(task->fds[fd].ctx);
+        int64_t ret = fd_call_close(&task->fds[fd]);
         task->fds[fd].valid = false;
         return ret;
     }
 }
+
+int64_t fd_call_read(fd_ctx_t* fd_ctx, uint8_t* buffer, const int64_t size, const uint64_t flags) {
+    ASSERT(fd_ctx != NULL);
+    ASSERT(fd_ctx->valid);
+
+    return fd_ctx->ops.read(fd_ctx->ctx, buffer, size, flags);
+}
+
+int64_t fd_call_write(fd_ctx_t* fd_ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
+    ASSERT(fd_ctx != NULL);
+    ASSERT(fd_ctx->valid);
+
+    return fd_ctx->ops.write(fd_ctx->ctx, buffer, size, flags);
+}
+
+int64_t fd_call_ioctl(fd_ctx_t* fd_ctx, const uint64_t ioctl, const uint64_t *args, const uint64_t arg_count) {
+    ASSERT(fd_ctx != NULL);
+    ASSERT(fd_ctx->valid);
+
+    return fd_ctx->ops.ioctl(fd_ctx->ctx, ioctl, args, arg_count);
+}
+
+int64_t fd_call_ioctl_ptr(fd_ctx_t* fd_ctx, const uint64_t ioctl, void* arg) {
+    ASSERT(fd_ctx != NULL);
+    ASSERT(fd_ctx->valid);
+
+    uint64_t ioctl_args = (uint64_t)arg;
+    return fd_call_ioctl(fd_ctx, ioctl, &ioctl_args, 1);
+}
+
+int64_t fd_call_close(fd_ctx_t* fd_ctx) {
+    ASSERT(fd_ctx != NULL);
+    ASSERT(fd_ctx->valid);
+
+    return fd_ctx->ops.close(fd_ctx->ctx);
+}
+

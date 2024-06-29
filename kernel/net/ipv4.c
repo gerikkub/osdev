@@ -17,7 +17,7 @@
 
 #include "stdlib/bitutils.h"
 
-void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uint64_t payload_len) {
+int64_t net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uint64_t payload_len) {
 
     net_dev_t* net_dev = NULL;
     ipv4_t via_ip;
@@ -26,16 +26,7 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
     if (net_dev == NULL) {
         console_log(LOG_WARN, "Net IPv4 No Known Route to %d.%d.%d.%d",
                     dest_ip->d[0], dest_ip->d[1], dest_ip->d[2], dest_ip->d[3]);
-        return;
-    }
-
-    bool arp_ok;
-    mac_t dest_mac;
-    arp_ok = net_arp_get_mac_for_ipv4(net_dev, &via_ip, &dest_mac);
-
-    if (!arp_ok) {
-        console_log(LOG_WARN, "Net IPv4 Dropping Packet. No MAC addr for address");
-        return;
+        return -1;
     }
 
     // Support fragmentation later
@@ -74,7 +65,7 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
     if (send_buffer == NULL) {
         console_log(LOG_WARN, "Net IPv4 Dropping Packet. Unable to allocated %u bytes",
                     ipv4_header.total_len + eth_overhead);
-        return;
+        return -1;
     }
 
     uint8_t* ipv4_payload = send_buffer->data + eth_offset;
@@ -126,7 +117,19 @@ void net_ipv4_send_packet(ipv4_t* dest_ip, uint16_t protocol, void* payload, uin
     ipv4_header.checksum = (uint16_t)~((checksum & 0xFFFF) + (checksum >> 16));
     *(uint16_t*)&ipv4_payload[10] = ipv4_header.checksum;
 
-    ethernet_send_packet(net_dev, send_buffer, &dest_mac, NET_ETHERTYPE_IPV4);
+    bool arp_ok;
+    mac_t dest_mac;
+    arp_ok = net_arp_get_mac_for_ipv4(net_dev, &via_ip, &dest_mac);
+
+    if (!arp_ok) {
+        send_buffer->arp_wait_ctx.via_ip = via_ip;
+        send_buffer->arp_wait_ctx.ethertype = NET_ETHERTYPE_IPV4;
+        net_arp_queue_packet(send_buffer);
+    } else {
+        ethernet_send_packet(net_dev, send_buffer, &dest_mac, NET_ETHERTYPE_IPV4);
+    }
+
+    return 0;
 }
 
 int64_t net_ipv4_parse_packet(net_packet_t* packet, ethernet_l2_frame_t* frame, net_ipv4_hdr_t* ipv4_header) {
@@ -182,6 +185,7 @@ void net_ipv4_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame
 
     // Drop the message if it's not our IP
     if (memcmp(&ipv4_header.dst_ip, &packet->dev->ipv4, sizeof(ipv4_t)) != 0) {
+        // console_log(LOG_DEBUG, "Not our IP, %d.%d.%d.%d", LOG_IPV4_ADDR(packet->dev->ipv4));
         return;
     }
 
@@ -200,10 +204,10 @@ void net_ipv4_l2_packet_handler(net_packet_t* packet, ethernet_l2_frame_t* frame
             net_ipv4_handle_icmp(packet, frame, &ipv4_header);
             break;
         case NET_IPV4_PROTO_UDP:
-            //net_udp_handle_packet(packet, frame, &ipv4_header);
+            net_udp_handle_packet(packet, frame, &ipv4_header);
             break;
         case NET_IPV4_PROTO_TCP:
-            //net_tcp_handle_packet(packet, frame, &ipv4_header);
+            net_tcp_handle_packet(packet, frame, &ipv4_header);
             break;
     }
 }

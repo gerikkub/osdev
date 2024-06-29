@@ -413,7 +413,8 @@ void vmem_set_kernel_table(_vmem_table* kernel_table) {
 
     uint64_t ttbr1_el1 = ((uintptr_t)kernel_table) |
                          0;
-    asm ("DSB SY");
+    // asm ("DSB SY");
+    asm ("ISB");
 
     WRITE_SYS_REG(TTBR1_EL1, ttbr1_el1);
 }
@@ -428,6 +429,7 @@ void vmem_set_user_table(_vmem_table* user_ptr, uint8_t asid) {
     asm ("DSB SY");
 
     WRITE_SYS_REG(TTBR0_EL1, ttbr0_el1);
+    // vmem_flush_tlb();
 }
 
 void vmem_initialize(void) { 
@@ -467,6 +469,8 @@ void vmem_enable_translations(void) {
 
     READ_SYS_REG(SCTLR_EL1, sctlr_el1);
 
+    sctlr_el1 |= BIT(12); // I bit. Enable Instruction Cache
+    sctlr_el1 |= BIT(2); // C bit. Enable Data Cache
     sctlr_el1 |= 1; // M bit. Enable MMU address translation
 
     WRITE_SYS_REG(SCTLR_EL1, sctlr_el1);
@@ -590,13 +594,22 @@ void vmem_print_l0_table(_vmem_table* table_ptr) {
 
 void vmem_flush_tlb(void) {
     asm volatile("TLBI VMALLE1");
-    MEM_DSB();
+    // asm volatile("DSB ISH");
+    asm volatile("ISB");
 }
 
 uint64_t vmem_check_address(uint64_t addr) {
 
     uint64_t par_el1;
     asm volatile("AT S1E1R, %0\n" : : "r" (addr));
+    READ_SYS_REG(PAR_EL1, par_el1);
+    return par_el1;
+}
+
+uint64_t vmem_check_address_user(uint64_t addr) {
+
+    uint64_t par_el1;
+    asm volatile("AT S1E0R, %0\n" : : "r" (addr));
     READ_SYS_REG(PAR_EL1, par_el1);
     return par_el1;
 }

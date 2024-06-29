@@ -52,4 +52,6 @@ void net_arp_send_packet(net_dev_t* net_dev, net_arp_packet_t* arp_packet, mac_t
 bool net_arp_get_mac_for_ipv4(net_dev_t* net_dev, ipv4_t* ipv4, mac_t* dest_mac);
 void net_arp_update_table(ipv4_t* ipv4, mac_t* mac);
 
+void net_arp_queue_packet(net_send_buffer_t* send_buffer);
+
 #endif
