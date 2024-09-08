@@ -6,6 +6,8 @@ set (CMAKE_SYSTEM_PROCESSOR aarch64)
 
 project (osdev_kernel C ASM)
 
+set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set (KERNEL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}
                          ${CMAKE_SOURCE_DIR}/include
                          ${CMAKE_SOURCE_DIR}/stdlib
@@ -59,9 +61,9 @@ function(create_board_kernel NAME LINKER_SCRIPT SOURCES)
     message(STATUS "Create board target: ${KERNEL_NAME}")
 endfunction()
 
+find_program(GENEXT2FS_BIN genext2fs HINTS ${PROJECT_SOURCE_ROOT}/../tools/genext2fs/bin REQUIRED)
 
 function(create_diskimg NAME)
-    set (GENEXT2FS_BIN /home/gerik/projects/osdev-monolithic/tools/genext2fs/bin/genext2fs)
 
     add_custom_target (diskimg-${NAME}
         COMMAND rm -rf diskdata

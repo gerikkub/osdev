@@ -2,7 +2,7 @@
 set (CMAKE_SYSTEM_NAME Generic)
 set (CMAKE_SYSTEM_PROCESSOR aarch64)
 
-set (COMPILER_PATH "/home/gerik/projects/osdev-monolithic/tools/compiler/bin")
+file (REAL_PATH "../tools/compiler/bin" COMPILER_PATH)
 
 set (CMAKE_C_COMPILER_WORKS 1)
 

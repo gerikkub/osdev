@@ -28,6 +28,7 @@ add_library(kernel_stdlib OBJECT
             #${CMAKE_CURRENT_SOURCE_DIR}/minimal/source/time/gmtime.c
 )
 target_include_directories(kernel_stdlib PRIVATE ${KERNEL_INCLUDE_DIRS})
+target_include_directories(kernel_stdlib SYSTEM INTERFACE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/minimal/include)
 target_compile_options(kernel_stdlib PRIVATE "-DKERNEL_BUILD")
 
 add_library(userspace_stdlib OBJECT
@@ -59,3 +60,4 @@ add_library(userspace_stdlib OBJECT
             #${CMAKE_CURRENT_SOURCE_DIR}/minimal/source/time/gmtime.c
 )
 target_include_directories(userspace_stdlib PRIVATE ${KERNEL_INCLUDE_DIRS})
+target_include_directories(userspace_stdlib SYSTEM INTERFACE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/minimal/include)

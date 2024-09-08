@@ -10,3 +10,5 @@ add_library(system_lib OBJECT
 
             ${CMAKE_CURRENT_SOURCE_DIR}/string_utils.c
 )
+
+target_link_libraries(system_lib userspace_stdlib)

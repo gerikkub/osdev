@@ -4,7 +4,6 @@
 
 #include "board_conf.h"
 
-#include "drivers/pl011_uart.h"
 #include "drivers/net/enc28j60/enc28j60.h"
 #include "drivers/loop/loop.h"
 
@@ -13,22 +12,16 @@
 #include "kernel/exec.h"
 #include "kernel/drivers.h"
 #include "kernel/dtb.h"
-#include "kernel/lib/libpci.h"
 #include "kernel/fd.h"
 #include "kernel/console.h"
 #include "kernel/drivers.h"
 #include "kernel/vfs.h"
 #include "kernel/task.h"
-#include "kernel/gtimer.h"
 #include "kernel/select.h"
 #include "kernel/sys_device.h"
 #include "kernel/fs_manager.h"
 #include "kernel/net/udp_socket.h"
 #include "kernel/lib/libtftp.h"
-
-#include "kernel/net/net.h"
-#include "kernel/net/arp.h"
-#include "kernel/net/ipv4_route.h"
 
 #include "include/k_ioctl_common.h"
 #include "include/k_syscall.h"
@@ -211,11 +204,12 @@ void board_loop() {
 
     int64_t nic_fd;
     nic_fd = vfs_open_device_fd("sys", "enc28j60", 0);
-    fd_ctx_t* nic_fd_ctx = get_kernel_fd(nic_fd);
+    fd_ctx_t* nic_fd_ctx = NULL;
 
     if (nic_fd < 0) {
         console_log(LOG_INFO, "enc28j60 not available. Skipping IP set");
     } else {
+        nic_fd_ctx = get_kernel_fd(nic_fd);
         uint64_t ip = 192 << 24 |
                       168 << 16 |
                       0 << 8 |
@@ -269,7 +263,6 @@ void board_loop() {
 
     create_kernel_task(0x10000, kernel_gpio_irq_thread, gpio_fd_ctx, "gpio-test");
 
-
     k_create_socket_t udp_create_socket = {
         .socket_type = SYSCALL_SOCKET_UDP4,
         .udp4.dest_ip.d = {192,168,0,207},
@@ -283,7 +276,7 @@ void board_loop() {
 
     void* file_data;
     int64_t file_len;
-    int64_t ok = tftp_recv_file(tftp_ctx, "/b55dbdaa/disk_image.img", &file_data, &file_len);
+    int64_t ok = tftp_recv_file(tftp_ctx, "/disk_image.img", &file_data, &file_len);
     ASSERT(ok == 0);
 
     console_log(LOG_INFO, "Read file %d", file_len);

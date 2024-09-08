@@ -173,15 +173,20 @@ int64_t tftp_recv_file(tftp_ctx_t* ctx, const char* fname, void** file_data, int
     while (true) {
         // uint8_t* data = vmalloc(512 + 4);
         uint8_t* data = vmalloc(1024);
-        // console_log(LOG_DEBUG, "Chunk %d %16x", chunk_idx, data);
+
 
         int64_t bytes = tftp_recv_data(ctx, data, block_num);
         vmalloc_check_structure();
-        // llist_append_ptr(chunks, data);
+
         chunks[chunk_idx++] = data;
         ASSERT(chunk_idx < 8192);
         block_num++;
         file_size += bytes;
+
+        if (file_size % (250*1024) == 0) {
+            console_log(LOG_DEBUG, "TFTP Recv %d KB", file_size / 1024);
+        }
+
 
         if (bytes < 0) {
             abort = true;

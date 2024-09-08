@@ -8,12 +8,19 @@ create_diskimg(raspi4b)
 create_qemu_target(raspi4b ${QEMU_FLAGS})
 
 add_custom_command(OUTPUT kernel-raspi4b.bin
-                   COMMAND aarch64-linux-gnu-objcopy -O binary kernel-raspi4b.elf kernel-raspi4b.bin
+                   COMMAND ${COMPILER_PATH}/aarch64-none-elf-objcopy -O binary kernel-raspi4b.elf kernel-raspi4b.bin
                    DEPENDS kernel-raspi4b
                    VERBATIM
 )
 
 add_custom_target(load-raspi4b
+    COMMAND cp kernel-raspi4b.bin ${PROJECT_SOURCE_DIR}/../tools/tftp_root/kernel8.img
+                  COMMAND cp disk_image.img ${PROJECT_SOURCE_DIR}/../tools/tftp_root/disk_image.img
+                  DEPENDS kernel-raspi4b.bin
+                  DEPENDS diskimg-raspi4b
+                  VERBATIM)
+
+add_custom_target(load-raspi4b-win
                   COMMAND cp kernel-raspi4b.bin /mnt/c/TFTP-Root/b55dbdaa/kernel8.img
                   COMMAND cp disk_image.img /mnt/c/TFTP-Root/b55dbdaa/disk_image.img
                   DEPENDS kernel-raspi4b.bin

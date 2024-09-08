@@ -33,7 +33,6 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/exception_asm.s
             ${CMAKE_CURRENT_SOURCE_DIR}/high_start.s
             ${CMAKE_CURRENT_SOURCE_DIR}/vmem_asm.s
-            ${CMAKE_CURRENT_SOURCE_DIR}/cache.s
 
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/ext2/ext2.c
             ${CMAKE_CURRENT_SOURCE_DIR}/fs/ext2/ext2_helpers.c

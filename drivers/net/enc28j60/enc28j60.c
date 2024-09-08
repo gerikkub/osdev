@@ -4,31 +4,20 @@
 
 #include "kernel/assert.h"
 #include "kernel/console.h"
-#include "kernel/lib/libdtb.h"
 #include "kernel/lib/lstruct.h"
 #include "kernel/lib/vmalloc.h"
 #include "kernel/drivers.h"
 #include "kernel/fd.h"
-#include "kernel/sys_device.h"
-#include "kernel/kernelspace.h"
-#include "kernel/memoryspace.h"
-#include "kernel/vmem.h"
 #include "kernel/task.h"
 #include "kernel/select.h"
-#include "kernel/kmalloc.h"
-#include "kernel/gtimer.h"
-#include "kernel/interrupt/interrupt.h"
 #include "kernel/net/net.h"
 #include "kernel/select.h"
-
-#include "drivers/spi/spi.h"
 
 #include "include/k_ioctl_common.h"
 #include "include/k_gpio.h"
 #include "include/k_select.h"
 
 #include "stdlib/bitutils.h"
-#include "stdlib/printf.h"
 
 #include "enc28j60.h"
 
@@ -532,7 +521,6 @@ void enc28j60_discover(void* ctx) {
     enc_ctx->gpio_int_fd_ctx = discover_ctx->gpio_int_fd_ctx;
     enc_ctx->gpio_int_num = discover_ctx->gpio_int_num;
 
-    console_log(LOG_INFO, "ENC28J60 found");
 
     enc_ctx->nic.ops = &s_enc_nic_ops;
     enc_ctx->nic.nic_ctx = enc_ctx;
@@ -542,8 +530,22 @@ void enc28j60_discover(void* ctx) {
     lstruct_init_head(&enc_ctx->send_buffers);
     enc_ctx->send_fd_ctx = NULL;
 
-    enc_cmd_softreset(enc_ctx);
+    int read_tries = 5;
+    uint8_t erev;
+    while (read_tries > 0) {
+        enc_cmd_softreset(enc_ctx);
 
+        erev = enc_cmd_read(enc_ctx, ENC_REG_EREVID, ENC_REG_ETH);
+        if (erev != 0) break;
+        read_tries--;
+    }
+    if (read_tries <= 0) {
+        console_log(LOG_INFO, "ENC28J60 Unresponsive", erev);
+        return;
+    }
+
+    console_log(LOG_INFO, "ENC28J60 (%2x) found (%d re-attempts)",
+                erev, 5-read_tries);
     /*
     uint8_t status;
     do {
