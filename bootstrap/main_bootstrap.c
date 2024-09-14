@@ -7,6 +7,7 @@
 void _high_start(void);
 
 void main_bootstrap(void) __attribute__((section (".bootstrap.text")));
+void setup_vmem_bootstrap(void) __attribute__((section (".bootstrap.text")));
 
 void bootstrap_write_byte(uint8_t b) __attribute__((section (".bootstrap.text")));
 void bootstrap_write_word(uint64_t w) __attribute__((section (".bootstrap.text")));

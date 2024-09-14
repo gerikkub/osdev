@@ -5,15 +5,9 @@
 
 #include "kernel/task.h"
 #include "kernel/assert.h"
-#include "kernel/vmem.h"
-#include "kernel/exception.h"
-#include "kernel/memoryspace.h"
-#include "kernel/kernelspace.h"
 #include "kernel/console.h"
 #include "kernel/gtimer.h"
-#include "kernel/lib/llist.h"
 #include "kernel/lib/lstruct.h"
-#include "kernel/lib/vmalloc.h"
 
 #include "kernel/interrupt/interrupt.h"
 
@@ -72,10 +66,6 @@ void schedule(void) {
 
     DISABLE_IRQ();
 
-    uint32_t* gpio_set = (uint32_t*)(0xffff00047e200000 + 0x1c);
-    uint32_t* gpio_clr = (uint32_t*)(0xffff00047e200000 + 0x28);
-    *gpio_set = (1 << 17);
-
     task_t* active_task = get_active_task();
 
     if (active_task != NULL) {
@@ -133,7 +123,6 @@ void schedule(void) {
     wait_timer_setup(now_us, TASK_MAX_PROC_TIME_US);
     (void)now_us;
 
-    *gpio_clr = (1 << 17);
 
     if (run_task != NULL) {
         s_schedule_ctx.active_task = run_task;

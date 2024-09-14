@@ -438,21 +438,23 @@ void vmem_initialize(void) {
                        SYS_TCR_EL1_TBI0 | // Ignore top byte in address translations
                        // ASID Size 8 bit
                        // IPS Phy address space 32 bits
+                       SYS_TCR_EL1_IPS2 |
+                       SYS_TCR_EL1_IPS1 |
+                       SYS_TCR_EL1_IPS0 |
                        SYS_TCR_EL1_TG11 | // 4K TTBR1_EL1 
                        // Non-shareable memory
                        // Non-cacheable
                        // Run Translation walks
                        // TTBR0_EL1.ASID defines the ASID
-                       SYS_TCR_EL1_T1SZ(39) | // Minimum size for TTBR1 region
+                       SYS_TCR_EL1_T1SZ(17) | // Minimum size for TTBR1 region
                        // 4K TTBR0_EL1
                        // Non-shareable memory
                        // Non-cacheable
                        // Run Translation walks
-                       SYS_TCR_EL1_T0SZ(16); // 48 bit size for TTBR0 region
+                       SYS_TCR_EL1_T0SZ(17); // 47 bit size for TTBR0 region
 
 
     WRITE_SYS_REG(TCR_EL1, tcr_el1);
-
 
     uint64_t mair_el1 = 0x44 | // Attr 0. Normal memory Non-cacheable
                         (0 << 8)           | // Attr 1. nGnRnE Device Memory

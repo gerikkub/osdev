@@ -7,8 +7,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "stdlib/printf.h"
-
 void console_open(void);
 void console_putc(const char c);
 void console_endl(void);

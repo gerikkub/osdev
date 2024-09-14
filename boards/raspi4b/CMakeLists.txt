@@ -8,7 +8,7 @@ create_diskimg(raspi4b)
 create_qemu_target(raspi4b ${QEMU_FLAGS})
 
 add_custom_command(OUTPUT kernel-raspi4b.bin
-                   COMMAND ${COMPILER_PATH}/aarch64-none-elf-objcopy -O binary kernel-raspi4b.elf kernel-raspi4b.bin
+                   COMMAND ${COMPILER_PATH}/bin/aarch64-none-elf-objcopy -O binary kernel-raspi4b.elf kernel-raspi4b.bin
                    DEPENDS kernel-raspi4b
                    VERBATIM
 )

@@ -194,8 +194,15 @@ uint64_t create_elf_task(uint8_t* elf_data,
             case PT_NULL:
                 tmp_result = ELF_VALID;
                 break;
-            default:
+            case PT_DYNAMIC:
+            case PT_INTERP:
+            case PT_SHLIB:
+            case PT_PHDR:
+            case PT_TLS:
                 tmp_result = ELF_UNHANDLED_PHDR;
+                break;
+            default:
+                // Allow other unknow PHDRs
                 break;
         }
 

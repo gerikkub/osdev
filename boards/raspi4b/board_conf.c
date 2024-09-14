@@ -53,7 +53,6 @@ void board_init_main_early(void) {
     uint8_t* uart_tx_ptr = (uint8_t*)0x47E215040;
     s_uart_tx_ptr = uart_tx_ptr;
     console_add_driver(&early_uart_ops, uart_tx_ptr);
-
 }
 
 void board_init_mappings(void) {
@@ -286,15 +285,14 @@ void board_loop() {
     ok = fs_manager_mount_device("sys", "loop0", FS_TYPE_EXT2, "home");
 
     if (ok == 0) {
-        /*
         uint64_t echo_tid;
         char* echo_argv[] = {
             "Echo in userspace",
             NULL
         };
-        echo_tid = exec_user_task("home", "bin/echo.elf", "echo", echo_argv);
+        echo_tid = exec_user_task("home", "bin/hello_rust.elf", "hello_rust", echo_argv);
         (void)echo_tid;
-        */
+
         uint64_t cat_tid;
         char* cat_argv[] = {
             "home",

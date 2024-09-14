@@ -145,6 +145,7 @@ ext2_mount_failure:
 static void ext2_file_populate_data(void* ctx, file_data_entry_t* entry) {
 
     ext2_fid_ctx_t* file_ctx = ctx;
+    ext2_fid_entry_ctx_t* entry_ctx = entry->ctx;
 
     const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
     const uint64_t alloc_size = ((entry->len + block_size - 1) / block_size) * block_size;
@@ -153,10 +154,7 @@ static void ext2_file_populate_data(void* ctx, file_data_entry_t* entry) {
     lock_acquire(&file_ctx->inode_lock, true);
     lock_acquire(&file_ctx->fs_ctx->fs_lock, true);
 
-    uint32_t block_num = entry->offset / block_size;
-
-    ext2_read_inode_data(file_ctx->fs_ctx, file_ctx->inode,
-                         block_num, 1, entry->data);
+    ext2_read_block(file_ctx->fs_ctx, entry_ctx->block_num, entry->data);
 
     lock_release(&file_ctx->fs_ctx->fs_lock);
     lock_release(&file_ctx->inode_lock);
@@ -248,11 +246,10 @@ static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
     
     // Only support direct and 1 indirect blocks right now...
 
-    int idx;
     int size_remaining = file_ctx->inode->size;
     uint64_t offset = 0;
     const uint32_t block_size = BLOCK_SIZE(file_ctx->fs_ctx->sb);
-    for (idx = 0; idx < 12; idx++) {
+    for (int idx = 0; idx < 12; idx++) {
         // Break if no file data is present
         if (file_ctx->inode->block_direct[idx] == 0) {
             break;
@@ -282,10 +279,12 @@ static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
                         file_ctx->inode->block_1indirect,
                         (void*)indirect_block);
 
-        for (idx = 0; idx < (block_size/sizeof(uint32_t)); idx++) {
+        for (int idx = 0; idx < EXT2_BLOCKS_PER_BLOCK(file_ctx->fs_ctx); idx++) {
             if (indirect_block[idx] == 0) {
                 break;
             }
+
+            ASSERT(size_remaining > 0);
 
             file_data_entry_t* fd_entry = vmalloc(sizeof(file_data_entry_t));
             ext2_fid_entry_ctx_t* entry_ctx = vmalloc(sizeof(ext2_fid_entry_ctx_t));
@@ -305,6 +304,49 @@ static file_data_t* ext2_create_file_data(ext2_fid_ctx_t* file_ctx) {
         }
 
         vfree(indirect_block);
+    }
+
+    if (file_ctx->inode->block_2indirect != 0) {
+        uint32_t* indirect2_block = vmalloc(block_size);
+        uint32_t* indirect1_block = vmalloc(block_size);
+
+        ext2_read_block(file_ctx->fs_ctx,
+                        file_ctx->inode->block_2indirect,
+                        (void*)indirect2_block);
+
+        for (int idx2 = 0; idx2 < EXT2_BLOCKS_PER_BLOCK(file_ctx->fs_ctx); idx2++) {
+            if (indirect2_block[idx2] == 0) {
+                break;
+            }
+
+            ext2_read_block(file_ctx->fs_ctx,
+                            indirect2_block[idx2],
+                            (void*)indirect1_block);
+
+            for (int idx1 = 0; idx1 < EXT2_BLOCKS_PER_BLOCK(file_ctx->fs_ctx); idx1++) {
+                if (indirect1_block[idx1] == 0) {
+                    break;
+                }
+
+                ASSERT(size_remaining > 0);
+
+                file_data_entry_t* fd_entry = vmalloc(sizeof(file_data_entry_t));
+                ext2_fid_entry_ctx_t* entry_ctx = vmalloc(sizeof(ext2_fid_entry_ctx_t));
+                entry_ctx->block_num = indirect1_block[idx1];
+
+                fd_entry->data = NULL;
+                fd_entry->len = block_size;
+                fd_entry->offset = offset;
+                fd_entry->ctx = entry_ctx;
+                fd_entry->dirty = 0;
+                fd_entry->available = 0;
+
+                llist_append_ptr(file_data->data_list, fd_entry);
+
+                size_remaining -= block_size;
+                offset += block_size;
+            }
+        }
     }
 
     file_data->size = file_ctx->inode->size;

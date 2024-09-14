@@ -10,3 +10,6 @@
 
 _start:
     b _bootstrap_start
+_2:
+    b _2
+

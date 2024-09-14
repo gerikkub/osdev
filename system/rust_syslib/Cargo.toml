@@ -1,0 +1,19 @@
+[package]
+name = "rust_syslib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+bench = false
+
+[build]
+target = "aarch64-unknown-none"
+
+[profile.dev]
+panic = "abort"
+target = "aarch64-unknown-none"
+
+[build-dependencies]
+bindgen = "0.70.1"
+

@@ -638,6 +638,7 @@ void pcie_discovered(void* ctx) {
 
 
     pci_range_t dtb_ranges = pcie_parse_ranges(dt_node);
+
     void* pcie_ptr = pcie_parse_allocate_reg(dt_node);
 
     pci_interrupt_map_t* pcie_int_map = pcie_parse_interrupt_map(dt_node);

@@ -15,7 +15,7 @@ set (KERNEL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}
 
 #set (CMAKE_ASM_FLAGS "-x assembler-with-cpp -Wall -fdata-sections -ffunction-sections")
 set (CMAKE_ASM_FLAGS "-x assembler-with-cpp")
-set (CMAKE_C_FLAGS "-ffreestanding -Wall -Werror -mno-pc-relative-literal-loads ")
+set (CMAKE_C_FLAGS "-ffreestanding -Wall -Werror")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mgeneral-regs-only -march=armv8.2-a")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -g -gdwarf-2 -Og")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function -Wno-unused-but-set-variable")
@@ -70,7 +70,7 @@ function(create_diskimg NAME)
         COMMAND mkdir -p diskdata/bin
         COMMAND cp ${APP_BINARIES} diskdata/bin
         COMMAND cp -r ${CMAKE_SOURCE_DIR}/diskextras/* diskdata/
-        COMMAND ${GENEXT2FS_BIN} -b 2880 -d diskdata/ ${CMAKE_CURRENT_BINARY_DIR}/disk_image.img
+        COMMAND ${GENEXT2FS_BIN} -b 4320 -d diskdata/ ${CMAKE_CURRENT_BINARY_DIR}/disk_image.img
         DEPENDS kernel-${NAME} ${APP_TARGETS})
     set_target_properties(diskimg-${NAME} PROPERTIES OUTPUT_NUM "disk_image.img")
 endfunction()
@@ -86,7 +86,7 @@ function(create_tarball NAME)
     set_target_properties(disktar-${NAME} PROPERTIES OUTPUT_NUM "disk_image.tar")
 endfunction()
 
-set (QEMU_PATH /home/gerik/Downloads/qemu/build/)
+find_program(QEMU_BIN qemu-system-aarch64 HINTS /home/gerik/Downloads/qemu/build /home/gerik/src/qemu/install/bin REQUIRED)
 
 function(create_qemu_target NAME QEMU_FLAGS)
 
@@ -94,11 +94,11 @@ function(create_qemu_target NAME QEMU_FLAGS)
     string (REPLACE " " ";" QEMU_VM_DEBUG_FLAGS "${QEMU_FLAGS} -S")
 
     add_custom_target(run-${NAME}
-        COMMAND ${QEMU_PATH}/qemu-system-aarch64 ${QEMU_VM_FLAGS}
+        COMMAND ${QEMU_BIN} ${QEMU_VM_FLAGS}
                     DEPENDS diskimg-${NAME})
 
     add_custom_target(debug-${NAME}
-        COMMAND ${QEMU_PATH}/qemu-system-aarch64 ${QEMU_VM_DEBUG_FLAGS}
+        COMMAND ${QEMU_BIN} ${QEMU_VM_DEBUG_FLAGS}
                     DEPENDS diskimg-${NAME})
 
 endfunction()

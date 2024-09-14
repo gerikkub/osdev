@@ -9,14 +9,9 @@
 #include "kernel/select.h"
 #include "kernel/lib/vmalloc.h"
 
-#include "kernel/net/net.h"
-#include "kernel/net/udp.h"
-#include "kernel/net/udp_socket.h"
-
 #include "include/k_ioctl_common.h"
 #include "include/k_select.h"
-
-#include "stdlib/bitutils.h"
+#include "include/k_net_api.h"
 
 #define TFTP_TIMEOUT_US (50 * 1000)
 
@@ -161,32 +156,30 @@ int64_t tftp_recv_file(tftp_ctx_t* ctx, const char* fname, void** file_data, int
 
     console_log(LOG_DEBUG, "TFTP Start Data");
 
-    // llist_head_t chunks = llist_create();
+    const int max_chunks = 16384;
 
-    uint8_t** chunks = vmalloc(8192 * sizeof(void*));
-    memset(chunks, 0, 8102 * sizeof(void*));
+    uint8_t** chunks = vmalloc(max_chunks * sizeof(void*));
+    memset(chunks, 0, max_chunks * sizeof(void*));
 
     int64_t block_num = 1;
     int64_t file_size = 0;
     bool abort = false;
     int64_t chunk_idx = 0;
     while (true) {
-        // uint8_t* data = vmalloc(512 + 4);
+        //uint8_t* data = vmalloc(512 + 4);
         uint8_t* data = vmalloc(1024);
-
 
         int64_t bytes = tftp_recv_data(ctx, data, block_num);
         vmalloc_check_structure();
 
         chunks[chunk_idx++] = data;
-        ASSERT(chunk_idx < 8192);
+        ASSERT(chunk_idx < max_chunks);
         block_num++;
         file_size += bytes;
 
         if (file_size % (250*1024) == 0) {
             console_log(LOG_DEBUG, "TFTP Recv %d KB", file_size / 1024);
         }
-
 
         if (bytes < 0) {
             abort = true;
@@ -205,27 +198,13 @@ int64_t tftp_recv_file(tftp_ctx_t* ctx, const char* fname, void** file_data, int
     int64_t file_idx = 0;
 
     uint8_t* data;
-    /*
-    FOR_LLIST(chunks, data)
-        if (file_size - idx >= 512) {
-            memcpy(&tmp_file_data[idx], &data[4], 512);
-        } else {
-            memcpy(&tmp_file_data[idx], &data[4], file_size - idx);
-        }
-        idx += 512;
-        // vfree(data);
-    END_FOR_LLIST()
-
-    // llist_free_all(chunks);
-    // llist_free(chunks);
-    */
 
     vmalloc_check_structure();
-    for (int idx = 0; idx < 8192; idx++) {
+    for (int idx = 0; idx < max_chunks; idx++) {
         if (chunks[idx] == 0) {
             break;
         }
-        // console_log(LOG_DEBUG, "Chunk %d %16x", idx, chunks[idx]);
+
         data = chunks[idx];
 
         if (file_size - file_idx >= 512) {
@@ -236,10 +215,9 @@ int64_t tftp_recv_file(tftp_ctx_t* ctx, const char* fname, void** file_data, int
         }
         file_idx += 512;
 
-        // vmalloc_check_structure();
-        // vfree(chunks[idx]);
+        //vfree(chunks[idx]);
     }
-    // vfree(chunks);
+    //vfree(chunks);
 
     *file_data = tmp_file_data;
     return 0;

@@ -10,6 +10,7 @@
 #include "kernel/kernelspace.h"
 #include "kernel/drivers.h"
 #include "kernel/dtb.h"
+#include "kernel/exec.h"
 #include "kernel/task.h"
 #include "kernel/console.h"
 #include "kernel/lib/libpci.h"
@@ -73,13 +74,18 @@ void board_loop() {
                                        "home");
     ASSERT(open_res >= 0);
 
+    uint64_t echo_tid;
+    char* echo_argv[] = {
+        "Echo in userspace",
+        NULL
+    };
+    echo_tid = exec_user_task("home", "bin/hello_rust.elf", "hello_rust", echo_argv);
+    ASSERT(echo_tid != 0);
+
     while (true) {
         task_wait_timer_in(1000*1000);
 
         console_log(LOG_INFO, "Tick");
-        uint64_t daif;
-        READ_SYS_REG(DAIF, daif);
-        console_log(LOG_INFO, "DAIF: 0x%4x", daif);
     }
 
 }

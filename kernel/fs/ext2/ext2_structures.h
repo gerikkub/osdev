@@ -134,10 +134,11 @@ typedef struct __attribute__((__packed__)) {
 
 // Inode Structures
 
+#define EXT2_BLOCKS_PER_BLOCK(fs) (BLOCK_SIZE(fs->sb) / sizeof(uint32_t))
 #define EXT2_BLOCK_DIRECT_MAX(fs) (12)
-#define EXT2_BLOCK_1INDIRECT_MAX(fs) (BLOCK_SIZE(fs->sb) / sizeof(uint32_t))
-#define EXT2_BLOCK_2INDIRECT_MAX(fs) (EXT2_BLOCK_1INDIRECT_MAX(fs) * EXT2_BLOCK_1INDIRECT_MAX(fs))
-#define EXT2_BLOCK_3INDIRECT_MAX(fs) (EXT2_BLOCK_2INDIRECT_MAX(fs) * EXT2_BLOCK_1INDIRECT_MAX(fs))
+#define EXT2_BLOCK_1INDIRECT_MAX(fs) (EXT2_BLOCK_DIRECT_MAX(fs) + EXT2_BLOCKS_PER_BLOCK(fs))
+#define EXT2_BLOCK_2INDIRECT_MAX(fs) (EXT2_BLOCK_1INDIRECT_MAX(fs) + EXT2_BLOCKS_PER_BLOCK(fs) * EXT2_BLOCKS_PER_BLOCK(fs))
+#define EXT2_BLOCK_3INDIRECT_MAX(fs) (EXT2_BLOCK_2INDIRECT_MAX(fs) + EXT2_BLOCKS_PER_BLOCK(fs) * EXT2_BLOCKS_PER_BLOCK(fs) * EXT2_BLOCKS_PER_BLOCK(fs))
 
 typedef struct __attribute__((__packed__)) {
     uint16_t mode;

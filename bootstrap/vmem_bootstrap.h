@@ -110,7 +110,8 @@ typedef enum {
     VMEM_ADDR_DEVICE
 } vmem_attr_t;
 
+_vmem_entry_t vmem_entry_block_bootstrap(uint16_t attr_hi, uint16_t attr_lo, uintptr_t addr, uint8_t block_level) __attribute__((section (".bootstrap.text")));
 
-void setup_vmem_bootstrap(void);
+_vmem_entry_t vmem_entry_table_bootstrap(uintptr_t addr, uint64_t flags) __attribute__((section (".bootstrap.text")));
 
 #endif

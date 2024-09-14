@@ -153,9 +153,6 @@ void idle_task(void) {
 
 void restore_context_idle(void) {
 
-    uint32_t* gpio_set = (uint32_t*)(0xffff00047e200000 + 0x1c);
-    *gpio_set = (1 << 27);
-
     ENABLE_IRQ();
 
     uint64_t tid = 0;

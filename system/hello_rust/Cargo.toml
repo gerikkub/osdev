@@ -1,0 +1,17 @@
+[package]
+name = "hello_rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+bench = false
+
+[profile.dev]
+panic = "abort"
+
+[build]
+target = "aarch64-unknown-none"
+
+[dependencies]
+rust_syslib = { path="../rust_syslib" }

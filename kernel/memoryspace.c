@@ -5,7 +5,6 @@
 #include "kernel/console.h"
 #include "kernel/memoryspace.h"
 #include "kernel/vmem.h"
-#include "kernel/task.h"
 #include "kernel/assert.h"
 #include "kernel/elf.h"
 #include "kernel/lib/llist.h"
@@ -37,6 +36,40 @@ memory_entry_t* memspace_get_entry_at_addr(memory_space_t* space, void* addr_ptr
 bool memspace_add_entry_to_memory(memory_space_t* space, memory_entry_t* entry) {
 
     ASSERT(space != NULL);
+
+    /*
+    memory_entry_t* walk_entry = NULL;
+    FOR_LLIST(space->entries, walk_entry)
+        if (((entry->start >= walk_entry->start) &&
+             (entry->start < walk_entry->end)) ||
+            ((entry->end > walk_entry->start) &&
+             (entry->end < walk_entry->end)) ||
+            ((walk_entry->start >= entry->start) &&
+             (walk_entry->start < entry->end)) ||
+            ((walk_entry->end > entry->start) &&
+             (walk_entry->end < entry->end))) {
+            
+            console_log(LOG_INFO, "Overlapping memspace entries for %16x-%16x (%d) and %16x-%16x (%d)",
+                        walk_entry->start, walk_entry->end, walk_entry->type,
+                        entry->start, entry->end, entry->type);
+        }
+    END_FOR_LLIST()
+    FOR_LLIST(space->new_entries, walk_entry)
+        if (((entry->start >= walk_entry->start) &&
+             (entry->start < walk_entry->end)) ||
+            ((entry->end > walk_entry->start) &&
+             (entry->end < walk_entry->end)) ||
+            ((walk_entry->start >= entry->start) &&
+             (walk_entry->start < entry->end)) ||
+            ((walk_entry->end > entry->start) &&
+             (walk_entry->end < entry->end))) {
+            
+            console_log(LOG_INFO, "Overlapping memspace entries for %16x-%16x (%d) and %16x-%16x (%d)",
+                        walk_entry->start, walk_entry->end, walk_entry->type,
+                        entry->start, entry->end, entry->type);
+        }
+    END_FOR_LLIST()
+    */
 
     memory_entry_t* new_entry = memspace_alloc_entry();
     memcpy(new_entry, entry, sizeof(memory_entry_t));

@@ -92,7 +92,7 @@ uint32_t ext2_get_inode_block_num(ext2_fs_ctx_t* fs, const ext2_inode_t* inode, 
     if (block_num < num_direct_blocks) {
         // Direct block
         disk_block_num = inode->block_direct[block_num];
-    } else if (block_num < num_1indirect_blocks) {
+    } else if (block_num < (num_1indirect_blocks + num_direct_blocks)) {
         uint32_t* block_buffer = vmalloc(BLOCK_SIZE(fs->sb));
 
         uint32_t block_idx = block_num - num_direct_blocks;
@@ -106,11 +106,18 @@ uint32_t ext2_get_inode_block_num(ext2_fs_ctx_t* fs, const ext2_inode_t* inode, 
         uint32_t* block_buffer_1 = vmalloc(BLOCK_SIZE(fs->sb));
         uint32_t* block_buffer_2 = vmalloc(BLOCK_SIZE(fs->sb));
 
-        uint32_t block_idx = block_num - num_direct_blocks - num_1indirect_blocks;
+        uint32_t block_idx = block_num - num_1indirect_blocks;
 
         uint32_t block_idx_1 = block_idx / num_1indirect_blocks;
         uint32_t block_idx_2 = block_idx % num_1indirect_blocks;
 
+        console_log(LOG_DEBUG, "Read indirect2 block %d (%d %d %d)",
+                    block_num, block_idx, block_idx_1, block_idx_2);
+
+        ASSERT(block_idx_1 < (BLOCK_SIZE(fs->sb)/sizeof(uint32_t)));
+        ASSERT(block_idx_2 < (BLOCK_SIZE(fs->sb)/sizeof(uint32_t)));
+
+        console_log(LOG_DEBUG, "Read indirect2 block %d", inode->block_2indirect);
         ext2_read_block(fs, inode->block_2indirect, block_buffer_1);
 
         ext2_read_block(fs, block_buffer_1[block_idx_1], block_buffer_2);
@@ -125,9 +132,7 @@ uint32_t ext2_get_inode_block_num(ext2_fs_ctx_t* fs, const ext2_inode_t* inode, 
         uint32_t* block_buffer_2 = vmalloc(BLOCK_SIZE(fs->sb));
         uint32_t* block_buffer_3 = vmalloc(BLOCK_SIZE(fs->sb));
 
-        uint32_t block_idx = block_num - num_direct_blocks
-                                       - num_1indirect_blocks
-                                       - num_2indirect_blocks;
+        uint32_t block_idx = block_num - num_2indirect_blocks;
 
         uint32_t block_idx_1 = block_idx / num_2indirect_blocks;
         uint32_t block_idx_2 = block_idx / num_1indirect_blocks;

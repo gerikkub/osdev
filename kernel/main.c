@@ -3,13 +3,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "stdlib/bitutils.h"
-#include "stdlib/printf.h"
-
-#include "drivers/pl011_uart.h"
-#include "drivers/qemu_fw_cfg.h"
-#include "drivers/virtio_pci_early_console/virtio_pci_early_console.h"
-
 #include "kernel/console.h"
 #include "kernel/kmalloc.h"
 #include "kernel/assert.h"
@@ -23,44 +16,25 @@
 #include "kernel/syscall.h"
 #include "kernel/memoryspace.h"
 #include "kernel/kernelspace.h"
-#include "kernel/modules.h"
 #include "kernel/elf.h"
-#include "kernel/dtb.h"
 #include "kernel/drivers.h"
-#include "kernel/vfs.h"
 #include "kernel/sys_device.h"
-#include "kernel/fs_manager.h"
 #include "kernel/fs/ext2/ext2.h"
 #include "kernel/fs/sysfs/sysfs.h"
 #include "kernel/fs/ramfs/ramfs.h"
-#include "kernel/exec.h"
-#include "kernel/select.h"
 
 #include "kernel/net/arp.h"
 #include "kernel/net/ipv4.h"
 #include "kernel/net/ipv4_route.h"
-#include "kernel/net/ipv4_icmp.h"
-#include "kernel/net/udp.h"
 #include "kernel/net/tcp_conn.h"
 #include "kernel/net/tcp_socket.h"
 #include "kernel/net/tcp_bind.h"
 
 #include "kernel/lib/vmalloc.h"
-#include "kernel/lib/libpci.h"
-
-#include "include/k_ioctl_common.h"
-#include "include/k_gpio.h"
-#include "include/k_spi.h"
-#include "include/k_syscall.h"
-#include "include/k_select.h"
 
 #include "drivers/aarch64/aarch64.h"
 
 #include "board_conf_generic.h"
-
-#include "drivers/timer/bcm2835_systemtimer.h"
-#include "drivers/gicv2/gicv2.h"
-
 
 void write32(void* ptr, uint32_t val) {
     *(volatile uint32_t*)ptr = val;
@@ -89,7 +63,7 @@ void main() {
     pagefault_init();
     exception_init();
 
-    vmalloc_init(48 * 1024 * 1024);
+    vmalloc_init(16 * 1024 * 1024);
 
     memspace_init_kernelspace();
     memspace_init_systemspace();
@@ -117,6 +91,7 @@ void main() {
     _vmem_table* dummy_user_table = vmem_allocate_empty_table();
 
     vmem_set_tables(kernel_vmem_table, dummy_user_table);
+    //vmem_initialize();
 
     board_init_early_console();
 
@@ -149,6 +124,10 @@ void main() {
     board_init_devices();
 
     gtimer_init();
+
+    // Enable FP support
+    uint64_t cpacr = 0x300000;
+    WRITE_SYS_REG(CPACR_EL1, cpacr);
 
     DISABLE_IRQ();
 

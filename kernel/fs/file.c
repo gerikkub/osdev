@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <kernel/assert.h>
+#include <kernel/console.h>
 #include <kernel/fd.h>
 #include <kernel/lib/llist.h>
 #include <kernel/lib/vmalloc.h>
@@ -34,10 +35,14 @@ int64_t file_read_op(void* ctx, uint8_t* buffer, const int64_t req_size, const u
         remaining = file_ctx->file_data->size - file_ctx->seek_idx;
     }
 
+    uint64_t entry_count = 0;
+    uint64_t exp_read_size = remaining;
+
     FOR_LLIST(file_ctx->file_data->data_list, entry)
         if (remaining == 0) {
             break;
         }
+        entry_count++;
 
         uint64_t end_idx = data_idx + entry->len;
         if (file_ctx->seek_idx >= data_idx &&
@@ -61,6 +66,9 @@ int64_t file_read_op(void* ctx, uint8_t* buffer, const int64_t req_size, const u
 
         data_idx += entry->len;
     END_FOR_LLIST()
+
+    console_log(LOG_DEBUG, "Read from %d of %d bytes from %d entries", count, exp_read_size, entry_count);
+    ASSERT(count == exp_read_size);
 
     return count;
 }
