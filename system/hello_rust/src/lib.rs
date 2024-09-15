@@ -9,7 +9,7 @@ use rust_syslib::console_write;
 #[no_mangle]
 fn main() {
     unsafe {
-        let str = ffi::CStr::from_ptr(c"Hello Rust!".as_ptr());
+        let str = ffi::CStr::from_ptr(c"Hello Rust!\n".as_ptr());
         console_write(str.as_ptr());
     }
 }

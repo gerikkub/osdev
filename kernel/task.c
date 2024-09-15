@@ -14,6 +14,7 @@
 #include "kernel/kernelspace.h"
 #include "kernel/console.h"
 #include "kernel/gtimer.h"
+#include "kernel/lib/vmalloc.h"
 
 #include "kernel/interrupt/interrupt.h"
 
@@ -39,6 +40,8 @@ void switch_to_kernel_task_stack_asm(uint64_t vector,
                                      uint64_t task_sp,
                                      exception_handler func);
 
+void save_fp_reg(uint8_t* fp_reg);
+void restore_fp_reg(uint8_t* fp_reg);
 
 void task_init(uint64_t* exstack) {
     ASSERT(exstack != NULL);
@@ -48,6 +51,8 @@ void task_init(uint64_t* exstack) {
     s_exstack = exstack;
 
     elapsedtimer_clear(&s_idletime);
+
+    set_sync_handler(EC_FP_ACCESS, enable_task_fp);
 }
 
 task_t* get_task_at_idx(int64_t idx) {
@@ -111,6 +116,13 @@ void save_context(task_reg_t* state_fp,
 
     task->run_state = TASK_RUNABLE;
 
+    if (task->enable_fp) {
+        save_fp_reg(task->fp_reg);
+    }
+    // Disable FP support
+    uint64_t cpacr = 0;
+    WRITE_SYS_REG(CPACR_EL1, cpacr);
+
     void* cpu_stack_base = &_stack_base;
 
     switch_to_kernel_task_stack_asm(vector,
@@ -132,10 +144,18 @@ void restore_context(uint64_t tid) {
     uint64_t currSP = 0;
     READ_SYS_REG(SPSel, currSP);
 
-    if (!(task->tid & TASK_TID_KERNEL)) {
+    if (IS_USER_TASK(tid)) {
         vmem_set_user_table((_vmem_table*)KSPACE_TO_PHY(task->low_vm_table), tid);
         // uint64_t asid = tid << 48;
         // asm("TLBI ASIDE1, %0\n" : : "r" (asid));
+
+        if (task->enable_fp) {
+            // Enable FP support
+            uint64_t cpacr = 0x300000;
+            WRITE_SYS_REG(CPACR_EL1, cpacr);
+
+            restore_fp_reg(task->fp_reg);
+        }
     }
 
     restore_context_asm(&task->reg, sp0t, cpu_stack_base, currSP);
@@ -465,6 +485,10 @@ void task_cleanup(task_t* task, int64_t ret_val) {
         END_FOR_LLIST()
     }
 
+    if (task->enable_fp) {
+        vfree(task->fp_reg);
+    }
+
     task->run_state = TASK_COMPLETE;
     task_requeue(task);
 }
@@ -589,3 +613,19 @@ void* get_kptr_for_task_ptr(uint64_t raw_ptr, task_t* task) {
 void* get_kptr_for_ptr(uint64_t raw_ptr) {
     return get_kptr_for_task_ptr(raw_ptr, get_active_task());
 }
+
+void enable_task_fp(uint64_t vector, uint32_t esr) {
+
+    task_t* t = get_active_task();
+    ASSERT(IS_USER_TASK(t->tid));
+
+    console_log(LOG_DEBUG, "Task (%s) requests FP support", t->name);
+
+    t->enable_fp = true;
+    t->fp_reg = vmalloc(512);
+    memset(t->fp_reg, 0, 512);
+
+    // Reschedule
+    schedule();
+}
+

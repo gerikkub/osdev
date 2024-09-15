@@ -7,6 +7,8 @@
 .global exception_init
 .global switch_to_kernel_task_stack_asm
 .global task_wait_kernel_final
+.global save_fp_reg
+.global restore_fp_reg
 
 .macro dummy_exception name num
 .align 7
@@ -223,19 +225,11 @@
 restore_context_asm:
 
     cbz x3, restore_context_asm_el1t
-    b restore_context_asm_el1h
 
 restore_context_asm_el1h:
     mov sp, x2
     msr SP_EL0, x1
-    b restore_context_asm_finish
 
-restore_context_asm_el1t:
-    # Assume someone else has setup the handler SP
-    mov sp, x1
-    b restore_context_asm_finish
-
-restore_context_asm_finish:
     mov x30, x0
     ldp x3, x1, [x30], #16
     ldr x2, [x30], #8
@@ -261,6 +255,38 @@ restore_context_asm_finish:
     ldr x30, [x30]
 
     eret
+
+restore_context_asm_el1t:
+    # Assume someone else has setup the handler SP
+    mov sp, x1
+
+    mov x30, x0
+    ldp x3, x1, [x30], #16
+    ldr x2, [x30], #8
+
+    msr ELR_EL1, x2
+    msr SPSR_EL1, x3
+
+    ldp x0, x1, [x30], #16
+    ldp x2, x3, [x30], #16
+    ldp x4, x5, [x30], #16
+    ldp x6, x7, [x30], #16
+    ldp x8, x9, [x30], #16
+    ldp x10, x11, [x30], #16
+    ldp x12, x13, [x30], #16
+    ldp x14, x15, [x30], #16
+    ldp x16, x17, [x30], #16
+    ldp x18, x19, [x30], #16
+    ldp x20, x21, [x30], #16
+    ldp x22, x23, [x30], #16
+    ldp x24, x25, [x30], #16
+    ldp x26, x27, [x30], #16
+    ldp x28, x29, [x30], #16
+    ldr x30, [x30]
+
+
+    eret
+
 
 
 exception_filename:
@@ -301,7 +327,30 @@ save_most_reg:
     stp x4, x5, [sp, #-16]!
     stp x2, x3, [sp, #-16]!
     stp x0, x1, [sp, #-16]!
+
     ret
+
+# Save all FP/NEON registers to memory pointed to by x0
+save_fp_reg:
+    stp q0, q1, [x0], #32
+    stp q2, q3, [x0], #32
+    stp q4, q5, [x0], #32
+    stp q6, q7, [x0], #32
+    stp q8, q9, [x0], #32
+    stp q10, q11, [x0], #32
+    stp q12, q13, [x0], #32
+    stp q14, q15, [x0], #32
+    stp q16, q17, [x0], #32
+    stp q18, q19, [x0], #32
+    stp q20, q21, [x0], #32
+    stp q22, q23, [x0], #32
+    stp q24, q25, [x0], #32
+    stp q26, q27, [x0], #32
+    stp q28, q29, [x0], #32
+    stp q30, q31, [x0], #32
+
+    ret
+
 
 # Restore all registers except x30 which is used for this method call
 restore_most_reg:
@@ -320,8 +369,29 @@ restore_most_reg:
     ldp x24, x25, [sp], #16
     ldp x26, x27, [sp], #16
     ldp x28, x29, [sp], #16
+
     ret
 
+# Save all FP/NEON registers to memory pointed to by x0
+restore_fp_reg:
+    ldp q0, q1, [x0], #32
+    ldp q2, q3, [x0], #32
+    ldp q4, q5, [x0], #32
+    ldp q6, q7, [x0], #32
+    ldp q8, q9, [x0], #32
+    ldp q10, q11, [x0], #32
+    ldp q12, q13, [x0], #32
+    ldp q14, q15, [x0], #32
+    ldp q16, q17, [x0], #32
+    ldp q18, q19, [x0], #32
+    ldp q20, q21, [x0], #32
+    ldp q22, q23, [x0], #32
+    ldp q24, q25, [x0], #32
+    ldp q26, q27, [x0], #32
+    ldp q28, q29, [x0], #32
+    ldp q30, q31, [x0], #32
+
+    ret
 
 # Switch to the task kernel stack and EL1t
 # Call the given function

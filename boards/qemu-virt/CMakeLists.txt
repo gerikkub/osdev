@@ -1,5 +1,5 @@
 
-set (QEMU_FLAGS "-M virt,gic-version=3 -cpu cortex-a57 -nographic -s -kernel ${CMAKE_CURRENT_BINARY_DIR}/kernel-qemu-virt.elf")
+set (QEMU_FLAGS "-M virt,gic-version=3 -cpu cortex-a57 -m 512M -nographic -s -kernel ${CMAKE_CURRENT_BINARY_DIR}/kernel-qemu-virt.elf")
 set (QEMU_FLAGS "${QEMU_FLAGS} -drive file=${CMAKE_CURRENT_BINARY_DIR}/disk_image.img,id=disk0,if=none")
 set (QEMU_FLAGS "${QEMU_FLAGS} -device virtio-blk-pci,drive=disk0,disable-legacy=on")
 set (QEMU_FLAGS "${QEMU_FLAGS} -device virtio-serial-pci,disable-legacy=on")

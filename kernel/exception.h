@@ -24,6 +24,7 @@ void set_kernel_sync_handler(uint32_t ec, kernel_sync_handler handler);
 
 void exception_init();
 
+#define EC_FP_ACCESS (0x7)
 #define EC_SVC (0x15)
 #define EC_INST_ABORT_LOWER (0x20)
 #define EC_INST_ABORT (0x21)

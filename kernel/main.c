@@ -63,7 +63,7 @@ void main() {
     pagefault_init();
     exception_init();
 
-    vmalloc_init(16 * 1024 * 1024);
+    vmalloc_init(24 * 1024 * 1024);
 
     memspace_init_kernelspace();
     memspace_init_systemspace();
@@ -124,10 +124,6 @@ void main() {
     board_init_devices();
 
     gtimer_init();
-
-    // Enable FP support
-    uint64_t cpacr = 0x300000;
-    WRITE_SYS_REG(CPACR_EL1, cpacr);
 
     DISABLE_IRQ();
 

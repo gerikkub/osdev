@@ -167,6 +167,9 @@ typedef struct task_t_ {
     msg_queue msgs;
 
     elapsedtimer_t profile_time;
+
+    bool enable_fp;
+    uint8_t* fp_reg;
 } task_t;
 
 void task_init(uint64_t* exstack);
@@ -245,6 +248,8 @@ void task_wait_timer_in(uint64_t delay_us);
 
 void* get_kptr_for_task_ptr(uint64_t raw_ptr, task_t* task);
 void* get_kptr_for_ptr(uint64_t raw_ptr);
+
+void enable_task_fp(uint64_t vector, uint32_t esr);
 
 #define TASK_SPSR_N BIT(31)
 #define TASK_SPSR_Z BIT(30)
