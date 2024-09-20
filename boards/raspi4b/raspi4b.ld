@@ -12,10 +12,10 @@ highmem_base = 0xFFFF000000000000;
 
 ram_base = 0x100000;
 
-ram_size = 128M;
+ram_size = 256M;
 flash_size = 0x7000000;
 
-heap_size = 64M;
+heap_size = 128M;
 
 
 SECTIONS
@@ -23,14 +23,20 @@ SECTIONS
 
     . = bootstrap_base;
     .bootstrap.text : {
+        _bootstrap_text_start = .;
         *(.bootstrap.text.first*)
         *(.bootstrap.text*)
+        . = ALIGN(4096);
+        _bootstrap_text_end = .;
     }
 
     . = bootstrap_data_base;
     .bootstrap.data : {
+        _bootstrap_data_start = .;
         *(.bootstrap.data.first*)
         *(.bootstrap.data*)
+        . = ALIGN(4096);
+        _bootstrap_data_end = .;
     }
 
     . = highmem_base + bootstrap_base + bootstrap_text_size + bootstrap_data_size;
@@ -45,7 +51,6 @@ SECTIONS
         *(.exception_vector)
         . = ALIGN(4096);
         _text_end = .;
-        . = ALIGN(4096);
     }
 
     . = highmem_base + ram_base + bootstrap_data_size;

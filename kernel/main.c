@@ -63,7 +63,7 @@ void main() {
     pagefault_init();
     exception_init();
 
-    vmalloc_init(24 * 1024 * 1024);
+    vmalloc_init(64 * 1024 * 1024);
 
     memspace_init_kernelspace();
     memspace_init_systemspace();

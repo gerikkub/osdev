@@ -87,8 +87,14 @@ el2_start:
 
     // Setup HCR
     //  - RW bit (Lower levels are AARCH64)
+    //  - FPEN bit (Float Point Enabled)
     mov x2, 0x80000000
     msr HCR_EL2, x2
+
+    // Setup CPTR_EL2
+    //  - FPEN bit (Float Point Enabled)
+    mov x2, 0x00300000
+    msr CPTR_EL2, x2
 
     // Enter EL1
     ldr x2, =el1_start
@@ -162,6 +168,34 @@ write_u64:
     mrs x0, SCTLR_EL1
     bic x0, x0, #1
     msr SCTLR_EL1, x0
+
+    mov x0, 'E
+    bl bootstrap_write_byte
+
+    mov x0, '\n
+    bl bootstrap_write_byte
+
+    mrs x0, ESR_EL1
+    bl bootstrap_write_word
+
+    mov x0, '\n
+    bl bootstrap_write_byte
+
+    mov x0, 'F
+    bl bootstrap_write_byte
+
+    mrs x0, FAR_EL1
+    bl bootstrap_write_word
+
+    mov x0, '\n
+    bl bootstrap_write_byte
+
+    mov x0, 'L
+    bl bootstrap_write_byte
+
+    mrs x0, ELR_EL1
+    bl bootstrap_write_word
+
 
 1:
     b 1b

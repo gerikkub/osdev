@@ -349,6 +349,10 @@ save_fp_reg:
     stp q28, q29, [x0], #32
     stp q30, q31, [x0], #32
 
+    mrs x1, FPCR
+    mrs x2, FPSR
+    stp x1, x2, [x0], #16
+
     ret
 
 
@@ -390,6 +394,10 @@ restore_fp_reg:
     ldp q26, q27, [x0], #32
     ldp q28, q29, [x0], #32
     ldp q30, q31, [x0], #32
+    ldp x1, x2, [x0], #16
+
+    msr FPCR, x1
+    msr FPSR, x2
 
     ret
 

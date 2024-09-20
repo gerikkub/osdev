@@ -7,6 +7,7 @@ add_library(kernel_drivers OBJECT
             gicv2/gicv2.c
             #gicv3/gicv3_its.c
             pcie/pcie.c
+            pcie/pcie-qemu.c
             virtio_pci_blk/virtio_pci_blk.c
             virtio_pci_console/virtio_pci_console.c
             virtio_pci_early_console/virtio_pci_early_console.c

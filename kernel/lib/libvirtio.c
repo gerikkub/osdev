@@ -392,7 +392,7 @@ void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_virtio_capab
     uint32_t feat_low = common_cfg->device_feature;
     console_printf(" %8x\n", feat_low);
 
-    uint64_t device_id = ((pci_header_t*)device_ctx->header_vmem)->device_id - 0x1040;
+    uint64_t device_id = device_ctx->header->device_id - 0x1040;
     print_virtio_feature_bits(feat_low, feat_high, device_id);
 
     common_cfg->driver_feature_sel = 1;

@@ -2,22 +2,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "bootstrap/vmem_bootstrap.h"
-
 void _high_start(void);
 
 void main_bootstrap(void) __attribute__((section (".bootstrap.text")));
 void setup_vmem_bootstrap(void) __attribute__((section (".bootstrap.text")));
-
 void bootstrap_write_byte(uint8_t b) __attribute__((section (".bootstrap.text")));
 void bootstrap_write_word(uint64_t w) __attribute__((section (".bootstrap.text")));
-
-void bootstrap_write_byte(uint8_t b) {
-    volatile uint8_t* uart_tx_ptr = (volatile uint8_t*)0x47E215040;
-    // volatile uint8_t* uart_tx_ptr = (volatile uint8_t*)0xFE215040;
-    *uart_tx_ptr = b;
-    for (volatile uint64_t idx = 1000; idx > 0; idx--);
-}
 
 void bootstrap_write_word(uint64_t w) {
     char hexmap[16];
@@ -45,9 +35,11 @@ void bootstrap_write_word(uint64_t w) {
 }
 
 void main_bootstrap(void) {
+    bootstrap_write_byte('B');
 
     setup_vmem_bootstrap();
 
+    bootstrap_write_byte('C');
     //while (1);
     _high_start();
 

@@ -55,6 +55,7 @@ add_library(kernel_src OBJECT
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/lstruct.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/vmalloc.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/elapsedtimer.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/lib/utils.c
 
             ${CMAKE_CURRENT_SOURCE_DIR}/lock/lock.c
             ${CMAKE_CURRENT_SOURCE_DIR}/lock/mutex.c

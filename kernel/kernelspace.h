@@ -9,15 +9,15 @@
 #define KERNELSPACE_ENTRIES 512
 #define SYSTEMSPACE_ENTRIES 512
 
-#define PHY_TO_KSPACE(x) (((uintptr_t)x) | 0xFFFF000000000000UL)
-#define KSPACE_TO_PHY(x) (((uintptr_t)x) & 0x0000FFFFFFFFFFFFUL)
+#define PHY_TO_KSPACE(x) (((uintptr_t)(x)) | 0xFFFF000000000000UL)
+#define KSPACE_TO_PHY(x) (((uintptr_t)(x)) & 0x0000FFFFFFFFFFFFUL)
 
 #define PHY_TO_KSPACE_PTR(x) ((void*)PHY_TO_KSPACE(x))
 #define KSPACE_TO_PHY_PTR(x) ((void*)KSPACE_TO_PHY(x))
 
 #define KSPACE_EXSTACK_SIZE (8192)
 
-#define IS_KSPACE_PTR(x) (((uintptr_t)x) & 0xFFFF000000000000UL)
+#define IS_KSPACE_PTR(x) (((uintptr_t)(x)) & 0xFFFF000000000000UL)
 #define IS_USPACE_PTR(x) (!IS_KSPACE_PTR(x))
 
 #define EARLY_CON_VIRT ((uint8_t*)0xFFFF000009000000UL)

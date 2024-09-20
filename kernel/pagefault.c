@@ -3,12 +3,11 @@
 
 #include "kernel/exception.h"
 #include "kernel/pagefault.h"
-#include "kernel/assert.h"
 #include "kernel/panic.h"
 #include "kernel/task.h"
-#include "kernel/console.h"
 #include "kernel/kernelspace.h"
 #include "kernel/lib/vmalloc.h"
+#include "kernel/interrupt/interrupt.h"
 
 #include "stdlib/printf.h"
 
@@ -143,58 +142,72 @@ void pagefault_handler(uint64_t vector, uint32_t esr) {
 
 void pagefault_kernel_handler(uint64_t vector, uint32_t esr, irq_stackframe_t* frame) {
 
-    uint32_t ec = esr >> 26;
+    static int in_pagefault = 0;
 
-    console_printf("Kernel Pagefault in vector %u\n", vector);
+    if (in_pagefault == 0) {
+        in_pagefault = 1;
 
-    console_printf("ESR %x\n", esr);
+        uint32_t ec = esr >> 26;
 
-    if ((esr & (1 << 10)) == 0) {
-        uint64_t far;
-        READ_SYS_REG(FAR_EL1, far);
-        console_printf("FAR %x\n", far);
-    } else {
-        console_printf("FAR Invalid\n");
-    }
+        console_printf("Kernel Pagefault in vector %u\n", vector);
 
-    console_printf("Fault Addr %x\n", frame->elr);
-    console_printf("Fault SPSR %x\n", frame->spsr);
+        console_printf("ESR %x\n", esr);
 
-    task_t* active_task = get_active_task();
-
-    console_printf("tid %u\n", active_task->tid);
-    console_printf("name %s\n", active_task->name);
-
-    pagefault_print_kernel_backtrace(active_task, frame);
-
-    console_printf("Registers:\n");
-    for (uint32_t idx = 0; idx < 31; idx++) {
-        if (idx < 10) {
-            console_printf("X%d:  %16x ",
-                           idx, frame->gp[idx]);
+        if ((esr & (1 << 10)) == 0) {
+            uint64_t far;
+            READ_SYS_REG(FAR_EL1, far);
+            console_printf("FAR %x\n", far);
         } else {
-            console_printf("X%d: %16x ",
-                           idx, frame->gp[idx]);
+            console_printf("FAR Invalid\n");
         }
 
-        if (idx%2 == 1) {
-            console_printf("\n");
+        console_printf("Fault Addr %x\n", frame->elr);
+        console_printf("Fault SPSR %x\n", frame->spsr);
+
+        task_t* active_task = get_active_task();
+
+        console_printf("tid %u\n", active_task->tid);
+        console_printf("name %s\n", active_task->name);
+
+        pagefault_print_kernel_backtrace(active_task, frame);
+
+        console_printf("Registers:\n");
+        for (uint32_t idx = 0; idx < 31; idx++) {
+            if (idx < 10) {
+                console_printf("X%d:  %16x ",
+                               idx, frame->gp[idx]);
+            } else {
+                console_printf("X%d: %16x ",
+                               idx, frame->gp[idx]);
+            }
+
+            if (idx%2 == 1) {
+                console_printf("\n");
+            }
         }
+
+        console_printf("\n");
+
+        switch (ec) {
+            case EC_INST_ABORT:
+                PANIC("Kernelspace Pagefault on instruction");
+                break;
+            case EC_DATA_ABORT:
+                PANIC("Kernelspace Pagefault on data");
+                break;
+            default:
+                PANIC("Unknown Pagefault");
+                break;
+        }
+
+    } else if (in_pagefault == 1) {
+        in_pagefault = 2;
+        PANIC("Recursive Pagefault");
+    } else {
+        DISABLE_IRQ();
+        while (1) {}
     }
 
-    console_printf("\n");
-
-    switch (ec) {
-        case EC_INST_ABORT:
-            PANIC("Kernelspace Pagefault on instruction");
-            break;
-        case EC_DATA_ABORT:
-            PANIC("Kernelspace Pagefault on data");
-            break;
-        default:
-            PANIC("Unknown Pagefault");
-            break;
-    }
 }
 
 bool pagefault_handler_kern(uint32_t esr) {

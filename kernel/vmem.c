@@ -434,6 +434,8 @@ void vmem_set_user_table(_vmem_table* user_ptr, uint8_t asid) {
 
 void vmem_initialize(void) { 
 
+    // Note: TCR set in board specific bootstrap files
+    /*
     uint64_t tcr_el1 = SYS_TCR_EL1_TBI1 | // Ignore top byte in address translations
                        SYS_TCR_EL1_TBI0 | // Ignore top byte in address translations
                        // ASID Size 8 bit
@@ -455,6 +457,7 @@ void vmem_initialize(void) {
 
 
     WRITE_SYS_REG(TCR_EL1, tcr_el1);
+    */
 
     uint64_t mair_el1 = 0x44 | // Attr 0. Normal memory Non-cacheable
                         (0 << 8)           | // Attr 1. nGnRnE Device Memory

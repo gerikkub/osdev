@@ -36,37 +36,7 @@ typedef void (*pci_irq_handler_fn)(uint32_t intid, void* ctx);
 
 struct pci_msix_capability_t;
 
-typedef struct {
-    uint64_t header_offset;
-
-    uintptr_t header_phy;
-    void* header_vmem;
-
-    uintptr_t io_base_phy;
-    void* io_base_vmem;
-    uint64_t io_size;
-    uintptr_t m32_base_phy;
-    void* m32_base_vmem;
-    uint64_t m32_size;
-    uintptr_t m64_base_phy;
-    void* m64_base_vmem;
-    uint64_t  m64_size;
-
-    struct {
-        bool allocated;
-        uint64_t space;
-        uintptr_t phy;
-        void* vmem;
-        uintptr_t len;
-    } bar[MAX_PCI_BAR];
-
-    struct pci_msix_capability_t* msix_cap;
-    llist_head_t msix_vector_list;
-    bitalloc_t msix_vector_alloc;
-
-} pci_device_ctx_t;
-
-typedef struct __attribute__((__packed__)) {
+typedef struct __attribute__((__packed__, aligned(512))) {
     uint16_t vendor_id;
     uint16_t device_id;
     uint16_t command;
@@ -81,7 +51,7 @@ typedef struct __attribute__((__packed__)) {
     uint8_t bist;
 } pci_header_t;
 
-typedef struct __attribute__((__packed__)) {
+typedef struct __attribute__((__packed__, aligned(512))) {
     uint16_t vendor_id;
     uint16_t device_id;
     uint16_t command;
@@ -206,8 +176,76 @@ typedef struct __attribute__((__packed__)) {
 } pci_vendor_capability_t;
 
 typedef struct {
-    uintptr_t header_phy;
-    uint64_t header_offset;
+    pci_msix_table_entry_t* entry;
+    uint32_t entry_idx;
+    uint32_t intid;
+    pci_irq_handler_fn handler;
+    void* ctx;
+} pci_msix_vector_ctx_t;
+
+typedef void (*pcie_irq_handler)(uint32_t intid, void* ctx);
+
+typedef struct {
+    pcie_irq_handler fn;
+    void* ctx;
+} pcie_int_handler_ctx_t;
+
+
+typedef struct {
+    pci_addr_t io_pci_addr;
+    uintptr_t io_mem_addr;
+    uint64_t io_size;
+
+    pci_addr_t m32_pci_addr;
+    uintptr_t m32_mem_addr;
+    uint64_t m32_size;
+
+    pci_addr_t m64_pci_addr;
+    uintptr_t m64_mem_addr;
+    uint64_t m64_size;
+} pci_range_t;
+
+typedef struct {
+    pci_range_t* range_ctx;
+    uint64_t io_top;
+    uint64_t m32_top;
+    uint64_t m64_top;
+} pci_alloc_t;
+
+typedef struct {
+    uint64_t device[3];
+    uint64_t int_num;
+    uint64_t int_ctx[3];
+} pci_interrupt_map_entry_t;
+
+typedef struct {
+    uint32_t intid;
+    llist_t* handler_list;
+} pci_interrupt_ctx_t;
+
+typedef struct {
+    uint32_t device_mask[3];
+    uint32_t int_mask;
+    pci_interrupt_map_entry_t* entries;
+    uint64_t num_entries;
+    pci_interrupt_ctx_t int_ctx[4];
+} pci_interrupt_map_t;
+
+typedef struct {
+    void* header_ptr;
+    int64_t header_size;
+
+    pci_range_t ranges;
+    pci_alloc_t dtb_alloc;
+    pci_interrupt_map_t int_map;
+
+    void* drv_ctx;
+} pci_ctx_t;
+
+typedef struct {
+    pci_ctx_t* pci_ctx;
+
+    pci_header0_t* header;
 
     uintptr_t io_base;
     uint64_t io_size;
@@ -224,20 +262,36 @@ typedef struct {
     } bar[6];
 } discovery_pci_ctx_t;
 
-typedef struct {
-    pci_msix_table_entry_t* entry;
-    uint32_t entry_idx;
-    uint32_t intid;
-    pci_irq_handler_fn handler;
-    void* ctx;
-} pci_msix_vector_ctx_t;
-
-typedef void (*pcie_irq_handler)(uint32_t intid, void* ctx);
 
 typedef struct {
-    pcie_irq_handler fn;
-    void* ctx;
-} pcie_int_handler_ctx_t;
+    pci_ctx_t* pci_ctx;
+
+    pci_header0_t* header;
+
+    uintptr_t io_base_phy;
+    void* io_base_vmem;
+    uint64_t io_size;
+    uintptr_t m32_base_phy;
+    void* m32_base_vmem;
+    uint64_t m32_size;
+    uintptr_t m64_base_phy;
+    void* m64_base_vmem;
+    uint64_t  m64_size;
+
+    struct {
+        bool allocated;
+        uint64_t space;
+        uintptr_t phy;
+        void* vmem;
+        uintptr_t len;
+    } bar[MAX_PCI_BAR];
+
+    struct pci_msix_capability_t* msix_cap;
+    llist_head_t msix_vector_list;
+    bitalloc_t msix_vector_alloc;
+
+} pci_device_ctx_t;
+
 
 void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t* module_ctx);
 

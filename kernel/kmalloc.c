@@ -6,11 +6,11 @@
 #include "kernel/assert.h"
 #include "kernel/kmalloc.h"
 #include "kernel/kernelspace.h"
+#include "kernel/dtb.h"
 
 #include "stdlib/bitutils.h"
 
 #include "kernel/console.h"
-#include "stdlib/printf.h"
 
 #define MEM_SIZE (1024*1024*1024)
 #define PAGE_SIZE (4*1024)
@@ -40,6 +40,22 @@ extern uint8_t _heap_limit;
 
 static uint64_t kmalloc_op_num = 0;
 
+void kmalloc_add_phy_memory(uintptr_t base_phy, uintptr_t len) {
+
+    ASSERT((len & (PAGE_SIZE-1)) == 0);
+
+    console_log(LOG_DEBUG, "Adding PHY memory [%16x, %16x] (%d KB)",
+                base_phy, base_phy + len, len / 1024);
+
+    s_last_memblock++;
+    ASSERT(s_last_memblock < NUM_MEM_BLOCKS);
+
+    s_memblocks[s_last_memblock].ptr = base_phy;
+    s_memblocks[s_last_memblock].size = len;
+    s_memblocks[s_last_memblock].magic = MEMBLOCK_MAGIC;
+    s_memblocks[s_last_memblock].flags = 0;
+}
+
 void kmalloc_init(void) {
 
     uintptr_t heap_base_phy = KSPACE_TO_PHY(&_heap_base);
@@ -57,16 +73,16 @@ void kmalloc_init(void) {
 void kmalloc_check_structure(void) {
 
     uint64_t idx;
-    uintptr_t exp_ptr = KSPACE_TO_PHY(&_heap_base);
+    //uintptr_t exp_ptr = KSPACE_TO_PHY(&_heap_base);
  
     for (idx = 0; idx <= s_last_memblock; idx++) {
         memblock_t* this_block = &s_memblocks[idx];
         ASSERT(this_block->magic == MEMBLOCK_MAGIC);
-        ASSERT(exp_ptr == this_block->ptr);
+        //ASSERT(exp_ptr == this_block->ptr);
 
-        exp_ptr += this_block->size;
-        uintptr_t heap_limit_phy = KSPACE_TO_PHY(&_heap_limit);
-        ASSERT(exp_ptr <= heap_limit_phy);
+        //exp_ptr += this_block->size;
+        //uintptr_t heap_limit_phy = KSPACE_TO_PHY(&_heap_limit);
+        //ASSERT(exp_ptr <= heap_limit_phy);
     }
 }
 
@@ -194,4 +210,70 @@ void print_kmalloc_memblock(memblock_t* memblock) {
 void print_kmalloc_debug(uint64_t alloc_size) {
 
     //console_log(LOG_DEBUG, "Alloc: %d", alloc_size);
+}
+
+void discover_phy_mem_dtb(mask_range_t* mask_ranges, uint64_t num_ranges) {
+
+    // mask_ranges must be in order and non-overlapping
+
+    discovery_dtb_ctx_t dtb_mem;
+    int res = dtb_query_name("memory", &dtb_mem);
+
+    int64_t added_size = 0;
+
+    if (res == 0) {
+        console_log(LOG_INFO, "Found memory node");
+        ASSERT(dtb_mem.dt_node->prop_reg != NULL);
+
+        for (int idx = 0; idx < dtb_mem.dt_node->prop_reg->num_regs; idx++) {
+            dt_prop_reg_entry_t* reg_entry = &dtb_mem.dt_node->prop_reg->reg_entries[idx];
+            ASSERT(reg_entry->addr_size == 2);
+            ASSERT(reg_entry->size_size <= 2);
+
+            uintptr_t reg_addr = ((uintptr_t)reg_entry->addr_ptr[0]) << 32 |
+                                 ((uintptr_t)reg_entry->addr_ptr[1]);
+            int64_t reg_size;
+            if (reg_entry->size_size == 1) {
+                reg_size = ((uintptr_t)reg_entry->size_ptr[0]);
+            } else {
+                reg_size = ((uintptr_t)reg_entry->size_ptr[0]) << 32 |
+                           ((uintptr_t)reg_entry->size_ptr[1]);
+            }
+            uintptr_t reg_end = reg_addr + (uintptr_t)reg_size;
+
+            for (int range_idx = 0; range_idx < num_ranges; range_idx++) {
+                mask_range_t* range = &mask_ranges[range_idx];
+                if (reg_addr >= range->start && reg_addr < range->end) {
+                    // Range starts before reg and continues into the range. Ignore this section
+                    reg_size -= (range->end - reg_addr);
+                    reg_addr = range->end;
+                    if (reg_size < 0) {
+                        reg_size = 0;
+                        break;
+                    }
+                } else if (range->start > reg_addr && range->start <= (reg_addr + reg_size)) {
+                    // Range begins in the middle of reg
+                    int64_t reg1_addr = reg_addr;
+                    int64_t reg1_size = range->start - reg_addr;
+                    if (reg1_size > 0x1000) {
+                        kmalloc_add_phy_memory(reg1_addr, reg1_size);
+                        added_size += reg1_size;
+                    }
+
+                    if (range->end < reg_end) {
+                        reg_addr = range->end;
+                        reg_size = reg_end - range->end;
+                    }
+                }
+            }
+
+            if (reg_size > 0x1000) {
+                kmalloc_add_phy_memory(reg_addr, reg_size);
+                added_size += reg_size;
+            }
+        }
+    }
+    ASSERT(res == 0);
+
+    console_log(LOG_INFO, "Discovered memory: %d KB", added_size / 1024);
 }

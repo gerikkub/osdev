@@ -15,6 +15,7 @@
 #include "kernel/console.h"
 #include "kernel/lib/libpci.h"
 #include "kernel/fs_manager.h"
+#include "kernel/kmalloc.h"
 
 void board_init_main_early(void) {
 }
@@ -63,8 +64,32 @@ void board_init_devices(void) {
     dtb_init(DTB_VMEM);
 }
 
+extern uint8_t _bootstrap_text_start;
+extern uint8_t _bootstrap_text_end;
+extern uint8_t _bootstrap_data_start;
+extern uint8_t _bootstrap_data_end;
+extern uint8_t _text_start;
+extern uint8_t _text_end;
+extern uint8_t _data_start;
+extern uint8_t _data_end;
+extern uint8_t _bss_start;
+extern uint8_t _bss_end;
+
 void board_discover_devices(void) {
 
+    mask_range_t mask_ranges[5] = {
+        {.start = (uintptr_t)&_bootstrap_text_start, .end = (uintptr_t)&_bootstrap_text_end},
+        {.start = (uintptr_t)&_text_start, .end = (uintptr_t)&_text_end},
+        {.start = (uintptr_t)&_bootstrap_data_start, .end = (uintptr_t)&_bootstrap_data_end},
+        {.start = (uintptr_t)&_data_start, .end = (uintptr_t)&_data_end},
+        {.start = (uintptr_t)&_bss_start,  .end = (uintptr_t)&_bss_end},
+    };
+    for (int idx = 0; idx < 5; idx++) {
+        mask_ranges[idx].start = KSPACE_TO_PHY(mask_ranges[idx].start);
+        mask_ranges[idx].end = KSPACE_TO_PHY(mask_ranges[idx].end);
+    }
+
+    discover_phy_mem_dtb(mask_ranges, 5);
 }
 
 void board_loop() {

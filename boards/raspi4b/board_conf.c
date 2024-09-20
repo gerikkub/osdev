@@ -22,6 +22,7 @@
 #include "kernel/fs_manager.h"
 #include "kernel/net/udp_socket.h"
 #include "kernel/lib/libtftp.h"
+#include "kernel/kmalloc.h"
 
 #include "include/k_ioctl_common.h"
 #include "include/k_syscall.h"
@@ -88,8 +89,32 @@ int64_t raspi4b_uart_open_op(void* ctx, const char* path, const uint64_t flags, 
     return 0;
 }
 
+extern uint8_t _bootstrap_text_start;
+extern uint8_t _bootstrap_text_end;
+extern uint8_t _bootstrap_data_start;
+extern uint8_t _bootstrap_data_end;
+extern uint8_t _text_start;
+extern uint8_t _text_end;
+extern uint8_t _data_start;
+extern uint8_t _data_end;
+extern uint8_t _bss_start;
+extern uint8_t _bss_end;
+
 void board_discover_devices(void) {
 
+    mask_range_t mask_ranges[5] = {
+        {.start = (uintptr_t)&_bootstrap_text_start, .end = (uintptr_t)&_bootstrap_text_end},
+        {.start = (uintptr_t)&_bootstrap_data_start, .end = (uintptr_t)&_bootstrap_data_end},
+        {.start = (uintptr_t)&_text_start, .end = (uintptr_t)&_text_end},
+        {.start = (uintptr_t)&_data_start, .end = (uintptr_t)&_data_end},
+        {.start = (uintptr_t)&_bss_start,  .end = (uintptr_t)&_bss_end},
+    };
+    for (int idx = 0; idx < 5; idx++) {
+        mask_ranges[idx].start = KSPACE_TO_PHY(mask_ranges[idx].start);
+        mask_ranges[idx].end = KSPACE_TO_PHY(mask_ranges[idx].end);
+    }
+
+    discover_phy_mem_dtb(mask_ranges, 5);
     uint8_t* uart_tx_ptr = (uint8_t*)0x47E215040;
     sys_device_register(&early_uart_ops, raspi4b_uart_open_op, uart_tx_ptr, "con0");
 
@@ -293,6 +318,7 @@ void board_loop() {
         echo_tid = exec_user_task("home", "bin/hello_rust.elf", "hello_rust", echo_argv);
         (void)echo_tid;
 
+        /*
         uint64_t cat_tid;
         char* cat_argv[] = {
             "home",
@@ -301,6 +327,7 @@ void board_loop() {
         };
         cat_tid = exec_user_task("home", "bin/cat.elf", "cat", cat_argv);
         (void)cat_tid;
+        */
     } else {
         console_log(LOG_DEBUG, "Mount failed");
     }

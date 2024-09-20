@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "kernel/console.h"
 #include "kernel/assert.h"
@@ -10,12 +11,8 @@
 #include "kernel/lib/vmalloc.h"
 #include "kernel/lib/llist.h"
 #include "kernel/lib/intmap.h"
+#include "kernel/lib/utils.h"
 
-#include "include/k_syscall.h"
-#include "include/k_messages.h"
-#include "include/k_modules.h"
-
-#include "stdlib/printf.h"
 #include "stdlib/bitutils.h"
 
 #define MAX_DTB_PROPERTIES 8192
@@ -23,6 +20,8 @@
 #define MAX_DTB_NODE_PROPERTIES 1024
 #define MAX_DTB_PROPERTY_LEN 256
 #define MAX_DTB_NODE_NAME 64
+
+static dt_ctx_t* dt_ctx = NULL;
 
 char* fdt_get_string(fdt_header_t* header, uint8_t* dtbmem, uint32_t stroff) {
     ASSERT(header != NULL);
@@ -351,6 +350,14 @@ uint8_t* get_fdt_node(fdt_ctx_t* fdt_ctx, uint8_t* dtb_ptr, dt_ctx_t* dt_ctx, dt
         memset(node->name, 0, name_len);
         memcpy(node->name, node_name_ptr, name_len-1);
 
+        for (int idx = 0; idx < name_len; idx++) {
+            if (node->name[idx] == '@') {
+                node->name[idx] = '\0';
+                node->address = strtoull(&node->name[idx+1], NULL, 16);
+            }
+
+        }
+
         token_ptr = (uint32_t*)((uint8_t*)token_ptr + name_len);
     }
 
@@ -542,7 +549,7 @@ void dtb_init(uintptr_t dtb_init_phy_addr) {
     uint8_t* dtb_tree = (devicetree + header.off_dt_struct);
 
     dt_node_t* root_node = fdt_create_node();
-    dt_ctx_t* dt_ctx = vmalloc(sizeof(dt_ctx_t));
+    dt_ctx = vmalloc(sizeof(dt_ctx_t));
     dt_ctx->head = root_node;
     dt_ctx->phandle_map = uintmap_alloc(64);
     get_fdt_node(&fdt_ctx, dtb_tree, dt_ctx, root_node, true);
@@ -551,3 +558,43 @@ void dtb_init(uintptr_t dtb_init_phy_addr) {
 
     dtb_discover(dt_ctx, root_node);
 }
+
+static int dtb_query_name_internal(const char** path_list,
+                                   dt_node_t* node,
+                                   discovery_dtb_ctx_t* disc_ctx) {
+    if (*path_list == NULL) {
+        // Found node
+        disc_ctx->dt_node = node;
+        return 0;
+    }
+
+    dt_node_t* child_node;
+    FOR_LLIST(node->children, child_node)
+        if (strcmp(child_node->name, path_list[0]) == 0) {
+            return dtb_query_name_internal(&path_list[1], child_node, disc_ctx);
+        }
+    END_FOR_LLIST()
+
+    return 1;
+}
+
+int dtb_query_name(const char* dev, discovery_dtb_ctx_t* disc_ctx) {
+
+    ASSERT(disc_ctx != NULL);
+
+    const char** path_list = path_parser(dev, '/');
+
+    int res = dtb_query_name_internal(path_list, dt_ctx->head, disc_ctx);
+
+    free_path_list(path_list);
+
+    if (res == 0) {
+        disc_ctx->dt_ctx = dt_ctx;
+    } else {
+        disc_ctx->dt_ctx = NULL;
+        disc_ctx->dt_node = NULL;
+    }
+
+    return res;
+}
+

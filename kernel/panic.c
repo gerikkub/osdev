@@ -25,6 +25,10 @@ void panic(char* file, uint64_t line, char* msg, ...) {
     uint64_t depth = 0;
     while (depth < 16 && frame_addr != 0) {
         struct stackframe_t* frame_ptr = (struct stackframe_t*)frame_addr;
+        if (!((frame_addr & 0xFFFF000000000000) == 0 ||
+              (frame_addr & 0xFFFF000000000000) == 0xFFFF000000000000)) {
+            break;
+        }
         console_printf("%16x ", frame_ptr->lr - 4);
         if (frame_ptr->fp == (uint64_t)frame_ptr) {
             break;

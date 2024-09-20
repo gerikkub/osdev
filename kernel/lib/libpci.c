@@ -18,11 +18,7 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t
     ASSERT(module_ctx != NULL);
 
     // Allocate virtual memory space for the PCI header
-    device->header_phy = module_ctx->header_phy;
-    void* header_vmem = PHY_TO_KSPACE_PTR(device->header_phy);
-    ASSERT(header_vmem != NULL);
-    device->header_vmem = header_vmem;
-    device->header_offset = module_ctx->header_offset;
+    device->header = module_ctx->header;
 
     // Allocate virtual memory space for IO, M32 and M64 memories
     device->io_base_phy = module_ctx->io_base;
@@ -90,12 +86,12 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t
 
 pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx) {
 
-    pci_header0_t* h = device_ctx->header_vmem;
+    pci_header0_t* h = device_ctx->header;
     uint8_t* cap_offset_ptr = &h->capabilities_ptr;
     pci_generic_capability_t* cap_ptr;
 
     while (*cap_offset_ptr != 0) {
-        cap_ptr = device_ctx->header_vmem + *cap_offset_ptr;
+        cap_ptr = (void*)device_ctx->header + *cap_offset_ptr;
 
         if (cap_ptr->cap == cap) {
             if (idx == 0) {
@@ -242,9 +238,9 @@ pci_msix_vector_ctx_t* pci_get_msix_entry(pci_device_ctx_t* device_ctx, uint32_t
 }
 
 void print_pci_header(pci_device_ctx_t* device_ctx) {
-    pci_header0_t* h0 = device_ctx->header_vmem;
+    pci_header0_t* h0 = device_ctx->header;
     console_printf("PCI Device\n");
-    console_printf(" Offset %8x\n", device_ctx->header_offset);
+    console_printf(" Offset %8x\n", device_ctx->pci_ctx->header_ptr - (void*)device_ctx->header);
     console_printf(" Vendor %4x Device %4x Revision %u\n", h0->vendor_id, h0->device_id, h0->revision_id);
     console_printf(" Class %4x Subclass %4x\n", h0->class, h0->subclass);
     console_printf(" Subsystem %4x Subsystem Vendor %4x\n", h0->subsystem_id, h0->subsystem_vendor_id);
@@ -289,12 +285,12 @@ const char* capability_names[] = {
 
 void print_pci_capabilities(pci_device_ctx_t* device_ctx) {
 
-    pci_header0_t* h = device_ctx->header_vmem;
+    pci_header0_t* h = device_ctx->header;
     uint8_t* cap_offset_ptr = &h->capabilities_ptr;
     pci_generic_capability_t* capability;
 
     while (*cap_offset_ptr != 0) {
-        capability = device_ctx->header_vmem + *cap_offset_ptr;
+        capability = (void*)device_ctx->header + *cap_offset_ptr;
         console_printf("CAP[%2x]: %2x\n",
                        *cap_offset_ptr,
                        capability->cap);
@@ -336,7 +332,7 @@ void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, pci_vendor_capabi
     (void)cap_ptr;
     console_printf(" Vendor Specific\n");
 
-    pci_header0_t* header = device_ctx->header_vmem;
+    pci_header0_t* header = device_ctx->header;
 
     switch (header->vendor_id) {
         case PCI_VENDOR_QEMU:

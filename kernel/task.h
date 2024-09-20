@@ -129,6 +129,20 @@ typedef struct {
     uint64_t wake_at;
 } wait_ctx_t;
 
+typedef struct {
+    union {
+        struct {
+            uint64_t h,l;
+        } q;
+        uint64_t d;
+        uint32_t s;
+        uint16_t h;
+        uint8_t b;
+    } reg[32];
+    uint64_t fpcr;
+    uint64_t fpsr;
+} fp_reg_t;
+
 typedef bool (*task_wakeup_f)(struct task_t_*, bool timeout, int64_t* ret);
 
 typedef struct task_t_ {
@@ -169,7 +183,7 @@ typedef struct task_t_ {
     elapsedtimer_t profile_time;
 
     bool enable_fp;
-    uint8_t* fp_reg;
+    fp_reg_t* fp_reg;
 } task_t;
 
 void task_init(uint64_t* exstack);

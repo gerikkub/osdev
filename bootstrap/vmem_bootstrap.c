@@ -6,8 +6,6 @@
 
 
 
-void bootstrap_write_byte(uint64_t w);
-void bootstrap_write_word(uint64_t w);
 
 _vmem_entry_t vmem_entry_block_bootstrap(uint16_t attr_hi, uint16_t attr_lo, uintptr_t addr, uint8_t block_level) {
 

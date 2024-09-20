@@ -116,7 +116,7 @@ uint64_t exception_handler_sync_kernel(uint64_t vector, irq_stackframe_t* frame)
 
     if (handler == 0) {
         unhandled_exception(ec);
-        PANIC("Unhandled Exception");
+        PANIC("Unhandled Kernel Exception");
     } else {
         handler(vector, esr, frame);
     }

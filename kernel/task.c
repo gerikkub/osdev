@@ -40,8 +40,8 @@ void switch_to_kernel_task_stack_asm(uint64_t vector,
                                      uint64_t task_sp,
                                      exception_handler func);
 
-void save_fp_reg(uint8_t* fp_reg);
-void restore_fp_reg(uint8_t* fp_reg);
+void save_fp_reg(fp_reg_t* fp_reg);
+void restore_fp_reg(fp_reg_t* fp_reg);
 
 void task_init(uint64_t* exstack) {
     ASSERT(exstack != NULL);
@@ -122,6 +122,7 @@ void save_context(task_reg_t* state_fp,
     // Disable FP support
     uint64_t cpacr = 0;
     WRITE_SYS_REG(CPACR_EL1, cpacr);
+    asm ("ISB");
 
     void* cpu_stack_base = &_stack_base;
 
@@ -153,6 +154,7 @@ void restore_context(uint64_t tid) {
             // Enable FP support
             uint64_t cpacr = 0x300000;
             WRITE_SYS_REG(CPACR_EL1, cpacr);
+            asm ("ISB");
 
             restore_fp_reg(task->fp_reg);
         }
@@ -275,6 +277,9 @@ uint64_t create_task(uint64_t* user_stack_base,
 
     task->ret_val = 0xFFFFFFFFDEADBEEF;
     task->waiters = llist_create();
+
+    task->enable_fp = false;
+    task->fp_reg = NULL;
 
     msg_queue_init(&task->msgs);
 
@@ -622,8 +627,12 @@ void enable_task_fp(uint64_t vector, uint32_t esr) {
     console_log(LOG_DEBUG, "Task (%s) requests FP support", t->name);
 
     t->enable_fp = true;
-    t->fp_reg = vmalloc(512);
-    memset(t->fp_reg, 0, 512);
+    t->fp_reg = vmalloc(sizeof(fp_reg_t));
+    memset(t->fp_reg, 0, sizeof(fp_reg_t));
+    ASSERT(sizeof(fp_reg_t) == (512+8+8));
+
+    t->fp_reg->fpcr = 0;
+    t->fp_reg->fpsr = 0;
 
     // Reschedule
     schedule();

@@ -11,10 +11,10 @@ highmem_base = 0xFFFF000000000000;
 
 ram_base = 0x40000000;
 
-ram_size = 128M;
+ram_size = 512M;
 flash_size = 0x7000000;
 
-heap_size = 32M;
+heap_size = 128M;
 
 
 SECTIONS
@@ -22,12 +22,18 @@ SECTIONS
 
     . = bootstrap_base;
     .bootstrap.text : {
+        _bootstrap_text_start = .;
         *(.bootstrap.text*)
+        . = ALIGN(4096);
+        _bootstrap_text_end = .;
     }
 
     . = ram_base;
     .bootstrap.data 0x40000000: {
+        _bootstrap_data_start = .;
         *(.bootstrap.data*)
+        . = ALIGN(4096);
+        _bootstrap_data_end = .;
     }
 
     .bootstrap.data : {
