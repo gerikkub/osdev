@@ -19,8 +19,6 @@
 #include "include/k_ioctl_common.h"
 #include "include/k_select.h"
 
-#include "stdlib/bitutils.h"
-
 typedef struct __attribute__((__packed__)) {
     uint64_t capacity;
     uint32_t size_max;
@@ -112,11 +110,10 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
     pci_device_ctx_t* pci_ctx = &disk_ctx->pci_device;
     pci_virtio_common_cfg_t* common_cfg;
     
-    pci_virtio_capability_t* cap_ptr;
-    cap_ptr = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
-    ASSERT(cap_ptr != NULL);
+    uint64_t cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(cap_off != 0);
 
-    common_cfg = pci_ctx->bar[cap_ptr->bar].vmem + cap_ptr->bar_offset;
+    common_cfg = GET_CAP_PTR(pci_ctx, cap_off);
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_ACKNOWLEGE);
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER);
@@ -158,11 +155,10 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER_OK);
 
-    pci_virtio_capability_t* blk_cfg_cap;
 
-    blk_cfg_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
-    ASSERT(blk_cfg_cap != NULL);
-    disk_ctx->device_config = *((virtio_blk_config_t*)(pci_ctx->bar[blk_cfg_cap->bar].vmem + blk_cfg_cap->bar_offset));
+    uint64_t blk_cfg_cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
+    ASSERT(blk_cfg_cap_off != 0);
+    disk_ctx->device_config = *((virtio_blk_config_t*)(GET_CAP_PTR(pci_ctx, blk_cfg_cap_off)));
 
     pci_enable_vector(&disk_ctx->pci_device, queue_intid);
     pci_enable_interrupts(&disk_ctx->pci_device);

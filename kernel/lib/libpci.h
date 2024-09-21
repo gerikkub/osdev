@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "include/k_modules.h"
-
 #include "kernel/lib/llist.h"
 
 #include "stdlib/bitalloc.h"
@@ -32,9 +30,42 @@
 
 #define MAX_PCI_BAR 6
 
+struct pci_msix_capability_t;
+struct pci_ctx_;
+
 typedef void (*pci_irq_handler_fn)(uint32_t intid, void* ctx);
 
-struct pci_msix_capability_t;
+typedef void (*pci_cntr_read_header_fn)(struct pci_ctx_* ctx, uint64_t header_offset, void* header_ptr);
+typedef uint8_t (*pci_cntr_read8_header_fn)(struct pci_ctx_* ctx, uint64_t header_offset, uint64_t offset);
+typedef uint16_t (*pci_cntr_read16_header_fn)(struct pci_ctx_* ctx, uint64_t header_offset, uint64_t offset);
+typedef uint32_t (*pci_cntr_read32_header_fn)(struct pci_ctx_* ctx, uint64_t header_offset, uint64_t offset);
+typedef void (*pci_cntr_write8_header_fn)(struct pci_ctx_* ctx, uint64_t header_offset, uint64_t offset, uint8_t data);
+typedef void (*pci_cntr_write16_header_fn)(struct pci_ctx_* ctx, uint64_t header_offset, uint64_t offset, uint16_t data);
+typedef void (*pci_cntr_write32_header_fn)(struct pci_ctx_* ctx, uint64_t header_offset, uint64_t offset, uint32_t data);
+
+#define PCI_HREAD8(pci_ctx, header_offset, off) \
+    (pci_ctx->header_ops.read8(pci_ctx, header_offset, off))
+
+#define PCI_HREAD16(pci_ctx, header_offset, off) \
+    (pci_ctx->header_ops.read16(pci_ctx, header_offset, off))
+
+#define PCI_HREAD32(pci_ctx, header_offset, off) \
+    (pci_ctx->header_ops.read32(pci_ctx, header_offset, off))
+
+#define PCI_HWRITE8(pci_ctx, header_offset, off, data) \
+    (pci_ctx->header_ops.write8(pci_ctx, header_offset, off, data))
+
+#define PCI_HWRITE16(pci_ctx, header_offset, off, data) \
+    (pci_ctx->header_ops.write16(pci_ctx, header_offset, off, data))
+
+#define PCI_HWRITE32(pci_ctx, header_offset, off, data) \
+    (pci_ctx->header_ops.write32(pci_ctx, header_offset, off, data))
+
+#define PCI_READBAR(pci_ctx, header_offset, idx) \
+    (pci_ctx->header_ops.read32(pci_ctx, header_offset, 0x10 + (idx) * sizeof(uint32_t)))
+
+#define PCI_WRITEBAR(pci_ctx, header_offset, idx, data) \
+    (pci_ctx->header_ops.write32(pci_ctx, header_offset, 0x10 + (idx) * sizeof(uint32_t), data))
 
 typedef struct __attribute__((__packed__, aligned(512))) {
     uint16_t vendor_id;
@@ -141,12 +172,20 @@ typedef enum {
     PCI_VENDOR_QEMU = 0x1AF4
 } pci_vendor_id_t;
 
+#define PCI_CAP_CAP (0)
+#define PCI_CAP_NEXT (1)
+
 typedef struct __attribute__((__packed__)) {
     uint8_t cap;
     uint8_t next;
     uint8_t payload[];
 } pci_generic_capability_t;
 
+#define PCI_CAP_MSIX_MSG_CTRL (2)
+#define PCI_CAP_MSIX_TABLE_OFF (4)
+#define PCI_CAP_MSIX_PBA_OFF (8)
+
+/*
 typedef struct __attribute__((__packed__)) pci_msix_capability_t {
     uint8_t cap;
     uint8_t next;
@@ -154,6 +193,7 @@ typedef struct __attribute__((__packed__)) pci_msix_capability_t {
     uint32_t table_offset;
     uint32_t pba_offset;
 } pci_msix_capability_t;
+*/
 
 #define PCI_MSIX_CTRL_SIZE_MASK (BIT(11) - 1)
 #define PCI_MSIX_CTRL_FUNCTION_MASK BIT(14)
@@ -169,11 +209,15 @@ typedef struct __attribute__((__packed__)) {
 
 #define PCI_MSIX_VECTOR_MASKED BIT(0)
 
+#define PCI_CAP_VENDOR_LEN (2)
+
+/*
 typedef struct __attribute__((__packed__)) {
     uint8_t cap;
     uint8_t next;
     uint8_t len;
 } pci_vendor_capability_t;
+*/
 
 typedef struct {
     pci_msix_table_entry_t* entry;
@@ -232,20 +276,27 @@ typedef struct {
 } pci_interrupt_map_t;
 
 typedef struct {
-    void* header_ptr;
-    int64_t header_size;
+    pci_cntr_read_header_fn read;
+    pci_cntr_read8_header_fn read8;
+    pci_cntr_read16_header_fn read16;
+    pci_cntr_read32_header_fn read32;
+    pci_cntr_write8_header_fn write8;
+    pci_cntr_write16_header_fn write16;
+    pci_cntr_write32_header_fn write32;
+} pci_cntr_ops_t;
 
+typedef struct pci_ctx_ {
     pci_range_t ranges;
     pci_alloc_t dtb_alloc;
     pci_interrupt_map_t int_map;
 
-    void* drv_ctx;
+    void* cntr_ctx;
+    pci_cntr_ops_t header_ops;
 } pci_ctx_t;
 
 typedef struct {
     pci_ctx_t* pci_ctx;
-
-    pci_header0_t* header;
+    uint64_t header_offset;
 
     uintptr_t io_base;
     uint64_t io_size;
@@ -263,10 +314,11 @@ typedef struct {
 } discovery_pci_ctx_t;
 
 
-typedef struct {
+typedef struct pci_device_ctx {
     pci_ctx_t* pci_ctx;
+    uint64_t header_offset;
 
-    pci_header0_t* header;
+    uint16_t vendor_id, device_id;
 
     uintptr_t io_base_phy;
     void* io_base_vmem;
@@ -286,21 +338,20 @@ typedef struct {
         uintptr_t len;
     } bar[MAX_PCI_BAR];
 
-    struct pci_msix_capability_t* msix_cap;
+    uint64_t msix_cap_off;
     llist_head_t msix_vector_list;
     bitalloc_t msix_vector_alloc;
 
 } pci_device_ctx_t;
 
-
 void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t* module_ctx);
 
-pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx);
+uint64_t pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx);
 
 void print_pci_header(pci_device_ctx_t* device_ctx);
 void print_pci_capabilities(pci_device_ctx_t* device_ctx);
-void print_pci_capability_msix(pci_device_ctx_t* device_ctx, pci_msix_capability_t* cap_ptr);
-void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr);
+void print_pci_capability_msix(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off);
+void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off);
 
 
 uint32_t pci_register_interrupt_handler(pci_device_ctx_t* device_ctx, pci_irq_handler_fn fn, void* fn_ctx);
@@ -314,5 +365,12 @@ pci_msix_vector_ctx_t* pci_get_msix_entry(pci_device_ctx_t* device_ctx, uint32_t
 void pci_wait_irq(pci_device_ctx_t* device_ctx);
 
 void pci_poke_bar_entry(pci_header0_t* header, uint32_t barnum, uint32_t barval);
+
+uint8_t pci_read8_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off);
+uint16_t pci_read16_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off);
+uint32_t pci_read32_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off);
+void pci_write8_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off, uint8_t val);
+void pci_write16_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off, uint16_t val);
+void pci_write32_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off, uint32_t val);
 
 #endif

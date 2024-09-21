@@ -17,8 +17,16 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t
     ASSERT(device != NULL);
     ASSERT(module_ctx != NULL);
 
-    // Allocate virtual memory space for the PCI header
-    device->header = module_ctx->header;
+    device->pci_ctx = module_ctx->pci_ctx;
+    device->header_offset = module_ctx->header_offset;
+
+    uint8_t header_mem[4096];
+    module_ctx->pci_ctx->header_ops.read(module_ctx->pci_ctx,
+                                         module_ctx->header_offset,
+                                         header_mem);
+    pci_header0_t* h = (pci_header0_t*)header_mem;
+    device->device_id = h->device_id;
+    device->vendor_id = h->vendor_id;
 
     // Allocate virtual memory space for IO, M32 and M64 memories
     device->io_base_phy = module_ctx->io_base;
@@ -76,22 +84,29 @@ void pci_alloc_device_from_context(pci_device_ctx_t* device, discovery_pci_ctx_t
     }
 
     device->msix_vector_list = llist_create();
-    device->msix_cap = (pci_msix_capability_t*)pci_get_capability(device, PCI_CAP_MSIX, 0);
-    ASSERT(device->msix_cap != NULL);
+    device->msix_cap_off = pci_get_capability(device, PCI_CAP_MSIX, 0);
+    ASSERT(device->msix_cap_off != 0);
 
-    uint32_t num_msix_entries = (device->msix_cap->msg_ctrl & PCI_MSIX_CTRL_SIZE_MASK) + 1;
+    uint32_t num_msix_entries = (pci_read16_capability(device,
+                                                       device->msix_cap_off,
+                                                       PCI_CAP_MSIX_MSG_CTRL)
+                                  & PCI_MSIX_CTRL_SIZE_MASK) + 1;
 
     bitalloc_init(&device->msix_vector_alloc, 0, num_msix_entries, vmalloc);
 }
 
-pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx) {
+uint64_t pci_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t idx) {
 
-    pci_header0_t* h = device_ctx->header;
+    uint8_t header_mem[4096];
+    device_ctx->pci_ctx->header_ops.read(device_ctx->pci_ctx,
+                                         device_ctx->header_offset,
+                                         header_mem);
+    pci_header0_t* h = (pci_header0_t*)header_mem;
     uint8_t* cap_offset_ptr = &h->capabilities_ptr;
     pci_generic_capability_t* cap_ptr;
 
     while (*cap_offset_ptr != 0) {
-        cap_ptr = (void*)device_ctx->header + *cap_offset_ptr;
+        cap_ptr = (void*)&header_mem[*cap_offset_ptr];
 
         if (cap_ptr->cap == cap) {
             if (idx == 0) {
@@ -105,10 +120,49 @@ pci_generic_capability_t* pci_get_capability(pci_device_ctx_t* device_ctx, uint6
     }
 
     if (*cap_offset_ptr != 0) {
-        return cap_ptr;
+        return (uintptr_t)cap_ptr - (uintptr_t)header_mem;
     } else {
         return NULL;
     }
+}
+
+uint8_t pci_read8_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off) {
+    return device_ctx->pci_ctx->header_ops.read8(device_ctx->pci_ctx,
+                                                 device_ctx->header_offset,
+                                                 cap + cap_off);
+}
+
+uint16_t pci_read16_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off) {
+    return device_ctx->pci_ctx->header_ops.read16(device_ctx->pci_ctx,
+                                                  device_ctx->header_offset,
+                                                  cap + cap_off);
+}
+
+uint32_t pci_read32_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off) {
+    return device_ctx->pci_ctx->header_ops.read32(device_ctx->pci_ctx,
+                                                  device_ctx->header_offset,
+                                                  cap + cap_off);
+}
+
+void pci_write8_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off, uint8_t val) {
+    device_ctx->pci_ctx->header_ops.write8(device_ctx->pci_ctx,
+                                           device_ctx->header_offset,
+                                           cap + cap_off,
+                                           val);
+}
+
+void pci_write16_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off, uint16_t val) {
+    device_ctx->pci_ctx->header_ops.write16(device_ctx->pci_ctx,
+                                            device_ctx->header_offset,
+                                            cap + cap_off,
+                                            val);
+}
+
+void pci_write32_capability(pci_device_ctx_t* device_ctx, uint64_t cap, uint64_t cap_off, uint32_t val) {
+    device_ctx->pci_ctx->header_ops.write32(device_ctx->pci_ctx,
+                                            device_ctx->header_offset,
+                                            cap + cap_off,
+                                            val);
 }
 
 uint32_t pci_register_interrupt_handler(pci_device_ctx_t* device_ctx, pci_irq_handler_fn fn, void* ctx) {
@@ -122,9 +176,12 @@ uint32_t pci_register_interrupt_handler(pci_device_ctx_t* device_ctx, pci_irq_ha
     ASSERT(msix_alloc_ok == true);
 
     pci_msix_table_entry_t* msix_entry = NULL;
-    uint32_t msix_table_bar = device_ctx->msix_cap->table_offset & 0x7;
+    const uint32_t msix_cap_table_offset = pci_read32_capability(device_ctx,
+                                                    device_ctx->msix_cap_off,
+                                                    PCI_CAP_MSIX_TABLE_OFF);
+    uint32_t msix_table_bar = msix_cap_table_offset & 0x7;
     ASSERT(device_ctx->bar[msix_table_bar].allocated);
-    uint32_t msix_table_offset = device_ctx->msix_cap->table_offset & 0xFFFFFFF8;
+    uint32_t msix_table_offset = msix_cap_table_offset & 0xFFFFFFF8;
     msix_entry = device_ctx->bar[msix_table_bar].vmem + msix_table_offset +
                  (sizeof(pci_msix_table_entry_t)*msix_entry_idx);
 
@@ -152,12 +209,26 @@ uint32_t pci_register_interrupt_handler(pci_device_ctx_t* device_ctx, pci_irq_ha
 }
 
 void pci_enable_interrupts(pci_device_ctx_t* device_ctx) {
-    device_ctx->msix_cap->msg_ctrl |= PCI_MSIX_CTRL_ENABLE;
+    uint16_t msg_ctrl = pci_read16_capability(device_ctx,
+                                              device_ctx->msix_cap_off,
+                                              PCI_CAP_MSIX_MSG_CTRL);
+
+    pci_write16_capability(device_ctx,
+                           device_ctx->msix_cap_off,
+                           PCI_CAP_MSIX_MSG_CTRL,
+                           msg_ctrl | PCI_MSIX_CTRL_ENABLE);
     MEM_DSB();
 }
 
 void pci_disable_interrupts(pci_device_ctx_t* device_ctx) {
-    device_ctx->msix_cap->msg_ctrl &= ~(PCI_MSIX_CTRL_ENABLE);
+    uint16_t msg_ctrl = pci_read16_capability(device_ctx,
+                                              device_ctx->msix_cap_off,
+                                              PCI_CAP_MSIX_MSG_CTRL);
+
+    pci_write16_capability(device_ctx,
+                           device_ctx->msix_cap_off,
+                           PCI_CAP_MSIX_MSG_CTRL,
+                           msg_ctrl & ~(PCI_MSIX_CTRL_ENABLE));
     MEM_DSB();
 }
 
@@ -211,8 +282,11 @@ void pci_interrupt_clear_pending(pci_device_ctx_t* device_ctx, uint32_t intid) {
 
     ASSERT(founditem != NULL);
 
-    uint8_t pba_bar = device_ctx->msix_cap->pba_offset & 7;
-    uint64_t pba_addr = device_ctx->msix_cap->pba_offset & (~7);
+    uint32_t msix_pba_off = pci_read32_capability(device_ctx,
+                                                  device_ctx->msix_cap_off,
+                                                  PCI_CAP_MSIX_PBA_OFF);
+    uint8_t pba_bar = msix_pba_off & 7;
+    uint64_t pba_addr = msix_pba_off & (~7);
     ASSERT(device_ctx->bar[pba_bar].allocated);
     uint64_t* pend_table = device_ctx->bar[pba_bar].vmem + pba_addr;
 
@@ -238,9 +312,13 @@ pci_msix_vector_ctx_t* pci_get_msix_entry(pci_device_ctx_t* device_ctx, uint32_t
 }
 
 void print_pci_header(pci_device_ctx_t* device_ctx) {
-    pci_header0_t* h0 = device_ctx->header;
+    uint8_t header_mem[4096];
+    device_ctx->pci_ctx->header_ops.read(device_ctx->pci_ctx,
+                                         device_ctx->header_offset,
+                                         header_mem);
+    pci_header0_t* h0 = (pci_header0_t*)header_mem;
     console_printf("PCI Device\n");
-    console_printf(" Offset %8x\n", device_ctx->pci_ctx->header_ptr - (void*)device_ctx->header);
+    console_printf(" Offset %8x\n", device_ctx->header_offset);
     console_printf(" Vendor %4x Device %4x Revision %u\n", h0->vendor_id, h0->device_id, h0->revision_id);
     console_printf(" Class %4x Subclass %4x\n", h0->class, h0->subclass);
     console_printf(" Subsystem %4x Subsystem Vendor %4x\n", h0->subsystem_id, h0->subsystem_vendor_id);
@@ -285,22 +363,26 @@ const char* capability_names[] = {
 
 void print_pci_capabilities(pci_device_ctx_t* device_ctx) {
 
-    pci_header0_t* h = device_ctx->header;
+    uint8_t header_mem[4096];
+    device_ctx->pci_ctx->header_ops.read(device_ctx->pci_ctx,
+                                         device_ctx->header_offset,
+                                         header_mem);
+    pci_header0_t* h = (pci_header0_t*)header_mem;
     uint8_t* cap_offset_ptr = &h->capabilities_ptr;
     pci_generic_capability_t* capability;
 
     while (*cap_offset_ptr != 0) {
-        capability = (void*)device_ctx->header + *cap_offset_ptr;
+        capability = (void*)&header_mem[*cap_offset_ptr];
         console_printf("CAP[%2x]: %2x\n",
                        *cap_offset_ptr,
                        capability->cap);
 
         switch (capability->cap) {
             case PCI_CAP_MSIX:
-                print_pci_capability_msix(device_ctx, (pci_msix_capability_t*)capability);
+                print_pci_capability_msix(device_ctx, header_mem, *cap_offset_ptr);
                 break;
             case PCI_CAP_VENDOR:
-                print_pci_capability_vendor(device_ctx, (pci_vendor_capability_t*)capability);
+                print_pci_capability_vendor(device_ctx, header_mem, *cap_offset_ptr);
                 break;
             default:
                 console_printf(" Unsupported\n");
@@ -312,31 +394,30 @@ void print_pci_capabilities(pci_device_ctx_t* device_ctx) {
     console_flush();
 }
 
-void print_pci_capability_msix(pci_device_ctx_t* device_ctx, pci_msix_capability_t* cap_ptr) {
+void print_pci_capability_msix(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off) {
 
     console_printf(" MSI-X\n");
     console_printf("  Message Control %4x\n",
-                   cap_ptr->msg_ctrl);
+                   *(uint16_t*)(header_mem + cap_off + PCI_CAP_MSIX_MSG_CTRL));
+    uint32_t table_offset = *(uint32_t*)(header_mem + cap_off + PCI_CAP_MSIX_TABLE_OFF);
     console_printf("  Table Offset [%u] %8x\n",
-                   cap_ptr->table_offset & 0x7,
-                   cap_ptr->table_offset & 0xFFFFFFF8);
+                   table_offset & 0x7,
+                   table_offset & 0xFFFFFFF8);
+    uint32_t pba_offset = *(uint32_t*)(header_mem + cap_off + PCI_CAP_MSIX_PBA_OFF);
     console_printf("  PBA Offset [%u] %8x\n",
-                   cap_ptr->pba_offset & 0x7,
-                   cap_ptr->pba_offset & 0xFFFFFFF8);
+                   pba_offset & 0x7,
+                   pba_offset & 0xFFFFFFF8);
     console_flush();
 }
 
-void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr) {
+void print_pci_capability_vendor(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off) {
 
     (void)device_ctx;
-    (void)cap_ptr;
     console_printf(" Vendor Specific\n");
 
-    pci_header0_t* header = device_ctx->header;
-
-    switch (header->vendor_id) {
+    switch (device_ctx->vendor_id) {
         case PCI_VENDOR_QEMU:
-            print_pci_capability_qemu(device_ctx, cap_ptr);
+            print_pci_capability_virtio(device_ctx, header_mem, cap_off);
             break;
         default:
             console_printf("  Unknown Vendor\n");

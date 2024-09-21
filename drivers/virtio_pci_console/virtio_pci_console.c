@@ -306,12 +306,11 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
     pci_device_ctx_t* pci_ctx = &console_ctx->pci_device;
     pci_virtio_common_cfg_t* common_cfg = NULL;
-    pci_virtio_capability_t* cap_ptr = NULL;
 
-    cap_ptr = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
-    ASSERT(cap_ptr);
+    uint64_t cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(cap_off);
 
-    common_cfg = GET_CAP_PTR(pci_ctx, cap_ptr);
+    common_cfg = GET_CAP_PTR(pci_ctx, cap_off);
 
     uint64_t features_req = (1UL << VIRTIO_CONSOLE_F_MULTIPORT) |
                             (1UL << VIRTIO_CONSOLE_F_EMERG_WRITE) |
@@ -329,10 +328,10 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
     pci_msix_vector_ctx_t* port0_rq_msix_item = pci_get_msix_entry(&console_ctx->pci_device, port0_rq_intid);
     ASSERT(port0_rq_msix_item != NULL);
 
-    pci_virtio_capability_t* console_cfg_cap;
-    console_cfg_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
-    ASSERT(console_cfg_cap);
-    console_ctx->virtio_console_cfg = GET_CAP_PTR(pci_ctx, console_cfg_cap);
+    uint64_t console_cfg_cap_off;
+    console_cfg_cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
+    ASSERT(console_cfg_cap_off != 0);
+    console_ctx->virtio_console_cfg = GET_CAP_PTR(pci_ctx, console_cfg_cap_off);
 
     console_ctx->num_virtqueues = console_ctx->virtio_console_cfg->max_nr_ports;
     console_ctx->virtqueues = vmalloc(console_ctx->num_virtqueues * sizeof(virtio_multiport_ctx_t));

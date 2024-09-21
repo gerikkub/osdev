@@ -9,24 +9,13 @@
 #include "kernel/lib/llist.h"
 #include "kernel/lib/vmalloc.h"
 #include "kernel/drivers.h"
-#include "kernel/fd.h"
-#include "kernel/sys_device.h"
-#include "kernel/kernelspace.h"
-#include "kernel/memoryspace.h"
-#include "kernel/vmem.h"
 #include "kernel/task.h"
-#include "kernel/kmalloc.h"
 
 #include "kernel/net/net.h"
 #include "kernel/net/nic_ops.h"
 
-#include "include/k_ioctl_common.h"
-
-#include "stdlib/bitutils.h"
-
 typedef struct {
     pci_device_ctx_t* pci_ctx;
-    pci_virtio_capability_t* virtio_cfg_cap;
 
     virtio_virtq_ctx_t receiveq1;
     virtio_virtq_ctx_t transmitq1;
@@ -183,8 +172,8 @@ static void virtio_pci_net_late_init(void* ctx) {
 
     pci_alloc_device_from_context(nic_ctx->pci_ctx, pci_ctx);
 
-    pci_virtio_capability_t* cap_ptr = NULL;
-    cap_ptr = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    uint64_t cap_off = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(cap_off);
 
     uint64_t features_req = (1UL << VIRTIO_NET_F_MAC) |
                             (1UL << VIRTIO_NET_F_STATUS) |
@@ -200,12 +189,8 @@ static void virtio_pci_net_late_init(void* ctx) {
     pci_msix_vector_ctx_t* receiveq_msix_item = pci_get_msix_entry(nic_ctx->pci_ctx, receiveq_intid);
     ASSERT(receiveq_msix_item);
 
-    nic_ctx->virtio_cfg_cap = NULL;
-    nic_ctx->virtio_cfg_cap = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
-    ASSERT(nic_ctx->virtio_cfg_cap);
-
     pci_virtio_common_cfg_t* common_cfg = NULL;
-    common_cfg = GET_CAP_PTR(nic_ctx->pci_ctx, cap_ptr);
+    common_cfg = GET_CAP_PTR(nic_ctx->pci_ctx, cap_off);
 
     virtio_alloc_queue(common_cfg,
                        VIRTIO_QUEUE_NET_RECEIVEQ1,
@@ -227,8 +212,9 @@ static void virtio_pci_net_late_init(void* ctx) {
     pci_enable_vector(nic_ctx->pci_ctx, nic_ctx->receiveq1_irq_ctx.intid);
     pci_enable_interrupts(nic_ctx->pci_ctx);
 
-    pci_virtio_capability_t* net_cfg_cap = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG); 
-    virtio_net_config_t* net_cfg = GET_CAP_PTR(nic_ctx->pci_ctx, net_cfg_cap);
+    uint64_t net_cfg_cap_off = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG); 
+    ASSERT(net_cfg_cap_off);
+    virtio_net_config_t* net_cfg = GET_CAP_PTR(nic_ctx->pci_ctx, net_cfg_cap_off);
 
     nic_ctx->net_dev.ops = &s_nic_ops;
     nic_ctx->net_dev.nic_ctx = nic_ctx;

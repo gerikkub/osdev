@@ -13,18 +13,20 @@
 #include "stdlib/bitutils.h"
 #include "stdlib/printf.h"
 
-pci_virtio_capability_t* virtio_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap) {
+uint64_t virtio_get_capability(pci_device_ctx_t* device_ctx, uint8_t cap) {
 
-    pci_virtio_capability_t* virtio_capability;
+    uint64_t cap_off;
     uint64_t idx = 0;
 
     do {
-        virtio_capability = (pci_virtio_capability_t*)pci_get_capability(device_ctx, PCI_CAP_VENDOR, idx);
+        cap_off = pci_get_capability(device_ctx, PCI_CAP_VENDOR, idx);
         idx++;
-    } while (virtio_capability != NULL &&
-             virtio_capability->type != cap);
+    } while (cap_off != 0 &&
+             device_ctx->pci_ctx->header_ops.read8(device_ctx->pci_ctx,
+                                                   device_ctx->header_offset,
+                                                   cap_off + VIRTIO_PCI_CAP_TYPE) != cap);
     
-    return virtio_capability;
+    return cap_off;
 }
 
 uint64_t virtio_get_features(pci_virtio_common_cfg_t* cfg) {
@@ -335,19 +337,28 @@ int64_t virtio_get_last_used_elem(virtio_virtq_ctx_t* queue_ctx) {
 }
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx) {
-    void* cap_ptr = virtio_get_capability(ctx, VIRTIO_PCI_CAP_NOTIFY_CFG);
-    ASSERT(cap_ptr != NULL);
+    uint64_t cap_off = virtio_get_capability(ctx, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    ASSERT(cap_off != 0);
 
-    pci_virtio_notify_capability_t* notify_cap = cap_ptr;
+    const uint8_t bar_num = ctx->pci_ctx->header_ops.read8(ctx->pci_ctx,
+                                                           ctx->header_offset,
+                                                           cap_off + VIRTIO_PCI_CAP_BAR);
+    const uint32_t bar_off = ctx->pci_ctx->header_ops.read32(ctx->pci_ctx,
+                                                             ctx->header_offset,
+                                                             cap_off + VIRTIO_PCI_CAP_BAR_OFF);
+    const uint32_t not_off_mul = ctx->pci_ctx->header_ops.read32(ctx->pci_ctx,
+                                                                 ctx->header_offset,
+                                                                 cap_off + VIRTIO_PCI_NOTIFY_CAP_OFF_MUL);
 
-    uint16_t* notify_addr = ctx->bar[notify_cap->cap.bar].vmem + notify_cap->cap.bar_offset +
-                                (queue_ctx->queue_notify_off * notify_cap->notify_off_multiplier);
+
+    uint16_t* notify_addr = ctx->bar[bar_num].vmem + bar_off +
+                                (queue_ctx->queue_notify_off * not_off_mul);
     
     *notify_addr = queue_ctx->queue_num;
     MEM_DSB();
 }
 
-void print_pci_capability_qemu(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr) {
+void print_pci_capability_virtio(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off) {
 
     const char* qemu_type_names[] = {
         "Unknown",
@@ -358,33 +369,35 @@ void print_pci_capability_qemu(pci_device_ctx_t* device_ctx, pci_vendor_capabili
         "Virito PCI Cap PCI Cfg",
     };
 
-    pci_virtio_capability_t* qemu_cap_ptr = (pci_virtio_capability_t*) cap_ptr;
+    const uint8_t cap_type = *(uint8_t*)(header_mem + cap_off + VIRTIO_PCI_CAP_TYPE);
 
     console_printf("  QEMU\n");
-    if (qemu_cap_ptr->type < VIRTIO_PCI_CAP_MAX) {
-        console_printf("  %s\n", qemu_type_names[qemu_cap_ptr->type]);
+    if (cap_type < VIRTIO_PCI_CAP_MAX) {
+        console_printf("  %s\n", qemu_type_names[cap_type]);
         console_printf("  BAR [%u] %8x %8x\n",
-                       qemu_cap_ptr->bar,
-                       qemu_cap_ptr->bar_offset,
-                       qemu_cap_ptr->bar_len);
+                       *(uint8_t*)(header_mem + cap_off + VIRTIO_PCI_CAP_BAR),
+                       *(uint32_t*)(header_mem + cap_off + VIRTIO_PCI_CAP_BAR_OFF),
+                       *(uint32_t*)(header_mem + cap_off + VIRTIO_PCI_CAP_BAR_LEN));
 
-        switch (qemu_cap_ptr->type) {
+        switch (cap_type) {
             case VIRTIO_PCI_CAP_COMMON_CFG:
-                print_qemu_capability_common(device_ctx, qemu_cap_ptr);
+                print_virtio_capability_common(device_ctx, header_mem, cap_off);
                 break;
         }
     } else {
-        console_printf("  Invalid Type %u\n", qemu_cap_ptr->type);
+        console_printf("  Invalid Type %u\n", cap_type);
     }
 
     console_flush();
 }
 
-void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_virtio_capability_t* cap_ptr) {
+void print_virtio_capability_common(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off) {
 
     pci_virtio_common_cfg_t* common_cfg;
+    const uint8_t bar_num = *(uint8_t*)(header_mem + cap_off + VIRTIO_PCI_CAP_BAR);
+    const uint32_t bar_off = *(uint8_t*)(header_mem + cap_off + VIRTIO_PCI_CAP_BAR_OFF);
 
-    common_cfg = device_ctx->bar[cap_ptr->bar].vmem + cap_ptr->bar_offset;
+    common_cfg = device_ctx->bar[bar_num].vmem + bar_off;
     common_cfg->device_feature_sel = 1;
     uint32_t feat_high = common_cfg->device_feature;
     console_printf("   Device Features: %8x", feat_high);
@@ -392,7 +405,7 @@ void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_virtio_capab
     uint32_t feat_low = common_cfg->device_feature;
     console_printf(" %8x\n", feat_low);
 
-    uint64_t device_id = device_ctx->header->device_id - 0x1040;
+    uint64_t device_id = device_ctx->device_id - 0x1040;
     print_virtio_feature_bits(feat_low, feat_high, device_id);
 
     common_cfg->driver_feature_sel = 1;
@@ -497,15 +510,13 @@ void print_virtio_feature_bits(uint32_t feat_low, uint32_t feat_high, uint64_t d
     console_flush();
 }
 
-bool virtio_init_with_features(pci_device_ctx_t* pci_ctx, uint64_t features_req) {
+bool virtio_init_with_features(pci_device_ctx_t* device_ctx, uint64_t features_req) {
 
     pci_virtio_common_cfg_t* common_cfg = NULL;
-    pci_virtio_capability_t* cap_ptr = NULL;
+    uint64_t cap_off = virtio_get_capability(device_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(cap_off != 0);
 
-    cap_ptr = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
-    ASSERT(cap_ptr);
-
-    common_cfg = GET_CAP_PTR(pci_ctx, cap_ptr);
+    common_cfg = GET_CAP_PTR(device_ctx, cap_off);
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_ACKNOWLEGE);
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER);

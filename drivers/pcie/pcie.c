@@ -10,7 +10,6 @@
 #include "kernel/lib/libpci.h"
 #include "kernel/lib/libdtb.h"
 #include "kernel/lib/llist.h"
-#include "kernel/lib/utils.h"
 #include "kernel/lib/vmalloc.h"
 
 #include "drivers/pcie/pcie.h"
@@ -198,7 +197,7 @@ uint64_t mem_to_pci_addr(pci_range_t* ranges, uintptr_t mem_addr, pci_space_t sp
     }
 }
 
-void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
+void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header, uint64_t header_offset) {
 
     discovery_register_t driver_discovery = {
         .type = DRIVER_DISCOVERY_PCI,
@@ -212,7 +211,7 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
     if (!have_driver) {
         console_log(LOG_WARN, "No Driver for PCI %4x:%4x at offset %x",
                        header->vendor_id, header->device_id,
-                       pci_ctx->header_ptr - (void*)header);
+                       header_offset);
         return;
     }
 
@@ -224,7 +223,7 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
     //device_ctx.int_map = pcie_int_map;
 
     device_ctx.pci_ctx = pci_ctx;
-    device_ctx.header = (pci_header0_t*)header;
+    device_ctx.header_offset = header_offset;
 
     device_ctx.io_size = 0;
     device_ctx.m32_size = 0;
@@ -236,12 +235,13 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
 
     int idx;
     for (idx = 0; idx < 6; idx++) {
-        if ((READ_MEM32(&header->bar[idx]) & PCI_BAR_REGION_MASK) == PCI_BAR_REGION_IO) {
+        const uint32_t bar_val = PCI_READBAR(pci_ctx, header_offset, idx);
+        if ((bar_val & PCI_BAR_REGION_MASK) == PCI_BAR_REGION_IO) {
             // IO Region bar
-            WRITE_MEM32(&header->bar[idx], 0);
-            uint32_t bar_init = READ_MEM32(&header->bar[idx]);
-            WRITE_MEM32(&header->bar[idx], 0xFFFFFFFF);
-            uint32_t bar_set = READ_MEM32(&header->bar[idx]);
+            PCI_WRITEBAR(pci_ctx, header_offset, idx, 0);
+            uint32_t bar_init = PCI_READBAR(pci_ctx, header_offset, idx);
+            PCI_WRITEBAR(pci_ctx, header_offset, idx, 0xFFFFFFFF);
+            uint32_t bar_set = PCI_READBAR(pci_ctx, header_offset, idx);
 
             uint32_t size = (~(bar_set ^ bar_init)) + 1;
             if (size == 0) {
@@ -260,7 +260,7 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
             device_ctx.bar[idx].len = size;
             device_ctx.bar[idx].space = PCI_SPACE_IO;
             device_ctx.bar[idx].phy = phy_addr;
-            WRITE_MEM32(&header->bar[idx], pci_addr);
+            PCI_WRITEBAR(pci_ctx, header_offset, idx, pci_addr);
 
             if (!io_aligned) {
                 device_ctx.io_base = pci_addr;
@@ -271,13 +271,13 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
 
         } else {
             // Memory Region bar
-            if ((READ_MEM32(&header->bar[idx]) & PCI_BAR_MEM_LOC_MASK) == PCI_BAR_MEM_LOC_M32) {
+            if ((bar_val & PCI_BAR_MEM_LOC_MASK) == PCI_BAR_MEM_LOC_M32) {
                 // 32-bit memory region
 
-                WRITE_MEM32(&header->bar[idx], 0);
-                uint32_t bar_init = READ_MEM32(&header->bar[idx]);
-                WRITE_MEM32(&header->bar[idx], 0xFFFFFFFF);
-                uint32_t bar_set = READ_MEM32(&header->bar[idx]);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx, 0);
+                uint32_t bar_init = PCI_READBAR(pci_ctx, header_offset, idx);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx, 0xFFFFFFFF);
+                uint32_t bar_set = PCI_READBAR(pci_ctx, header_offset, idx);
 
                 uint32_t size = (~(uint64_t)(bar_set ^ bar_init)) + 1;
                 if (size == 0) {
@@ -295,7 +295,7 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
                 device_ctx.bar[idx].len = size;
                 device_ctx.bar[idx].space = PCI_SPACE_M32;
                 device_ctx.bar[idx].phy = phy_addr;
-                WRITE_MEM32(&header->bar[idx], pci_addr);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx, pci_addr);
 
                 if (!m32_aligned) {
                     device_ctx.m32_base = pci_addr;
@@ -304,15 +304,17 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
 
                 device_ctx.m32_size = pci_addr + size - device_ctx.m32_base;
 
-            } else if ((header->bar[idx] & PCI_BAR_MEM_LOC_MASK) == PCI_BAR_MEM_LOC_M64) {
+            } else if ((bar_val & PCI_BAR_MEM_LOC_MASK) == PCI_BAR_MEM_LOC_M64) {
                 // 64-bit memory region
 
-                WRITE_MEM32(&header->bar[idx], 0);
-                WRITE_MEM32(&header->bar[idx+1], 0);
-                uint64_t bar_init = ((uint64_t)READ_MEM32(&header->bar[idx+1]) << 32) | READ_MEM32(&header->bar[idx]);
-                WRITE_MEM32(&header->bar[idx], 0xFFFFFFFF);
-                WRITE_MEM32(&header->bar[idx+1], 0xFFFFFFFF);
-                uint64_t bar_set = ((uint64_t)READ_MEM32(&header->bar[idx+1]) << 32) | READ_MEM32(&header->bar[idx]);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx, 0);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx+1, 0);
+                uint64_t bar_init = ((uint64_t)PCI_READBAR(pci_ctx, header_offset, idx+1) << 32) |
+                                      PCI_READBAR(pci_ctx, header_offset, idx);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx, 0xFFFFFFFF);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx+1, 0xFFFFFFFF);
+                uint64_t bar_set = ((uint64_t)PCI_READBAR(pci_ctx, header_offset, idx+1) << 32) |
+                                      PCI_READBAR(pci_ctx, header_offset, idx);
 
                 uint64_t size = (~(bar_set ^ bar_init)) + 1;
                 if (size == 0) {
@@ -329,8 +331,8 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
                 device_ctx.bar[idx].len = size;
                 device_ctx.bar[idx].space = PCI_SPACE_M64;
                 device_ctx.bar[idx].phy = phy_addr;
-                WRITE_MEM32(&header->bar[idx], pci_addr & 0xFFFFFFFFUL);
-                WRITE_MEM32(&header->bar[idx+1], (pci_addr >> 32) & 0xFFFFFFFFUL);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx, pci_addr & 0xFFFFFFFFUL);
+                PCI_WRITEBAR(pci_ctx, header_offset, idx+1, (pci_addr >> 32) & 0xFFFFFFFFUL);
 
                 if (!m64_aligned) {
                     device_ctx.m64_base = pci_addr;
@@ -355,27 +357,29 @@ void create_pci_device(pci_ctx_t* pci_ctx, pci_header0_t* header) {
     }
     memspace_update_kernel_vmem();
 
-    uint16_t cmd = READ_MEM16(&header->command);
-    WRITE_MEM16(&header->command, cmd | 7);
+    uint16_t cmd = PCI_HREAD16(pci_ctx, header_offset, offsetof(pci_header0_t, command));
+    PCI_HWRITE16(pci_ctx, header_offset, offsetof(pci_header0_t, command), cmd | 7);
     
     discover_driver(&driver_discovery, (void*)&device_ctx);
 }
 
-void discover_pcie(pci_ctx_t* pci_ctx) {
+void discover_pcie(pci_ctx_t* pci_ctx, uint64_t header_count) {
 
-    uint64_t offset;
-    for (offset = 0; offset < pci_ctx->header_size; offset += 512) {
-        pci_header_t* header = (pci_header_t*)(pci_ctx->header_ptr + offset);
+    for (int64_t count = 0; count < header_count; count++) {
+        uint64_t offset = count * 4096;
+        uint8_t* header_mem[4096];
+        pci_ctx->header_ops.read(pci_ctx, offset, header_mem);
 
-        console_log(LOG_DEBUG,
-                    "Offset: %d Vendor: %4x Device: %4x Type: %x2",
-                    offset, header->vendor_id, header->device_id, header->header_type);
-                    
+        pci_header_t* header = (pci_header_t*)header_mem;
 
         if (header->vendor_id != 0xFFFF &&
             (header->header_type & 0x7F) == 0) {
 
-            create_pci_device(pci_ctx, (pci_header0_t*)header);
+            console_log(LOG_DEBUG,
+                        "Offset: %d Vendor: %4x Device: %4x Type: %x2",
+                        offset, header->vendor_id, header->device_id, header->header_type);
+
+            create_pci_device(pci_ctx, (pci_header0_t*)header, offset);
         }
     }
 }

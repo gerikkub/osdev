@@ -20,11 +20,17 @@
 void board_init_main_early(void) {
 }
 
+static void* s_earlycon_virt;
+static void* s_earlypci_virt;
+
 void board_init_mappings(void) {
 
+    s_earlycon_virt = memspace_alloc_kernel_virt(VMEM_PAGE_SIZE, 0);
+    s_earlypci_virt = memspace_alloc_kernel_virt(VMEM_PAGE_SIZE, 0);
+
     memory_entry_device_t earlycon_device = {
-       .start = (uint64_t)EARLY_CON_VIRT,
-       .end = (uint64_t)EARLY_CON_VIRT + VMEM_PAGE_SIZE,
+       .start = (uint64_t)s_earlycon_virt,
+       .end = (uint64_t)s_earlycon_virt + VMEM_PAGE_SIZE,
        .type = MEMSPACE_DEVICE,
        .flags = MEMSPACE_FLAG_PERM_KRW,
        .phy_addr = (uint64_t)EARLY_CON_PHY_BASE
@@ -33,8 +39,8 @@ void board_init_mappings(void) {
     memspace_add_entry_to_kernel_memory((memory_entry_t*)&earlycon_device);
 
     memory_entry_device_t earlypci_device = {
-       .start = (uint64_t)EARLY_PCI_VIRT,
-       .end = (uint64_t)EARLY_PCI_VIRT + VMEM_PAGE_SIZE,
+       .start = (uint64_t)s_earlypci_virt,
+       .end = (uint64_t)s_earlypci_virt + VMEM_PAGE_SIZE,
        .type = MEMSPACE_DEVICE,
        .flags = MEMSPACE_FLAG_PERM_KRW,
        .phy_addr = (uint64_t)EARLY_PCI_PHY_BASE
@@ -44,9 +50,9 @@ void board_init_mappings(void) {
 }
 
 void board_init_early_console(void) {
-    pci_poke_bar_entry((pci_header0_t*)EARLY_PCI_VIRT, 4, 16396);
-    pci_poke_bar_entry((pci_header0_t*)EARLY_PCI_VIRT, 5, 128);
-    virtio_pci_early_console_init((uint32_t*)(EARLY_CON_VIRT + EARLY_CON_BASE_OFFSET));
+    pci_poke_bar_entry((pci_header0_t*)s_earlypci_virt, 4, 16396);
+    pci_poke_bar_entry((pci_header0_t*)s_earlypci_virt, 5, 128);
+    virtio_pci_early_console_init((uint32_t*)(s_earlycon_virt + EARLY_CON_BASE_OFFSET));
 }
 
 void board_init_devices(void) {

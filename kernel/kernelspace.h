@@ -20,11 +20,6 @@
 #define IS_KSPACE_PTR(x) (((uintptr_t)(x)) & 0xFFFF000000000000UL)
 #define IS_USPACE_PTR(x) (!IS_KSPACE_PTR(x))
 
-#define EARLY_CON_VIRT ((uint8_t*)0xFFFF000009000000UL)
-#define EARLY_CON_PHY_BASE 0x8000006000ULL
-#define EARLY_PCI_VIRT ((uint8_t*)0xFFFF000009001000UL)
-#define EARLY_PCI_PHY_BASE (0x4010010000UL)
-
 void memspace_init_kernelspace(void);
 bool memspace_add_entry_to_kernel_memory(memory_entry_t* entry);
 void memspace_update_kernel_cache(memory_entry_cache_t* entry);

@@ -8,6 +8,12 @@
 #include "kernel/lib/libpci.h"
 #include "stdlib/malloc.h"
 
+#define VIRTIO_PCI_CAP_TYPE (3)
+#define VIRTIO_PCI_CAP_BAR (4)
+#define VIRTIO_PCI_CAP_BAR_OFF (8)
+#define VIRTIO_PCI_CAP_BAR_LEN (12)
+
+/*
 typedef struct __attribute__((__packed__)) {
     uint8_t cap;
     uint8_t next;
@@ -18,14 +24,23 @@ typedef struct __attribute__((__packed__)) {
     uint32_t bar_offset;
     uint32_t bar_len;
 } pci_virtio_capability_t;
+*/
 
-#define GET_CAP_PTR(pci_ctx, cap_ptr) pci_ctx->bar[cap_ptr->bar].vmem + cap_ptr->bar_offset
+#define GET_CAP_PTR(device_ctx, cap_off) \
+    device_ctx->bar[device_ctx->pci_ctx->header_ops.read8(device_ctx->pci_ctx, \
+                                                          device_ctx->header_offset, \
+                                                          cap_off + VIRTIO_PCI_CAP_BAR)].vmem \
+    + device_ctx->pci_ctx->header_ops.read32(device_ctx->pci_ctx, \
+                                             device_ctx->header_offset, \
+                                             cap_off + VIRTIO_PCI_CAP_BAR_OFF)
 
-
+#define VIRTIO_PCI_NOTIFY_CAP_OFF_MUL (16)
+/*
 typedef struct __attribute__((__packed__)) {
     pci_virtio_capability_t cap;
     uint32_t notify_off_multiplier;
 } pci_virtio_notify_capability_t;
+*/
 
 enum {
     VIRTIO_PCI_CAP_UNKNOWN = 0,
@@ -38,6 +53,25 @@ enum {
 };
 
 #define VIRTIO_MSI_NO_VECTOR (0xFFFF)
+
+/*
+#define VIRTIO_PCI_COMMON_CFG_DEV_FEAT_SEL (0)
+#define VIRTIO_PCI_COMMON_CFG_DEV_FEAT (4)
+#define VIRTIO_PCI_COMMON_CFG_DRI_FEAT_SEL (8)
+#define VIRTIO_PCI_COMMON_CFG_DRI_FEAT (12)
+#define VIRTIO_PCI_COMMON_CFG_MSIX_CONF (16)
+#define VIRTIO_PCI_COMMON_CFG_NUM_Q (18)
+#define VIRTIO_PCI_COMMON_CFG_DEV_STAT (20)
+#define VIRTIO_PCI_COMMON_CFG_CFG_GEN (21)
+#define VIRTIO_PCI_COMMON_CFG_Q_SEL (22)
+#define VIRTIO_PCI_COMMON_CFG_Q_SIZE (24)
+#define VIRTIO_PCI_COMMON_CFG_Q_MSIX_VEC (26)
+#define VIRTIO_PCI_COMMON_CFG_Q_EN (28)
+#define VIRTIO_PCI_COMMON_CFG_Q_NOTIFY_OFF (30)
+#define VIRTIO_PCI_COMMON_CFG_Q_DESC (32)
+#define VIRTIO_PCI_COMMON_CFG_Q_DRI (40)
+#define VIRTIO_PCI_COMMON_CFG_Q_DEV (48)
+*/
 
 typedef struct __attribute__((__packed__)) {
     uint32_t device_feature_sel;
@@ -236,7 +270,7 @@ typedef struct __attribute__((__packed__)) {
     uint16_t num_buffers;
 } virtio_net_hdr_t;
 
-pci_virtio_capability_t* virtio_get_capability(pci_device_ctx_t* device_ctx, uint64_t cap);
+uint64_t virtio_get_capability(pci_device_ctx_t* device_ctx, uint8_t cap);
 
 uint64_t virtio_get_features(pci_virtio_common_cfg_t* cfg);
 void virtio_set_features(pci_virtio_common_cfg_t* cfg, uint64_t features);
@@ -265,9 +299,9 @@ int64_t virtio_get_last_used_elem(virtio_virtq_ctx_t* queue_ctx);
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx);
 
-void print_pci_capability_qemu(pci_device_ctx_t* device_ctx, pci_vendor_capability_t* cap_ptr);
+void print_pci_capability_virtio(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off);
 
-void print_qemu_capability_common(pci_device_ctx_t* device_ctx, pci_virtio_capability_t* cap_ptr);
+void print_virtio_capability_common(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off);
 
 void print_virtio_feature_bits(uint32_t feat_low, uint32_t feat_high, uint64_t device_id);
 
