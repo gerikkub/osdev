@@ -9,7 +9,6 @@
 #include "kernel/kernelspace.h"
 #include "kernel/lib/libpci.h"
 #include "kernel/lib/llist.h"
-#include "kernel/lib/llist.h"
 #include "kernel/lib/vmalloc.h"
 
 #include "drivers/pcie/pcie.h"

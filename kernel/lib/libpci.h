@@ -46,6 +46,7 @@
 
 struct pci_msix_capability_t;
 struct pci_ctx_;
+struct pci_device_ctx;
 
 typedef void (*pci_irq_handler_fn)(uint32_t intid, void* ctx);
 
@@ -385,6 +386,9 @@ typedef struct pci_bridge_tree_ {
     uint64_t m32_limit;
     uint64_t m64_base;
     uint64_t m64_limit;
+
+    struct pci_device_ctx* this_dev;
+
     llist_head_t children;
     llist_head_t devices;
 } pci_bridge_tree_t;
