@@ -1,11 +1,10 @@
 
 #include <stdint.h>
 
-#include "stdlib/bitutils.h"
-
 #include "kernel/fd.h"
 #include "kernel/console.h"
 
+#include "stdlib/bitutils.h"
 
 int64_t virtio_pci_early_console_write(void* ctx, const uint8_t* buffer, const int64_t size, const uint64_t flags) {
     uint32_t* emerg_wr_addr = ctx;

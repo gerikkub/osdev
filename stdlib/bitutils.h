@@ -37,8 +37,8 @@
           : [out] "=r" (x))
 
 #define MEM_ISB() asm volatile ("isb SY")
-#define MEM_DMB() __atomic_thread_fence(__ATOMIC_SEQ_CST)
-#define MEM_DSB() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+#define MEM_DMB() asm volatile ("dmb SY")
+#define MEM_DSB() asm volatile ("dsb SY")
 
 /*
 #define MEM_DMB() asm volatile ("dmb SY")
@@ -46,6 +46,7 @@
 */
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 uint16_t en_swap_16(uint16_t a);
 uint32_t en_swap_32(uint32_t a);

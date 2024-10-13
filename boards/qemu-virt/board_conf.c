@@ -100,6 +100,13 @@ void board_discover_devices(void) {
 
 void board_loop() {
 
+    while (true) {
+        task_wait_timer_in(1000*1000);
+
+        console_log(LOG_INFO, "Tick");
+    }
+
+
     int64_t open_res;
     open_res = fs_manager_mount_device("sys", "virtio_disk0", FS_TYPE_EXT2,
                                        "home");

@@ -5,9 +5,9 @@ add_library(kernel_drivers OBJECT
             console/console_dev.c
             gicv3/gicv3.c
             gicv2/gicv2.c
-            #gicv3/gicv3_its.c
             pcie/pcie.c
             pcie/pcie-qemu.c
+            pcie/pcie-bcm2711.c
             virtio_pci_blk/virtio_pci_blk.c
             virtio_pci_console/virtio_pci_console.c
             virtio_pci_early_console/virtio_pci_early_console.c

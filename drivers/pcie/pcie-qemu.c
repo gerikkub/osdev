@@ -115,5 +115,7 @@ void pcie_qemu_discovered(void* ctx) {
 
     //pcie_init_interrupts();
 
-    discover_pcie(pci_ctx, 256*32*8);
+    scan_pcie_topology(pci_ctx);
+    pcie_fixup_bridge_tree(pci_ctx);
+    discover_pcie(pci_ctx);
 }

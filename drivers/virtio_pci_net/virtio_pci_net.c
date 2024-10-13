@@ -168,12 +168,13 @@ static void virtio_pci_net_late_init(void* ctx) {
     discovery_pci_ctx_t* pci_ctx = ctx;
 
     virtio_pci_net_ctx_t* nic_ctx = vmalloc(sizeof(virtio_pci_net_ctx_t));
-    nic_ctx->pci_ctx = vmalloc(sizeof(pci_device_ctx_t));
+    nic_ctx->pci_ctx = ctx;
+    virtio_init_pci_caps(nic_ctx->pci_ctx);
 
-    pci_alloc_device_from_context(nic_ctx->pci_ctx, pci_ctx);
+    pci_cap_t* common_cap = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(common_cap);
 
-    uint64_t cap_off = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
-    ASSERT(cap_off);
+    pci_virtio_common_cfg_t* common_cfg = common_cap->ctx;
 
     uint64_t features_req = (1UL << VIRTIO_NET_F_MAC) |
                             (1UL << VIRTIO_NET_F_STATUS) |
@@ -188,9 +189,6 @@ static void virtio_pci_net_late_init(void* ctx) {
                                                 
     pci_msix_vector_ctx_t* receiveq_msix_item = pci_get_msix_entry(nic_ctx->pci_ctx, receiveq_intid);
     ASSERT(receiveq_msix_item);
-
-    pci_virtio_common_cfg_t* common_cfg = NULL;
-    common_cfg = GET_CAP_PTR(nic_ctx->pci_ctx, cap_off);
 
     virtio_alloc_queue(common_cfg,
                        VIRTIO_QUEUE_NET_RECEIVEQ1,
@@ -212,9 +210,9 @@ static void virtio_pci_net_late_init(void* ctx) {
     pci_enable_vector(nic_ctx->pci_ctx, nic_ctx->receiveq1_irq_ctx.intid);
     pci_enable_interrupts(nic_ctx->pci_ctx);
 
-    uint64_t net_cfg_cap_off = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG); 
-    ASSERT(net_cfg_cap_off);
-    virtio_net_config_t* net_cfg = GET_CAP_PTR(nic_ctx->pci_ctx, net_cfg_cap_off);
+    pci_cap_t* net_cfg_cap = virtio_get_capability(nic_ctx->pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG); 
+    ASSERT(net_cfg_cap);
+    virtio_net_config_t* net_cfg = net_cfg_cap->ctx;
 
     nic_ctx->net_dev.ops = &s_nic_ops;
     nic_ctx->net_dev.nic_ctx = nic_ctx;
@@ -231,11 +229,7 @@ static void virtio_pci_net_late_init(void* ctx) {
 static void virtio_pci_net_ctx(void* ctx) {
     console_log(LOG_INFO, "virtio-pci-net found device");
 
-    discovery_pci_ctx_t* pci_ctx = ctx;
-    discovery_pci_ctx_t* pci_ctx_copy = vmalloc(sizeof(discovery_pci_ctx_t));
-    *pci_ctx_copy = *pci_ctx;
-
-    driver_register_late_init(virtio_pci_net_late_init, pci_ctx_copy);
+    driver_register_late_init(virtio_pci_net_late_init, ctx);
 }
 
 static discovery_register_t s_virtio_pci_net_register = {

@@ -47,7 +47,7 @@ typedef struct __attribute__((__packed__)) {
 } virtio_blk_config_t;
 
 typedef struct {
-    pci_device_ctx_t pci_device;
+    pci_device_ctx_t* pci_device;
     virtio_virtq_ctx_t virtio_requestq;
     uint64_t device_pos;
     virtio_blk_config_t device_config;
@@ -100,20 +100,22 @@ static void print_blk_config(pci_device_ctx_t* pci_ctx) {
 
 static void virtio_pci_blk_device_irq_fn(uint32_t intid, void* ctx) {
     blk_disk_ctx_t* disk_ctx = ctx;
-    pci_interrupt_clear_pending(&disk_ctx->pci_device, intid);
+    pci_interrupt_clear_pending(disk_ctx->pci_device, intid);
 
     virtio_handle_irq(&disk_ctx->virtio_irq_ctx);
 }
 
 static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
 
-    pci_device_ctx_t* pci_ctx = &disk_ctx->pci_device;
-    pci_virtio_common_cfg_t* common_cfg;
-    
-    uint64_t cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
-    ASSERT(cap_off != 0);
+    pci_device_ctx_t* pci_ctx = disk_ctx->pci_device;
 
-    common_cfg = GET_CAP_PTR(pci_ctx, cap_off);
+    virtio_init_pci_caps(pci_ctx);
+
+    pci_virtio_common_cfg_t* common_cfg;
+    pci_cap_t* common_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(common_cap);
+
+    common_cfg = common_cap->ctx;
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_ACKNOWLEGE);
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER);
@@ -126,14 +128,14 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
 
     uint32_t queue_intid;
     queue_intid = pci_register_interrupt_handler(
-                                        &disk_ctx->pci_device,
+                                        disk_ctx->pci_device,
                                         virtio_pci_blk_device_irq_fn,
                                         disk_ctx);
 
     bool found = false;
     pci_msix_vector_ctx_t* msix_item = NULL;
 
-    FOR_LLIST(disk_ctx->pci_device.msix_vector_list, msix_item)
+    FOR_LLIST(disk_ctx->pci_device->msix_vector_list, msix_item)
         if (msix_item->intid == queue_intid) {
             found = true;
             break;
@@ -156,17 +158,17 @@ static void init_blk_device(blk_disk_ctx_t* disk_ctx) {
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER_OK);
 
 
-    uint64_t blk_cfg_cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
-    ASSERT(blk_cfg_cap_off != 0);
-    disk_ctx->device_config = *((virtio_blk_config_t*)(GET_CAP_PTR(pci_ctx, blk_cfg_cap_off)));
+    pci_cap_t* blk_cfg_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
+    ASSERT(blk_cfg_cap);
+    memcpy(&disk_ctx->device_config, blk_cfg_cap->ctx, sizeof(disk_ctx->device_config));
 
-    pci_enable_vector(&disk_ctx->pci_device, queue_intid);
-    pci_enable_interrupts(&disk_ctx->pci_device);
+    pci_enable_vector(disk_ctx->pci_device, queue_intid);
+    pci_enable_interrupts(disk_ctx->pci_device);
 }
 
 static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buffer, uint64_t len) {
 
-    pci_device_ctx_t* pci_ctx = &disk_ctx->pci_device;
+    pci_device_ctx_t* pci_ctx = disk_ctx->pci_device;
     virtio_virtq_buffer_t write_buffers[1] = {0};
     virtio_virtq_buffer_t read_buffers[2] = {0};
 
@@ -207,7 +209,7 @@ static void read_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buf
 
 static void write_blk_device(blk_disk_ctx_t* disk_ctx, uint64_t sector, void* buffer, uint64_t len) {
 
-    pci_device_ctx_t* pci_ctx = &disk_ctx->pci_device;
+    pci_device_ctx_t* pci_ctx = disk_ctx->pci_device;
     virtio_virtq_buffer_t write_buffers[2] = {0};
     virtio_virtq_buffer_t read_buffers[1] = {0};
 
@@ -449,12 +451,10 @@ static fd_ops_t s_bulk_file_ops = {
 };
 
 static void virtio_pci_blk_late_init(void* ctx) {
-    discovery_pci_ctx_t* pci_ctx = ctx;
 
     blk_disk_ctx_t* disk_ctx = vmalloc(sizeof(blk_disk_ctx_t));
     disk_ctx->device_pos = 0;
-
-    pci_alloc_device_from_context(&disk_ctx->pci_device, pci_ctx);
+    disk_ctx->pci_device = ctx;
 
     init_blk_device(disk_ctx);
 
@@ -464,8 +464,6 @@ static void virtio_pci_blk_late_init(void* ctx) {
     sys_device_register(&s_bulk_file_ops, virtio_pci_blk_open_op, disk_ctx, disk_ctx->name);
 
     llist_append_ptr(s_blk_disks, disk_ctx);
-
-    vfree(pci_ctx);
 
     uint64_t len_page = PAGE_CEIL(disk_ctx->device_config.capacity * 512);
     disk_ctx->cache_virtaddr = memspace_alloc_kernel_virt(len_page, VMEM_PAGE_SIZE);
@@ -489,11 +487,7 @@ static void virtio_pci_blk_late_init(void* ctx) {
 
 static void virtio_pci_blk_ctx(void* ctx) {
 
-    discovery_pci_ctx_t* pci_ctx = ctx;
-    discovery_pci_ctx_t* pci_ctx_copy = vmalloc(sizeof(discovery_pci_ctx_t));
-    *pci_ctx_copy = *pci_ctx;
-
-    driver_register_late_init(virtio_pci_blk_late_init, pci_ctx_copy);
+    driver_register_late_init(virtio_pci_blk_late_init, ctx);
 }
 
 static discovery_register_t s_virtio_pci_blk_register = {

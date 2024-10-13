@@ -25,7 +25,7 @@ typedef struct {
 } virtio_multiport_ctx_t;
 
 typedef struct {
-    pci_device_ctx_t pci_device;
+    pci_device_ctx_t* pci_device;
     virtio_console_cfg_t* virtio_console_cfg;
     virtio_multiport_ctx_t* virtqueues;
     uint32_t num_virtqueues;
@@ -50,7 +50,7 @@ typedef struct {
 
 static void virtio_pci_console_device_irq_fn(uint32_t intid, void* ctx) {
     virtio_console_ctx_t* console_ctx = ctx;
-    pci_interrupt_clear_pending(&console_ctx->pci_device, intid);
+    pci_interrupt_clear_pending(console_ctx->pci_device, intid);
 
     if (console_ctx->ctrl_irq_ctx.intid == intid) {
         virtio_handle_irq(&console_ctx->ctrl_irq_ctx);
@@ -74,7 +74,7 @@ static void populate_receiveq_for_port(virtio_console_ctx_t* console_ctx, virtio
    recv_buffer->len = 2048;
 
    virtio_virtq_send(receiveq, NULL, 0, recv_buffer, 1);
-   virtio_virtq_notify(&console_ctx->pci_device, receiveq);
+   virtio_virtq_notify(console_ctx->pci_device, receiveq);
 }
 
 static void send_control_message(virtio_console_ctx_t* console_ctx, uint32_t port, uint16_t event, uint16_t value) {
@@ -92,7 +92,7 @@ static void send_control_message(virtio_console_ctx_t* console_ctx, uint32_t por
     ctrl_msg->value = value;
 
     virtio_virtq_send(transmitq, &send_buffer, 1, NULL, 0);
-    virtio_virtq_notify(&console_ctx->pci_device, transmitq);
+    virtio_virtq_notify(console_ctx->pci_device, transmitq);
     virtio_poll_virtq(transmitq, true);
 
     virtio_return_buffer(transmitq, send_buffer.ptr);
@@ -205,7 +205,7 @@ static int64_t virtio_pci_console_write_op(void* ctx, const uint8_t* buffer, con
     memcpy(write_buffer.ptr, buffer, size);
 
     virtio_virtq_send(transmitq, &write_buffer, 1, NULL, 0);
-    virtio_virtq_notify(&console_ctx->pci_device, transmitq);
+    virtio_virtq_notify(console_ctx->pci_device, transmitq);
     virtio_poll_virtq(transmitq, true);
 
     virtio_return_buffer(transmitq, write_buffer.ptr);
@@ -253,7 +253,7 @@ static void handle_ctrl_message_add(virtio_console_ctx_t* console_ctx, virtio_co
     name[4] = (dev_ctx->port % 10) + '0';
     sys_device_register(&s_virtio_pci_console_file_ops, virtio_pci_console_open_op, dev_ctx, name);
 
-    pci_enable_vector(&console_ctx->pci_device, console_ctx->virtqueues[msg->port].recv_irq_ctx.intid);
+    pci_enable_vector(console_ctx->pci_device, console_ctx->virtqueues[msg->port].recv_irq_ctx.intid);
 
     send_control_message(console_ctx, msg->port, VIRTIO_CONSOLE_PORT_READY, 1);
 }
@@ -290,7 +290,7 @@ static void virtio_pci_control_monitor_thread(void* ctx) {
         ASSERT(get_ok);
 
         virtio_virtq_send(receiveq, NULL, 0, &recv_buffer, 1);
-        virtio_virtq_notify(&console_ctx->pci_device, receiveq);
+        virtio_virtq_notify(console_ctx->pci_device, receiveq);
 
         virtio_poll_virtq_irq(receiveq, &console_ctx->ctrl_irq_ctx);
 
@@ -304,13 +304,13 @@ static void virtio_pci_control_monitor_thread(void* ctx) {
 
 static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
-    pci_device_ctx_t* pci_ctx = &console_ctx->pci_device;
+    pci_device_ctx_t* pci_ctx = console_ctx->pci_device;
     pci_virtio_common_cfg_t* common_cfg = NULL;
 
-    uint64_t cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
-    ASSERT(cap_off);
+    pci_cap_t* common_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_COMMON_CFG);
+    ASSERT(common_cap);
 
-    common_cfg = GET_CAP_PTR(pci_ctx, cap_off);
+    common_cfg = common_cap->ctx;
 
     uint64_t features_req = (1UL << VIRTIO_CONSOLE_F_MULTIPORT) |
                             (1UL << VIRTIO_CONSOLE_F_EMERG_WRITE) |
@@ -321,17 +321,16 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
     uint32_t port0_rq_intid;
     port0_rq_intid = pci_register_interrupt_handler(
-                                        &console_ctx->pci_device,
+                                        console_ctx->pci_device,
                                         virtio_pci_console_device_irq_fn,
                                         console_ctx);
 
-    pci_msix_vector_ctx_t* port0_rq_msix_item = pci_get_msix_entry(&console_ctx->pci_device, port0_rq_intid);
+    pci_msix_vector_ctx_t* port0_rq_msix_item = pci_get_msix_entry(console_ctx->pci_device, port0_rq_intid);
     ASSERT(port0_rq_msix_item != NULL);
 
-    uint64_t console_cfg_cap_off;
-    console_cfg_cap_off = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
-    ASSERT(console_cfg_cap_off != 0);
-    console_ctx->virtio_console_cfg = GET_CAP_PTR(pci_ctx, console_cfg_cap_off);
+    pci_cap_t* console_cfg_cap = virtio_get_capability(pci_ctx, VIRTIO_PCI_CAP_DEVICE_CFG);
+    ASSERT(console_cfg_cap);
+    console_ctx->virtio_console_cfg = console_cfg_cap->ctx;
 
     console_ctx->num_virtqueues = console_ctx->virtio_console_cfg->max_nr_ports;
     console_ctx->virtqueues = vmalloc(console_ctx->num_virtqueues * sizeof(virtio_multiport_ctx_t));
@@ -357,11 +356,11 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
         uint32_t portn_rq_intid;
         portn_rq_intid = pci_register_interrupt_handler(
-                                            &console_ctx->pci_device,
+                                            console_ctx->pci_device,
                                             virtio_pci_console_device_irq_fn,
                                             console_ctx);
 
-        pci_msix_vector_ctx_t* portn_rq_msix_item = pci_get_msix_entry(&console_ctx->pci_device, portn_rq_intid);
+        pci_msix_vector_ctx_t* portn_rq_msix_item = pci_get_msix_entry(console_ctx->pci_device, portn_rq_intid);
         ASSERT(portn_rq_msix_item != NULL);
 
         virtio_alloc_queue(common_cfg,
@@ -382,11 +381,11 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
     uint32_t ctrl_intid;
     ctrl_intid = pci_register_interrupt_handler(
-                                        &console_ctx->pci_device,
+                                        console_ctx->pci_device,
                                         virtio_pci_console_device_irq_fn,
                                         console_ctx);
 
-    pci_msix_vector_ctx_t* msix_item = pci_get_msix_entry(&console_ctx->pci_device, ctrl_intid);
+    pci_msix_vector_ctx_t* msix_item = pci_get_msix_entry(console_ctx->pci_device, ctrl_intid);
     ASSERT(msix_item != NULL);
 
     virtio_alloc_queue(common_cfg,
@@ -408,9 +407,9 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 
     virtio_set_status(common_cfg, VIRTIO_STATUS_DRIVER_OK);
 
-    pci_enable_vector(&console_ctx->pci_device, console_ctx->ctrl_irq_ctx.intid);
-    pci_enable_vector(&console_ctx->pci_device, console_ctx->virtqueues[0].recv_irq_ctx.intid);
-    pci_enable_interrupts(&console_ctx->pci_device);
+    pci_enable_vector(console_ctx->pci_device, console_ctx->ctrl_irq_ctx.intid);
+    pci_enable_vector(console_ctx->pci_device, console_ctx->virtqueues[0].recv_irq_ctx.intid);
+    pci_enable_interrupts(console_ctx->pci_device);
 
     send_control_message(console_ctx, 0, VIRTIO_CONSOLE_DEVICE_READY, 1);
 
@@ -424,11 +423,10 @@ static void init_console_device(virtio_console_ctx_t* console_ctx) {
 }
 
 static void virtio_console_late_init(void* ctx) {
-    discovery_pci_ctx_t* pci_ctx = ctx;
 
     virtio_console_ctx_t* console_ctx = vmalloc(sizeof(virtio_console_ctx_t));
-
-    pci_alloc_device_from_context(&console_ctx->pci_device, pci_ctx);
+    console_ctx->pci_device = ctx;
+    virtio_init_pci_caps(console_ctx->pci_device);
 
     init_console_device(console_ctx);
 
@@ -444,8 +442,6 @@ static void virtio_console_late_init(void* ctx) {
 
     sys_device_register(&s_virtio_pci_console_file_ops, virtio_pci_console_open_op, dev_ctx, "con0");
     console_log(LOG_INFO, "Hello from serial driver!");
-
-    vfree(pci_ctx);
 }
 
 static void virtio_pci_console_ctx(void* ctx) {
@@ -453,11 +449,7 @@ static void virtio_pci_console_ctx(void* ctx) {
     console_log(LOG_DEBUG, "virtio-pci-blk got ctx");
     console_flush();
 
-    discovery_pci_ctx_t* pci_ctx = ctx;
-    discovery_pci_ctx_t* pci_ctx_copy = vmalloc(sizeof(discovery_pci_ctx_t));
-    *pci_ctx_copy = *pci_ctx;
-
-    driver_register_late_init(virtio_console_late_init, pci_ctx_copy);
+    driver_register_late_init(virtio_console_late_init, ctx);
 }
 
 

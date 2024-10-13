@@ -12,29 +12,7 @@
 #define VIRTIO_PCI_CAP_BAR (4)
 #define VIRTIO_PCI_CAP_BAR_OFF (8)
 #define VIRTIO_PCI_CAP_BAR_LEN (12)
-
-/*
-typedef struct __attribute__((__packed__)) {
-    uint8_t cap;
-    uint8_t next;
-    uint8_t len;
-    uint8_t type;
-    uint8_t bar;
-    uint8_t res0[3];
-    uint32_t bar_offset;
-    uint32_t bar_len;
-} pci_virtio_capability_t;
-*/
-
-#define GET_CAP_PTR(device_ctx, cap_off) \
-    device_ctx->bar[device_ctx->pci_ctx->header_ops.read8(device_ctx->pci_ctx, \
-                                                          device_ctx->header_offset, \
-                                                          cap_off + VIRTIO_PCI_CAP_BAR)].vmem \
-    + device_ctx->pci_ctx->header_ops.read32(device_ctx->pci_ctx, \
-                                             device_ctx->header_offset, \
-                                             cap_off + VIRTIO_PCI_CAP_BAR_OFF)
-
-#define VIRTIO_PCI_NOTIFY_CAP_OFF_MUL (16)
+#define VIRTIO_PCI_CAP_NOTIFY_OFF_MUL (16)
 /*
 typedef struct __attribute__((__packed__)) {
     pci_virtio_capability_t cap;
@@ -270,7 +248,7 @@ typedef struct __attribute__((__packed__)) {
     uint16_t num_buffers;
 } virtio_net_hdr_t;
 
-uint64_t virtio_get_capability(pci_device_ctx_t* device_ctx, uint8_t cap);
+pci_cap_t* virtio_get_capability(pci_device_ctx_t* device_ctx, uint8_t cap_type);
 
 uint64_t virtio_get_features(pci_virtio_common_cfg_t* cfg);
 void virtio_set_features(pci_virtio_common_cfg_t* cfg, uint64_t features);
@@ -299,12 +277,13 @@ int64_t virtio_get_last_used_elem(virtio_virtq_ctx_t* queue_ctx);
 
 void virtio_virtq_notify(pci_device_ctx_t* ctx, virtio_virtq_ctx_t* queue_ctx);
 
-void print_pci_capability_virtio(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off);
+void print_pci_capability_virtio(pci_device_ctx_t* device_ctx, pci_cap_t* cap);
 
-void print_virtio_capability_common(pci_device_ctx_t* device_ctx, void* header_mem, uint64_t cap_off);
+void print_virtio_capability_common(pci_device_ctx_t* device_ctx, pci_cap_t* cap);
 
 void print_virtio_feature_bits(uint32_t feat_low, uint32_t feat_high, uint64_t device_id);
 
+void virtio_init_pci_caps(pci_device_ctx_t* pci_ctx);
 bool virtio_init_with_features(pci_device_ctx_t* pci_ctx, uint64_t features);
 
 uint64_t virtio_poll_virtq_block(virtio_virtq_ctx_t* queue_ctx);

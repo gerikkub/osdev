@@ -11,6 +11,9 @@ void panic(char* file, uint64_t line, char* msg, ...) {
 
     console_log(LOG_CRIT, "Panic: %s:%u %s\n", file, line, msg);
 
+    uint64_t esr;
+    READ_SYS_REG(ESR_EL1, esr);
+    console_log(LOG_CRIT, "ESR: %8x", esr);
     console_log(LOG_CRIT, "Backtrace");
 
     struct stackframe_t {
@@ -34,6 +37,7 @@ void panic(char* file, uint64_t line, char* msg, ...) {
             break;
         }
         frame_addr = frame_ptr->fp;
+        depth++;
     }
     console_printf("\n");
 
